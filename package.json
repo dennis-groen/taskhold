@@ -12,7 +12,13 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "check": "pnpm format:check && pnpm lint --deny-warnings && pnpm typecheck"
+    "check": "pnpm format:check && pnpm lint --deny-warnings && pnpm typecheck",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @taskhold/api db:generate",
+    "db:migrate": "pnpm --filter @taskhold/api db:migrate",
+    "db:studio": "pnpm --filter @taskhold/api db:studio",
+    "auth:generate": "pnpm --filter @taskhold/api auth:generate"
   },
   "devDependencies": {
     "oxfmt": "^0.74.0",

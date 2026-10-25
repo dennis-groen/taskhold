@@ -11,6 +11,7 @@
   "env": {
     "es2024": true
   },
+  "ignorePatterns": ["**/routeTree.gen.ts"],
   "overrides": [
     {
       "files": ["apps/api/**"],
@@ -29,6 +30,14 @@
         "react/react-in-jsx-scope": "off",
         "react/rules-of-hooks": "error",
         "react/only-export-components": ["warn", { "allowConstantExport": true }]
+      }
+    },
+    {
+      // TanStack route files export `Route`, shadcn components export variants
+      "files": ["apps/web/src/routes/**", "apps/web/**/components/ui/**"],
+      "plugins": ["react"],
+      "rules": {
+        "react/only-export-components": "off"
       }
     }
   ]
