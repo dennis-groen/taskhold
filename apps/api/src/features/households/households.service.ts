@@ -1,8 +1,18 @@
-// Business rules for households: who can create, join and see what.
+// Business rules for households: who can create, join, manage and see what.
 // Talks to the DAL only, throws AppErrors, and knows nothing about HTTP.
+//
+// Every change to who is in a household runs in a transaction that locks the household row,
+// so concurrent joins, leaves and removals in one household happen one at a time.
 import { transaction, type Transaction } from "../../db/client.ts";
 import * as householdsDal from "./households.dal.ts";
-import { alreadyInHousehold, inviteNotFound, notInHousehold } from "./households.errors.ts";
+import {
+  alreadyInHousehold,
+  cannotRemoveSelf,
+  inviteNotFound,
+  memberNotFound,
+  notInHousehold,
+  ownerOnly,
+} from "./households.errors.ts";
 import type { Household, InvitePreview, Membership } from "./households.types.ts";
 import { generateInviteCode, normalizeInviteCode } from "./invite-code.ts";
 
@@ -48,13 +58,88 @@ export async function previewInvite(rawCode: string): Promise<InvitePreview> {
 /** Adds the user to the household behind the code. Fails if they're already in one. */
 export async function acceptInvite(userId: string, rawCode: string): Promise<Household> {
   const household = await findByInviteCode(rawCode);
-  const added = await householdsDal.insertMember({
-    householdId: household.id,
-    userId,
-    role: "member",
+  await transaction(async (tx) => {
+    // The household may have been deleted, or its code replaced, since we looked it up
+    const locked = await householdsDal.lockHousehold(household.id, tx);
+    if (!locked || locked.inviteCode !== household.inviteCode) throw inviteNotFound();
+
+    const added = await householdsDal.insertMember(
+      { householdId: household.id, userId, role: "member" },
+      tx,
+    );
+    if (!added) throw alreadyInHousehold();
   });
-  if (!added) throw alreadyInHousehold();
   return getHousehold(household.id);
+}
+
+/**
+ * Takes the user out of their household. If they were the owner, the member who joined
+ * earliest takes over; if they were the last one, the household is deleted.
+ */
+export async function leaveHousehold(userId: string): Promise<{ householdDeleted: boolean }> {
+  return transaction(async (tx) => {
+    const membership = await lockMembershipOf(userId, tx);
+    const { householdId } = membership;
+    await householdsDal.deleteMember({ householdId, userId }, tx);
+
+    const successor = await householdsDal.findEarliestMember(householdId, tx);
+    if (!successor) {
+      await householdsDal.deleteHousehold(householdId, tx);
+      return { householdDeleted: true };
+    }
+    if (membership.role === "owner") {
+      await householdsDal.setMemberRole(
+        { householdId, userId: successor.userId, role: "owner" },
+        tx,
+      );
+    }
+    return { householdDeleted: false };
+  });
+}
+
+/** Owner only: removes another member from the owner's household */
+export async function removeMember(ownerId: string, memberId: string): Promise<Household> {
+  if (ownerId === memberId) throw cannotRemoveSelf();
+
+  const householdId = await transaction(async (tx) => {
+    const owner = await lockMembershipOf(ownerId, tx, { ownerOnly: true });
+    const removed = await householdsDal.deleteMember(
+      { householdId: owner.householdId, userId: memberId },
+      tx,
+    );
+    if (!removed) throw memberNotFound();
+    return owner.householdId;
+  });
+  return getHousehold(householdId);
+}
+
+/** Owner only: replaces the invite code, so the old code and link stop working */
+export async function regenerateInviteCode(ownerId: string): Promise<Household> {
+  const householdId = await transaction(async (tx) => {
+    const owner = await lockMembershipOf(ownerId, tx, { ownerOnly: true });
+    for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
+      if (await householdsDal.updateInviteCode(owner.householdId, generateInviteCode(), tx)) {
+        return owner.householdId;
+      }
+    }
+    throw new Error("Could not generate a unique invite code");
+  });
+  return getHousehold(householdId);
+}
+
+/**
+ * Locks the user's household for the rest of the transaction and returns their membership,
+ * read again after locking because another request may have changed it while we waited.
+ */
+async function lockMembershipOf(userId: string, tx: Transaction, options = { ownerOnly: false }) {
+  const before = await householdsDal.findMembershipByUserId(userId, tx);
+  if (!before) throw notInHousehold();
+
+  await householdsDal.lockHousehold(before.householdId, tx);
+  const membership = await householdsDal.findMembershipByUserId(userId, tx);
+  if (!membership || membership.householdId !== before.householdId) throw notInHousehold();
+  if (options.ownerOnly && membership.role !== "owner") throw ownerOnly();
+  return membership;
 }
 
 async function getHousehold(householdId: string): Promise<Household> {

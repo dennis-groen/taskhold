@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 import { HouseholdMembers } from "../components/household-members.tsx";
 import { InviteCodeSlots } from "../components/invite-code-slots.tsx";
+import { NewInviteCodeButton } from "../components/new-invite-code-button.tsx";
 import { formatInviteCode, inviteLink } from "../invite-code.ts";
 
 const householdRoute = getRouteApi("/_household");
@@ -25,7 +26,13 @@ export function InviteMembersPage() {
   const { created } = routeApi.useSearch();
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
   const [copyBlocked, setCopyBlocked] = useState(false);
+  // Set after the owner replaces the code, so the new one plays in like a fresh one
+  const [replaced, setReplaced] = useState(false);
   const linkRef = useRef<HTMLParagraphElement>(null);
+
+  const isOwner = household.members.some(
+    (member) => member.id === user.id && member.role === "owner",
+  );
 
   const code = formatInviteCode(household.inviteCode);
   const link = inviteLink(household.inviteCode);
@@ -67,7 +74,14 @@ export function InviteMembersPage() {
 
       <Field className="mt-8">
         <FieldLabel htmlFor="invite-code">Invite code</FieldLabel>
-        <InviteCodeSlots id="invite-code" value={household.inviteCode} readOnly reveal={created} />
+        <InviteCodeSlots
+          // A new code remounts the slots so the reveal plays again
+          key={household.inviteCode}
+          id="invite-code"
+          value={household.inviteCode}
+          readOnly
+          reveal={created || replaced}
+        />
         <FieldDescription>
           Anyone with this code can join, so only share it with people you live with.
         </FieldDescription>
@@ -100,6 +114,17 @@ export function InviteMembersPage() {
         <output className="mt-1 block text-sm text-foreground">
           Your browser blocked copying. The link above is selected, so copy it with Ctrl+C or ⌘C.
         </output>
+      )}
+      {isOwner && (
+        <div className="mt-4">
+          <NewInviteCodeButton
+            onReplaced={() => {
+              setCopied(null);
+              setCopyBlocked(false);
+              setReplaced(true);
+            }}
+          />
+        </div>
       )}
 
       <section className="mt-10">

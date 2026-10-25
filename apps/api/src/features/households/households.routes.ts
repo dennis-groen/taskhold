@@ -2,11 +2,24 @@
 import { validate } from "../../lib/validation.ts";
 import { protectedRouter } from "../auth/auth.middleware.ts";
 import * as householdsService from "./households.service.ts";
-import { createHouseholdBody, inviteCodeParam } from "./households.validation.ts";
+import { createHouseholdBody, inviteCodeParam, memberParam } from "./households.validation.ts";
 
 export const householdRoutes = protectedRouter()
   .get("/current", async (c) => {
     const household = await householdsService.getHouseholdOf(c.get("user").id);
+    return c.json({ household }, 200);
+  })
+  .post("/current/leave", async (c) => {
+    const result = await householdsService.leaveHousehold(c.get("user").id);
+    return c.json(result, 200);
+  })
+  .post("/current/invite-code", async (c) => {
+    const household = await householdsService.regenerateInviteCode(c.get("user").id);
+    return c.json({ household }, 200);
+  })
+  .delete("/current/members/:userId", validate("param", memberParam), async (c) => {
+    const { userId } = c.req.valid("param");
+    const household = await householdsService.removeMember(c.get("user").id, userId);
     return c.json({ household }, 200);
   })
   .post("/", validate("json", createHouseholdBody), async (c) => {

@@ -50,6 +50,9 @@ In VS Code, install the recommended Oxc extension to format and lint on save.
 
 - A signed-in user without a household is sent to `/onboarding`, where they create a household or join one with an 8-character invite code. A user belongs to at most one household.
 - `/invite` shows the household's code and a shareable link (`/join/ABCD-EFGH`). Opening the link while signed out goes through sign-in and comes back to it.
+- The owner can remove members (on `/dashboard`) and replace the invite code (on `/invite`); the old code and link stop working immediately.
+- Anyone can leave. If the owner leaves, the member who joined earliest becomes the owner. If the last member leaves, the household is deleted.
+- Every change to who is in a household locks the household row in a transaction, so simultaneous joins, leaves and removals can't leave a household without members or without an owner.
 - Tables: `household` and `household_member` in `apps/api/src/features/households/households.schema.ts`.
 
 ## API client (Hono RPC)

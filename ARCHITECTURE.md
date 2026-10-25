@@ -40,6 +40,8 @@ Requests flow `routes → service → dal → database`, never backwards.
 - A feature may call another feature's service, never its DAL. `viewer` uses `auth` and `households` this way.
 - Schema files may import other features' tables, because foreign keys cross features.
 - Each feature mounts under its own path in `app.ts`. A feature that needs a signed-in user builds its router with `protectedRouter()`, so every route in it returns 401 without a session.
+- When a rule depends on other rows (the last member leaving deletes the household, the owner leaving hands over ownership), the service locks the parent row first (`householdsDal.lockHousehold`) and re-reads under the lock. Concurrent requests then run one after another instead of acting on stale reads.
+- DB-specific error handling stays in the DAL: it turns a constraint conflict into a plain result (`null` or `false`) that the service can act on, using `onConflictDoNothing`, or a savepoint plus `db/errors.ts` where an insert can't skip conflicts.
 
 ### Adding an API feature
 

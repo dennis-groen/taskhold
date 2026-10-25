@@ -37,3 +37,19 @@ export async function lookUpInvite(code: string): Promise<InviteLookup> {
     return { status: "error", message: errorMessage(err, "Couldn't check this code. Try again.") };
   }
 }
+
+/** Leaves the household. If you were the last member, the household is deleted. */
+export async function leaveHousehold(): Promise<{ householdDeleted: boolean }> {
+  return parseResponse(households.current.leave.$post());
+}
+
+/** Owner only: replaces the invite code, so the old code and link stop working */
+export async function regenerateInviteCode(): Promise<Household> {
+  return (await parseResponse(households.current["invite-code"].$post())).household;
+}
+
+/** Owner only */
+export async function removeMember(userId: string): Promise<Household> {
+  return (await parseResponse(households.current.members[":userId"].$delete({ param: { userId } })))
+    .household;
+}

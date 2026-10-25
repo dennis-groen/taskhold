@@ -5,6 +5,8 @@ import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { buttonVariants } from "@/components/ui/button";
 
 import { HouseholdMembers } from "../components/household-members.tsx";
+import { LeaveHouseholdButton } from "../components/leave-household-button.tsx";
+import { RemoveMemberButton } from "../components/remove-member-button.tsx";
 
 const householdRoute = getRouteApi("/_household");
 
@@ -12,6 +14,9 @@ export function HouseholdOverviewPage() {
   const household = householdRoute.useLoaderData();
   const { user } = householdRoute.useRouteContext();
   const count = household.members.length;
+  const isOwner = household.members.some(
+    (member) => member.id === user.id && member.role === "owner",
+  );
 
   return (
     <>
@@ -28,8 +33,20 @@ export function HouseholdOverviewPage() {
             Invite people
           </Link>
         </div>
-        <HouseholdMembers members={household.members} currentUserId={user.id} />
+        <HouseholdMembers
+          members={household.members}
+          currentUserId={user.id}
+          renderAction={(member) =>
+            isOwner && member.id !== user.id ? (
+              <RemoveMemberButton member={member} householdName={household.name} />
+            ) : null
+          }
+        />
       </section>
+
+      <div className="mt-12 border-t pt-6">
+        <LeaveHouseholdButton household={household} currentUserId={user.id} />
+      </div>
     </>
   );
 }

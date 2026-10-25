@@ -1,8 +1,9 @@
 // Data access for households: the only place that queries household tables.
 // Functions return plain records and take an optional executor so services can run them in a transaction.
-import { asc, eq, type SQL } from "drizzle-orm";
+import { and, asc, eq, type SQL } from "drizzle-orm";
 
-import { db, type Executor } from "../../db/client.ts";
+import { db, type Executor, type Transaction } from "../../db/client.ts";
+import { isUniqueViolation } from "../../db/errors.ts";
 import { household, householdMember, type HouseholdRole } from "./households.schema.ts";
 
 export type MembershipRecord = {
@@ -101,4 +102,89 @@ export async function insertMember(
     .onConflictDoNothing({ target: householdMember.userId })
     .returning({ id: householdMember.id });
   return rows.length > 0;
+}
+
+/**
+ * Locks the household row until the transaction ends, so membership changes to one household
+ * happen one at a time. Returns null when the household no longer exists.
+ */
+export async function lockHousehold(
+  householdId: string,
+  tx: Transaction,
+): Promise<{ inviteCode: string } | null> {
+  const rows = await tx
+    .select({ inviteCode: household.inviteCode })
+    .from(household)
+    .where(eq(household.id, householdId))
+    .for("update");
+  return rows[0] ?? null;
+}
+
+/** The member who joined first, or null when nobody is left */
+export async function findEarliestMember(
+  householdId: string,
+  executor: Executor = db,
+): Promise<{ userId: string } | null> {
+  const rows = await executor
+    .select({ userId: householdMember.userId })
+    .from(householdMember)
+    .where(eq(householdMember.householdId, householdId))
+    .orderBy(asc(householdMember.joinedAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Returns false when the user wasn't a member of that household */
+export async function deleteMember(
+  values: { householdId: string; userId: string },
+  executor: Executor = db,
+): Promise<boolean> {
+  const rows = await executor
+    .delete(householdMember)
+    .where(
+      and(
+        eq(householdMember.householdId, values.householdId),
+        eq(householdMember.userId, values.userId),
+      ),
+    )
+    .returning({ id: householdMember.id });
+  return rows.length > 0;
+}
+
+export async function setMemberRole(
+  values: { householdId: string; userId: string; role: HouseholdRole },
+  executor: Executor = db,
+): Promise<void> {
+  await executor
+    .update(householdMember)
+    .set({ role: values.role })
+    .where(
+      and(
+        eq(householdMember.householdId, values.householdId),
+        eq(householdMember.userId, values.userId),
+      ),
+    );
+}
+
+/** Deletes the household; its memberships go with it (ON DELETE CASCADE) */
+export async function deleteHousehold(householdId: string, executor: Executor = db): Promise<void> {
+  await executor.delete(household).where(eq(household.id, householdId));
+}
+
+/** Returns false when another household already uses the new code, so the caller can try another */
+export async function updateInviteCode(
+  householdId: string,
+  inviteCode: string,
+  executor: Executor = db,
+): Promise<boolean> {
+  try {
+    // A savepoint, so a duplicate code doesn't abort the caller's transaction
+    await executor.transaction(async (savepoint) => {
+      await savepoint.update(household).set({ inviteCode }).where(eq(household.id, householdId));
+    });
+    return true;
+  } catch (err) {
+    if (isUniqueViolation(err, "household_invite_code_unique")) return false;
+    throw err;
+  }
 }
