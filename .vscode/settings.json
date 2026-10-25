@@ -1,0 +1,9 @@
+{
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  // Format with oxfmt first, then apply oxlint fixes
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.format.oxc": "always",
+    "source.fixAll.oxc": "always"
+  }
+}

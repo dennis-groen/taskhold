@@ -20,13 +20,17 @@ pnpm dev          # runs api and web in parallel
 
 Open http://localhost:5173.
 
+In VS Code, install the recommended Oxc extension to format and lint on save.
+
 ## Scripts
 
-| Command          | What it does                          |
-| ---------------- | ------------------------------------- |
-| `pnpm dev`       | Start both apps in watch mode         |
-| `pnpm dev:api`   | Start only the API                    |
-| `pnpm dev:web`   | Start only the frontend               |
-| `pnpm build`     | Build all apps                        |
-| `pnpm typecheck` | Typecheck all apps                    |
-| `pnpm lint`      | Lint (oxlint in `apps/web`)           |
+| Command          | What it does                  |
+| ---------------- | ----------------------------- |
+| `pnpm dev`       | Start both apps in watch mode |
+| `pnpm dev:api`   | Start only the API            |
+| `pnpm dev:web`   | Start only the frontend       |
+| `pnpm build`     | Build all apps                |
+| `pnpm typecheck` | Typecheck all apps            |
+| `pnpm lint`      | Lint everything with oxlint   |
+| `pnpm format`    | Format everything with oxfmt  |
+| `pnpm check`     | Format check, lint, typecheck |

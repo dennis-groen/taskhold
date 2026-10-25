@@ -1,12 +1,11 @@
 {
   "name": "@taskhold/web",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
     "typecheck": "tsc -b",
     "preview": "vite preview"
   },
@@ -23,7 +22,6 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "babel-plugin-react-compiler": "^1.0.0",
-    "oxlint": "^1.88.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.4"
   }
