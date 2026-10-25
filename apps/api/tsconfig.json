@@ -6,7 +6,11 @@
     "rootDir": "src",
     "outDir": "dist",
     "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true
+    "rewriteRelativeImportExtensions": true,
+
+    /* Referenced by apps/web, which reads the RPC client types from the emitted .d.ts */
+    "composite": true,
+    "declarationMap": true
   },
   "include": ["src"]
 }

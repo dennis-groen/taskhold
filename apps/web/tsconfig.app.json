@@ -17,5 +17,7 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The RPC client's types come from the API's build output, not its source
+  "references": [{ "path": "../api" }]
 }
