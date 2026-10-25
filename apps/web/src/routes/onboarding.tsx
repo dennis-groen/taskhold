@@ -1,6 +1,7 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
-import { PageShell } from "@/components/page-shell.tsx";
+import { AppShell } from "@/components/layout/app-shell.tsx";
+import { SignOutButton } from "@/features/auth/components/sign-out-button.tsx";
 
 export const Route = createFileRoute("/onboarding")({
   beforeLoad: ({ context }) => {
@@ -13,8 +14,8 @@ export const Route = createFileRoute("/onboarding")({
 function OnboardingLayout() {
   const { user } = Route.useRouteContext();
   return (
-    <PageShell user={user}>
+    <AppShell user={user} actions={<SignOutButton />}>
       <Outlet />
-    </PageShell>
+    </AppShell>
   );
 }

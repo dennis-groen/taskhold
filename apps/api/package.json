@@ -11,7 +11,7 @@
     "build": "tsc",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
-    "auth:generate": "auth generate --config src/auth.ts --output src/db/auth-schema.ts --yes",
+    "auth:generate": "auth generate --config src/features/auth/auth.ts --output src/features/auth/auth.schema.ts --yes",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

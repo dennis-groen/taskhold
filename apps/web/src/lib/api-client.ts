@@ -1,21 +1,11 @@
-import {
-  DetailedError,
-  hcWithType,
-  parseResponse,
-  type ApiErrorBody,
-  type InferResponseType,
-} from "@taskhold/api/client";
+import { DetailedError, hcWithType, parseResponse, type ApiErrorBody } from "@taskhold/api/client";
 
-// Same origin as the app: Vite proxies /api to the API in dev
+// Typed Hono RPC client. Same origin as the app: Vite proxies /api to the API in dev.
 export const api = hcWithType("/").api;
 
 /** Resolves to the success body, throws DetailedError for any non-2xx response */
 export { parseResponse };
-
-export type Viewer = InferResponseType<typeof api.viewer.$get, 200>;
-export type Household = InferResponseType<typeof api.household.$get, 200>["household"];
-export type HouseholdMember = Household["members"][number];
-export type InvitePreview = InferResponseType<(typeof api.invites)[":code"]["$get"], 200>["invite"];
+export type { InferResponseType } from "@taskhold/api/client";
 
 function isApiErrorBody(value: unknown): value is ApiErrorBody {
   return (

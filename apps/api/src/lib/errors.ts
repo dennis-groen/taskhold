@@ -1,40 +1,21 @@
-import type { ErrorHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+/** What went wrong, in terms the HTTP layer can turn into a status code */
+export type ErrorKind = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict";
 
 /** Body of every error response */
 export type ApiErrorBody = { error: { code: string; message: string } };
 
-/** An error the client can act on: `code` is stable, `message` is shown to people. */
-export class ApiError extends HTTPException {
+/**
+ * A failure the client can act on. Services throw these without knowing about HTTP;
+ * `code` is stable for clients to branch on, `message` is written for people.
+ */
+export class AppError extends Error {
+  readonly kind: ErrorKind;
   readonly code: string;
 
-  constructor(status: ContentfulStatusCode, code: string, message: string) {
-    super(status, { message });
+  constructor(kind: ErrorKind, code: string, message: string) {
+    super(message);
+    this.name = "AppError";
+    this.kind = kind;
     this.code = code;
   }
-}
-
-export const onError: ErrorHandler = (err, c) => {
-  if (err instanceof ApiError) {
-    return c.json({ error: { code: err.code, message: err.message } }, err.status);
-  }
-  if (err instanceof HTTPException) {
-    return c.json({ error: { code: "HTTP_ERROR", message: err.message } }, err.status);
-  }
-  console.error(err);
-  return c.json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong." } }, 500);
-};
-
-/** True when a Postgres unique constraint rejected the write (Drizzle wraps the pg error in `cause`). */
-export function isUniqueViolation(err: unknown, constraint: string): boolean {
-  const pgError: unknown = err instanceof Error && err.cause ? err.cause : err;
-  return (
-    typeof pgError === "object" &&
-    pgError !== null &&
-    "code" in pgError &&
-    pgError.code === "23505" &&
-    "constraint" in pgError &&
-    pgError.constraint === constraint
-  );
 }

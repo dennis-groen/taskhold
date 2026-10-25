@@ -1,5 +1,5 @@
 import { UserAvatar } from "@/components/user-avatar.tsx";
-import type { HouseholdMember } from "@/lib/api.ts";
+import type { HouseholdMember } from "../households.api.ts";
 
 export function HouseholdMembers({
   members,

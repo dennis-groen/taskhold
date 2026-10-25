@@ -1,7 +1,8 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
-import { PageShell } from "@/components/page-shell.tsx";
-import { api, parseResponse } from "@/lib/api.ts";
+import { AppShell } from "@/components/layout/app-shell.tsx";
+import { SignOutButton } from "@/features/auth/components/sign-out-button.tsx";
+import { fetchCurrentHousehold } from "@/features/households/households.api.ts";
 
 // Pages for people who belong to a household; loads that household once for all of them
 export const Route = createFileRoute("/_household")({
@@ -11,15 +12,15 @@ export const Route = createFileRoute("/_household")({
     if (!household) throw redirect({ to: "/onboarding" });
     return { user };
   },
-  loader: async () => (await parseResponse(api.household.$get())).household,
+  loader: () => fetchCurrentHousehold(),
   component: HouseholdLayout,
 });
 
 function HouseholdLayout() {
   const { user } = Route.useRouteContext();
   return (
-    <PageShell user={user}>
+    <AppShell user={user} actions={<SignOutButton />}>
       <Outlet />
-    </PageShell>
+    </AppShell>
   );
 }

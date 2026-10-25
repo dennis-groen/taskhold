@@ -4,7 +4,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { INVITE_CODE_LENGTH, INVITE_CODE_PATTERN, extractInviteCode } from "@/lib/invite-code.ts";
+import { INVITE_CODE_LENGTH, INVITE_CODE_PATTERN, extractInviteCode } from "../invite-code.ts";
 import { cn } from "@/lib/utils";
 
 /**

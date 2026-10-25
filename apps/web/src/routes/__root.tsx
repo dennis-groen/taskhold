@@ -1,13 +1,11 @@
 import { Outlet, createRootRoute, redirect } from "@tanstack/react-router";
 
-import { api, parseResponse, type Viewer } from "@/lib/api.ts";
+import { fetchViewer } from "@/features/auth/auth.api.ts";
 
 import "@/styles/globals.css";
 
 // Every page requires a signed-in user unless it's listed here
 const PUBLIC_PATHS = new Set(["/"]);
-
-const SIGNED_OUT: Viewer = { user: null, household: null };
 
 // Where signed-in users without a household are allowed to be
 function isSetupPath(path: string) {
@@ -16,8 +14,7 @@ function isSetupPath(path: string) {
 
 export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
-    // An unreachable API counts as signed out, so protected pages stay closed
-    const viewer = await parseResponse(api.viewer.$get()).catch(() => SIGNED_OUT);
+    const viewer = await fetchViewer();
     const path = location.pathname;
 
     if (!viewer.user) {

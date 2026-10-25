@@ -1,9 +1,11 @@
 import { relations } from "drizzle-orm";
 import { index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-import { user } from "./auth-schema.ts";
+// Schema files may reference other features' tables: foreign keys cross slices by nature
+import { user } from "../auth/auth.schema.ts";
 
 export const householdRole = pgEnum("household_role", ["owner", "member"]);
+export type HouseholdRole = (typeof householdRole.enumValues)[number];
 
 export const household = pgTable("household", {
   id: text("id")

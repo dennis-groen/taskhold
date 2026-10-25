@@ -19,6 +19,87 @@
         "node": true
       }
     },
+
+    // API layering: routes -> service -> dal. Only DAL files query the database.
+    {
+      "files": ["apps/api/src/features/**/*.routes.ts", "apps/api/src/features/**/*.middleware.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(\\.dal|\\.schema|/db/client)(\\.ts)?$",
+                "message": "The HTTP layer calls services. Only DAL files touch the database."
+              },
+              {
+                "group": ["drizzle-orm", "drizzle-orm/*"],
+                "message": "The HTTP layer calls services. Only DAL files touch the database."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/api/src/features/**/*.service.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["drizzle-orm", "drizzle-orm/*"],
+                "message": "Services hold business rules. Build queries in the feature's DAL."
+              },
+              {
+                "regex": "\\.schema(\\.ts)?$",
+                "allowTypeImports": true,
+                "message": "Services hold business rules. Build queries in the feature's DAL."
+              },
+              {
+                "regex": "/db/client(\\.ts)?$",
+                "importNames": ["db", "pool"],
+                "message": "Services query through the DAL. Use transaction() to group DAL calls."
+              },
+              {
+                "regex": "^\\.\\./[^/]+/[^/]+\\.dal(\\.ts)?$",
+                "message": "Call the other feature's service, never its DAL."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/api/src/features/**/*.dal.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "\\.(service|routes|middleware)(\\.ts)?$",
+                "message": "The DAL is the bottom layer. It can't call services or routes."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/api/src/lib/**", "apps/api/src/config/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "regex": "/features/", "message": "Shared code can't depend on a feature." }
+            ]
+          }
+        ]
+      }
+    },
     {
       "files": ["apps/web/**"],
       "plugins": ["react", "jsx-a11y"],
@@ -30,6 +111,91 @@
         "react/react-in-jsx-scope": "off",
         "react/rules-of-hooks": "error",
         "react/only-export-components": ["warn", { "allowConstantExport": true }]
+      }
+    },
+
+    // Web layering: routes -> features -> shared (components, lib). Features never import each other.
+    {
+      "files": ["apps/web/src/components/**", "apps/web/src/lib/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/**", "@/routes/**"],
+                "message": "Shared code can't depend on features or routes."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Files at a feature's root, e.g. features/households/households.api.ts
+      "files": ["apps/web/src/features/*/*.ts", "apps/web/src/features/*/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/routes/**"],
+                "message": "Features can't import routes. Read route data with getRouteApi()."
+              },
+              {
+                "group": ["@/features/**"],
+                "message": "Features don't import each other. Compose features in a route instead."
+              },
+              {
+                "regex": "^\\.\\./",
+                "message": "Relative imports stay inside the feature. Use @/components or @/lib for shared code."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Files one folder down, e.g. features/households/pages/join-household-page.tsx
+      "files": ["apps/web/src/features/*/*/*.ts", "apps/web/src/features/*/*/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/routes/**"],
+                "message": "Features can't import routes. Read route data with getRouteApi()."
+              },
+              {
+                "group": ["@/features/**"],
+                "message": "Features don't import each other. Compose features in a route instead."
+              },
+              {
+                "regex": "^\\.\\./\\.\\./",
+                "message": "Relative imports stay inside the feature. Use @/components or @/lib for shared code."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Keep features flat: one level of folders (components/, pages/, hooks/) inside a feature
+      "files": ["apps/web/src/features/*/*/*/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": ".*",
+                "message": "Keep feature folders one level deep (components/, pages/, hooks/), or split the feature."
+              }
+            ]
+          }
+        ]
       }
     },
     {
