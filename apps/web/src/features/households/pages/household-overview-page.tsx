@@ -1,5 +1,6 @@
 import { UserPlusIcon } from "@phosphor-icons/react";
 import { Link, getRouteApi } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { buttonVariants } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import { RemoveMemberButton } from "../components/remove-member-button.tsx";
 
 const householdRoute = getRouteApi("/_household");
 
-export function HouseholdOverviewPage() {
+/** `children` is where other features put their part of the dashboard, above the members */
+export function HouseholdOverviewPage({ children }: { children?: ReactNode }) {
   const household = householdRoute.useLoaderData();
   const { user } = householdRoute.useRouteContext();
   const count = household.members.length;
@@ -21,9 +23,10 @@ export function HouseholdOverviewPage() {
   return (
     <>
       <PageHeading title={household.name}>
-        {count === 1 ? "Just you so far." : `${count} people share this household.`} Shopping lists
-        and chores will show up here.
+        {count === 1 ? "Just you so far." : `${count} people share this household.`}
       </PageHeading>
+
+      {children && <div className="mt-10">{children}</div>}
 
       <section className="mt-10">
         <div className="mb-3 flex items-center justify-between gap-4">

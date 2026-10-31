@@ -3,6 +3,7 @@ import { logger } from "hono/logger";
 
 import { authRoutes } from "./features/auth/auth.routes.ts";
 import { householdRoutes } from "./features/households/households.routes.ts";
+import { shoppingRoutes } from "./features/shopping/shopping.routes.ts";
 import { viewerRoutes } from "./features/viewer/viewer.routes.ts";
 import { errorHandler } from "./lib/error-handler.ts";
 
@@ -14,4 +15,5 @@ export const app = new Hono()
   .get("/health", (c) => c.json({ status: "ok" }, 200))
   .route("/auth", authRoutes)
   .route("/viewer", viewerRoutes)
-  .route("/households", householdRoutes);
+  .route("/households", householdRoutes)
+  .route("/shopping", shoppingRoutes);

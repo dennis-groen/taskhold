@@ -26,6 +26,13 @@ export async function findMembership(userId: string): Promise<Membership | null>
     : null;
 }
 
+/** Like findMembership, for features that only work inside a household */
+export async function getMembershipOf(userId: string): Promise<Membership> {
+  const membership = await findMembership(userId);
+  if (!membership) throw notInHousehold();
+  return membership;
+}
+
 export async function getHouseholdOf(userId: string): Promise<Household> {
   const membership = await householdsDal.findMembershipByUserId(userId);
   if (!membership) throw notInHousehold();

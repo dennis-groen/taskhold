@@ -55,6 +55,16 @@ In VS Code, install the recommended Oxc extension to format and lint on save.
 - Every change to who is in a household locks the household row in a transaction, so simultaneous joins, leaves and removals can't leave a household without members or without an owner.
 - Tables: `household` and `household_member` in `apps/api/src/features/households/households.schema.ts`.
 
+## Shopping lists
+
+- Every member of a household can create, open, change and delete all of its lists. Lists are on `/dashboard`, and each one opens at `/lists/:listId`.
+- Items have a name and an optional free-text quantity ("2", "500 g"). Checking one off records who did it; "Clear checked off" removes everything that's been bought.
+- Changes show straight away (optimistic updates with React Query) and roll back with a message if the API rejects them.
+- An open list checks for changes from other members every 5 seconds while the tab is visible, and refetches when you come back to the tab. If someone deletes the list, the page says so.
+- Items can carry a client-generated id, so a retried add doesn't create a duplicate.
+- Tables: `shopping_list` and `shopping_item` in `apps/api/src/features/shopping/shopping.schema.ts`. Deleting a household deletes its lists; when someone leaves, the items they added stay.
+- The API can also rename a list (`PATCH /api/shopping/lists/:listId`); the UI doesn't offer it yet.
+
 ## API client (Hono RPC)
 
 The web app calls the API through a typed [Hono RPC](https://hono.dev/docs/guides/rpc) client, exported from `apps/api/src/client.ts` as `@taskhold/api/client`. Each web feature wraps its calls in a `<feature>.api.ts` file, with request and response types coming straight from the API routes:

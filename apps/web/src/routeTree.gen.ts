@@ -18,6 +18,7 @@ import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
 import { Route as OnboardingCreateRouteImport } from './routes/onboarding/create'
 import { Route as OnboardingJoinRouteImport } from './routes/onboarding/join'
+import { Route as HouseholdListsListIdRouteImport } from './routes/_household/lists/$listId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -63,6 +64,11 @@ const OnboardingJoinRoute = OnboardingJoinRouteImport.update({
   path: '/join',
   getParentRoute: () => OnboardingRoute,
 } as any)
+const HouseholdListsListIdRoute = HouseholdListsListIdRouteImport.update({
+  id: '/lists/$listId',
+  path: '/lists/$listId',
+  getParentRoute: () => HouseholdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/create': typeof OnboardingCreateRoute
   '/onboarding/join': typeof OnboardingJoinRoute
   '/onboarding/': typeof OnboardingIndexRoute
+  '/lists/$listId': typeof HouseholdListsListIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/onboarding/create': typeof OnboardingCreateRoute
   '/onboarding/join': typeof OnboardingJoinRoute
   '/onboarding': typeof OnboardingIndexRoute
+  '/lists/$listId': typeof HouseholdListsListIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/onboarding/create': typeof OnboardingCreateRoute
   '/onboarding/join': typeof OnboardingJoinRoute
   '/onboarding/': typeof OnboardingIndexRoute
+  '/_household/lists/$listId': typeof HouseholdListsListIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/onboarding/create'
     | '/onboarding/join'
     | '/onboarding/'
+    | '/lists/$listId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
     | '/onboarding/create'
     | '/onboarding/join'
     | '/onboarding'
+    | '/lists/$listId'
   id:
     | '__root__'
     | '/'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '/onboarding/create'
     | '/onboarding/join'
     | '/onboarding/'
+    | '/_household/lists/$listId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -200,17 +212,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingJoinRouteImport
       parentRoute: typeof OnboardingRoute
     }
+    '/_household/lists/$listId': {
+      id: '/_household/lists/$listId'
+      path: '/lists/$listId'
+      fullPath: '/lists/$listId'
+      preLoaderRoute: typeof HouseholdListsListIdRouteImport
+      parentRoute: typeof HouseholdRoute
+    }
   }
 }
 
 interface HouseholdRouteChildren {
   HouseholdDashboardRoute: typeof HouseholdDashboardRoute
   HouseholdInviteRoute: typeof HouseholdInviteRoute
+  HouseholdListsListIdRoute: typeof HouseholdListsListIdRoute
 }
 
 const HouseholdRouteChildren: HouseholdRouteChildren = {
   HouseholdDashboardRoute: HouseholdDashboardRoute,
   HouseholdInviteRoute: HouseholdInviteRoute,
+  HouseholdListsListIdRoute: HouseholdListsListIdRoute,
 }
 
 const HouseholdRouteWithChildren = HouseholdRoute._addFileChildren(

@@ -23,6 +23,7 @@ features/
     households.errors.ts      the feature's AppErrors
     households.types.ts       shapes returned to clients
     invite-code.ts            pure domain logic: generate and normalize codes
+  shopping/               shopping lists and items, scoped to the user's household
   viewer/                 GET /api/viewer, composed from the auth and households services
 ```
 
@@ -37,7 +38,8 @@ Requests flow `routes → service → dal → database`, never backwards.
 | `*.dal.ts`     | Runs Drizzle queries, returns plain records, takes an optional executor for transactions | Call services or decide what's allowed      |
 
 - Services throw `AppError(kind, code, message)`. `lib/error-handler.ts` maps the `kind` to a status code and responds with `{ error: { code, message } }`.
-- A feature may call another feature's service, never its DAL. `viewer` uses `auth` and `households` this way.
+- A feature may call another feature's service, never its DAL. `viewer` uses `auth` and `households` this way, and `shopping` asks `householdsService.getMembershipOf()` which household a user is in.
+- Data that belongs to a household is always queried with the household id in the `WHERE` clause, so an id from another household reads as missing (404) and never leaks.
 - Schema files may import other features' tables, because foreign keys cross features.
 - Each feature mounts under its own path in `app.ts`. A feature that needs a signed-in user builds its router with `protectedRouter()`, so every route in it returns 401 without a session.
 - When a rule depends on other rows (the last member leaving deletes the household, the owner leaving hands over ownership), the service locks the parent row first (`householdsDal.lockHousehold`) and re-reads under the lock. Concurrent requests then run one after another instead of acting on stale reads.
@@ -62,14 +64,22 @@ features/
   households/
     households.api.ts     RPC calls and their response types
     invite-code.ts        format and parse invite codes
-    components/           household-members, invite-code-slots
+    components/           household-members, invite-code-slots, leave/remove/new-code buttons
     pages/                setup, create, join, invite, overview
+  shopping/
+    shopping.api.ts       RPC calls and their response types
+    shopping.queries.ts   React Query keys and queryOptions (loaders and components share them)
+    hooks/                use-shopping-list: the list plus optimistic changes
+    components/           dashboard section, item row, add-item form, delete-list button
+    pages/                a single list
 components/               shared: shadcn ui/, layout/ (app shell, page heading), small app-wide pieces
 lib/                      shared: RPC client and errorMessage(), utils
 ```
 
+- Server data that changes while a page is open (shopping lists) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
+- Optimistic changes follow `hooks/use-shopping-list.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
-- Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the auth feature's sign-out button into the shared app shell.
+- Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the auth feature's sign-out button into the shared app shell, and `routes/_household/dashboard.tsx` passes the shopping lists section into the household overview page.
 - Inside a feature, imports are relative and folders are one level deep (`components/`, `pages/`, `hooks/`).
 - Shared code (`components/`, `lib/`) never imports a feature or a route.
 

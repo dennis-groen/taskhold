@@ -1,4 +1,5 @@
-import { Outlet, createRootRoute, redirect } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
+import { Outlet, createRootRouteWithContext, redirect } from "@tanstack/react-router";
 
 import { fetchViewer } from "@/features/auth/auth.api.ts";
 
@@ -12,7 +13,7 @@ function isSetupPath(path: string) {
   return path === "/onboarding" || path.startsWith("/onboarding/") || path.startsWith("/join/");
 }
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
     const viewer = await fetchViewer();
     const path = location.pathname;

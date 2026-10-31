@@ -14,19 +14,28 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
     "error" in value &&
     typeof value.error === "object" &&
     value.error !== null &&
+    "code" in value.error &&
+    typeof value.error.code === "string" &&
     "message" in value.error &&
     typeof value.error.message === "string"
   );
 }
 
+function errorBody(error: unknown): ApiErrorBody | null {
+  if (!(error instanceof DetailedError)) return null;
+  // parseResponse puts the parsed error body in detail.data
+  const detail: unknown = error.detail;
+  const body =
+    typeof detail === "object" && detail !== null && "data" in detail ? detail.data : null;
+  return isApiErrorBody(body) ? body : null;
+}
+
+/** The API's error code, e.g. "LIST_NOT_FOUND", or null for network errors and the like */
+export function errorCode(error: unknown): string | null {
+  return errorBody(error)?.error.code ?? null;
+}
+
 /** The message the API wrote for people, or `fallback` when there isn't one (e.g. network down) */
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof DetailedError) {
-    // parseResponse puts the parsed error body in detail.data
-    const detail: unknown = error.detail;
-    const body =
-      typeof detail === "object" && detail !== null && "data" in detail ? detail.data : null;
-    if (isApiErrorBody(body)) return body.error.message;
-  }
-  return fallback;
+  return errorBody(error)?.error.message ?? fallback;
 }
