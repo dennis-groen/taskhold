@@ -1,18 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { HouseholdOverviewPage } from "@/features/households/pages/household-overview-page.tsx";
-import { ShoppingListsSection } from "@/features/shopping/components/shopping-lists-section.tsx";
-import { listsQuery } from "@/features/shopping/shopping.queries.ts";
-
+// The old home page; kept so existing links and bookmarks still land somewhere
 export const Route = createFileRoute("/_household/dashboard")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(listsQuery()),
-  component: DashboardPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/lists", replace: true });
+  },
 });
-
-function DashboardPage() {
-  return (
-    <HouseholdOverviewPage>
-      <ShoppingListsSection />
-    </HouseholdOverviewPage>
-  );
-}

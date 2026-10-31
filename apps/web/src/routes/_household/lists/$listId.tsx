@@ -1,8 +1,11 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
 
 import { ListNotFound } from "@/features/shopping/components/list-not-found.tsx";
 import { ShoppingListPage } from "@/features/shopping/pages/shopping-list-page.tsx";
 import { isListGone, listQuery } from "@/features/shopping/shopping.queries.ts";
+import { otherFirstNames } from "@/lib/shared-with.ts";
+
+const householdRoute = getRouteApi("/_household");
 
 export const Route = createFileRoute("/_household/lists/$listId")({
   loader: async ({ context, params }) => {
@@ -14,5 +17,11 @@ export const Route = createFileRoute("/_household/lists/$listId")({
     }
   },
   notFoundComponent: ListNotFound,
-  component: ShoppingListPage,
+  component: ListRoute,
 });
+
+function ListRoute() {
+  const household = householdRoute.useLoaderData();
+  const { user } = householdRoute.useRouteContext();
+  return <ShoppingListPage otherMembers={otherFirstNames(household.members, user.id)} />;
+}

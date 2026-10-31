@@ -13,11 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as HouseholdRouteImport } from './routes/_household'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as HouseholdDashboardRouteImport } from './routes/_household/dashboard'
+import { Route as HouseholdHouseholdRouteImport } from './routes/_household/household'
 import { Route as HouseholdInviteRouteImport } from './routes/_household/invite'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
 import { Route as OnboardingCreateRouteImport } from './routes/onboarding/create'
 import { Route as OnboardingJoinRouteImport } from './routes/onboarding/join'
+import { Route as HouseholdListsIndexRouteImport } from './routes/_household/lists/index'
 import { Route as HouseholdListsListIdRouteImport } from './routes/_household/lists/$listId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -37,6 +39,11 @@ const OnboardingRoute = OnboardingRouteImport.update({
 const HouseholdDashboardRoute = HouseholdDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => HouseholdRoute,
+} as any)
+const HouseholdHouseholdRoute = HouseholdHouseholdRouteImport.update({
+  id: '/household',
+  path: '/household',
   getParentRoute: () => HouseholdRoute,
 } as any)
 const HouseholdInviteRoute = HouseholdInviteRouteImport.update({
@@ -64,6 +71,11 @@ const OnboardingJoinRoute = OnboardingJoinRouteImport.update({
   path: '/join',
   getParentRoute: () => OnboardingRoute,
 } as any)
+const HouseholdListsIndexRoute = HouseholdListsIndexRouteImport.update({
+  id: '/lists/',
+  path: '/lists/',
+  getParentRoute: () => HouseholdRoute,
+} as any)
 const HouseholdListsListIdRoute = HouseholdListsListIdRouteImport.update({
   id: '/lists/$listId',
   path: '/lists/$listId',
@@ -74,22 +86,26 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/onboarding': typeof OnboardingRouteWithChildren
   '/dashboard': typeof HouseholdDashboardRoute
+  '/household': typeof HouseholdHouseholdRoute
   '/invite': typeof HouseholdInviteRoute
   '/join/$code': typeof JoinCodeRoute
   '/onboarding/create': typeof OnboardingCreateRoute
   '/onboarding/join': typeof OnboardingJoinRoute
   '/onboarding/': typeof OnboardingIndexRoute
   '/lists/$listId': typeof HouseholdListsListIdRoute
+  '/lists/': typeof HouseholdListsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof HouseholdDashboardRoute
+  '/household': typeof HouseholdHouseholdRoute
   '/invite': typeof HouseholdInviteRoute
   '/join/$code': typeof JoinCodeRoute
   '/onboarding/create': typeof OnboardingCreateRoute
   '/onboarding/join': typeof OnboardingJoinRoute
   '/onboarding': typeof OnboardingIndexRoute
   '/lists/$listId': typeof HouseholdListsListIdRoute
+  '/lists': typeof HouseholdListsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,12 +113,14 @@ export interface FileRoutesById {
   '/_household': typeof HouseholdRouteWithChildren
   '/onboarding': typeof OnboardingRouteWithChildren
   '/_household/dashboard': typeof HouseholdDashboardRoute
+  '/_household/household': typeof HouseholdHouseholdRoute
   '/_household/invite': typeof HouseholdInviteRoute
   '/join/$code': typeof JoinCodeRoute
   '/onboarding/create': typeof OnboardingCreateRoute
   '/onboarding/join': typeof OnboardingJoinRoute
   '/onboarding/': typeof OnboardingIndexRoute
   '/_household/lists/$listId': typeof HouseholdListsListIdRoute
+  '/_household/lists/': typeof HouseholdListsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,34 +128,40 @@ export interface FileRouteTypes {
     | '/'
     | '/onboarding'
     | '/dashboard'
+    | '/household'
     | '/invite'
     | '/join/$code'
     | '/onboarding/create'
     | '/onboarding/join'
     | '/onboarding/'
     | '/lists/$listId'
+    | '/lists/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboard'
+    | '/household'
     | '/invite'
     | '/join/$code'
     | '/onboarding/create'
     | '/onboarding/join'
     | '/onboarding'
     | '/lists/$listId'
+    | '/lists'
   id:
     | '__root__'
     | '/'
     | '/_household'
     | '/onboarding'
     | '/_household/dashboard'
+    | '/_household/household'
     | '/_household/invite'
     | '/join/$code'
     | '/onboarding/create'
     | '/onboarding/join'
     | '/onboarding/'
     | '/_household/lists/$listId'
+    | '/_household/lists/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -177,6 +201,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HouseholdDashboardRouteImport
       parentRoute: typeof HouseholdRoute
     }
+    '/_household/household': {
+      id: '/_household/household'
+      path: '/household'
+      fullPath: '/household'
+      preLoaderRoute: typeof HouseholdHouseholdRouteImport
+      parentRoute: typeof HouseholdRoute
+    }
     '/_household/invite': {
       id: '/_household/invite'
       path: '/invite'
@@ -212,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingJoinRouteImport
       parentRoute: typeof OnboardingRoute
     }
+    '/_household/lists/': {
+      id: '/_household/lists/'
+      path: '/lists'
+      fullPath: '/lists/'
+      preLoaderRoute: typeof HouseholdListsIndexRouteImport
+      parentRoute: typeof HouseholdRoute
+    }
     '/_household/lists/$listId': {
       id: '/_household/lists/$listId'
       path: '/lists/$listId'
@@ -224,14 +262,18 @@ declare module '@tanstack/react-router' {
 
 interface HouseholdRouteChildren {
   HouseholdDashboardRoute: typeof HouseholdDashboardRoute
+  HouseholdHouseholdRoute: typeof HouseholdHouseholdRoute
   HouseholdInviteRoute: typeof HouseholdInviteRoute
   HouseholdListsListIdRoute: typeof HouseholdListsListIdRoute
+  HouseholdListsIndexRoute: typeof HouseholdListsIndexRoute
 }
 
 const HouseholdRouteChildren: HouseholdRouteChildren = {
   HouseholdDashboardRoute: HouseholdDashboardRoute,
+  HouseholdHouseholdRoute: HouseholdHouseholdRoute,
   HouseholdInviteRoute: HouseholdInviteRoute,
   HouseholdListsListIdRoute: HouseholdListsListIdRoute,
+  HouseholdListsIndexRoute: HouseholdListsIndexRoute,
 }
 
 const HouseholdRouteWithChildren = HouseholdRoute._addFileChildren(

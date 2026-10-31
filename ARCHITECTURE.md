@@ -70,16 +70,16 @@ features/
     shopping.api.ts       RPC calls and their response types
     shopping.queries.ts   React Query keys and queryOptions (loaders and components share them)
     hooks/                use-shopping-list: the list plus optimistic changes
-    components/           dashboard section, item row, add-item form, delete-list button
-    pages/                a single list
-components/               shared: shadcn ui/, layout/ (app shell, page heading), small app-wide pieces
+    components/           quick add (the round + button), add row, item row, delete-list button
+    pages/                all lists, a single list
+components/               shared: shadcn ui/, layout/ (household shell with nav, onboarding app shell, page heading, group), small app-wide pieces
 lib/                      shared: RPC client and errorMessage(), utils
 ```
 
 - Server data that changes while a page is open (shopping lists) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
 - Optimistic changes follow `hooks/use-shopping-list.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
-- Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the auth feature's sign-out button into the shared app shell, and `routes/_household/dashboard.tsx` passes the shopping lists section into the household overview page.
+- Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
 - Inside a feature, imports are relative and folders are one level deep (`components/`, `pages/`, `hooks/`).
 - Shared code (`components/`, `lib/`) never imports a feature or a route.
 

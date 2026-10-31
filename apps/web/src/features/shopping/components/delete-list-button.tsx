@@ -16,7 +16,7 @@ export function DeleteListButton({ list }: { list: ShoppingList }) {
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="outline" className="text-destructive hover:text-destructive">
+        <Button variant="ghost" className="-ml-2.5 text-destructive hover:text-destructive">
           <TrashIcon />
           Delete list
         </Button>
@@ -32,7 +32,7 @@ export function DeleteListButton({ list }: { list: ShoppingList }) {
       onConfirm={async () => {
         await deleteList(list.id);
         // Leave first, so the open list doesn't poll for something that's gone
-        await navigate({ to: "/dashboard" });
+        await navigate({ to: "/lists" });
         queryClient.removeQueries({ queryKey: shoppingKeys.list(list.id) });
         await queryClient.invalidateQueries({ queryKey: shoppingKeys.lists() });
       }}

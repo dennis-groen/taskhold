@@ -27,7 +27,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         throw redirect({ to: "/onboarding" });
       }
     } else if (isSetupPath(path)) {
-      throw redirect({ to: "/dashboard" });
+      throw redirect({ to: "/lists" });
     }
 
     return { viewer };

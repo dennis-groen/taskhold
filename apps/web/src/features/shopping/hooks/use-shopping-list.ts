@@ -19,43 +19,21 @@ import { isListGone, listQuery, shoppingKeys } from "../shopping.queries.ts";
 
 type Person = { id: string; name: string };
 
+// Shared by every change to every list, so we know when the last one finishes
+const changeKey = [...shoppingKeys.all, "change"];
+
 /**
  * A list plus the changes people make to it. Every change shows on screen straight away and is
  * rolled back if the API rejects it.
  */
 export function useShoppingList(listId: string, viewer: Person) {
-  const queryClient = useQueryClient();
   const { data: list, error: refetchError } = useSuspenseQuery(listQuery(listId));
-  const [error, setError] = useState<string | null>(null);
+  const { error, callbacks } = useChangeError();
 
-  const options = {
-    queryClient,
-    listId,
-    onStart: () => setError(null),
-    onError: (err: unknown) =>
-      setError(
-        errorMessage(err, "Couldn't save that change. Check your connection and try again."),
-      ),
-  };
+  const add = useAddItem(viewer, callbacks);
 
-  const add = useListChange(options, {
-    mutationFn: (item: { id: string; name: string; quantity: string | null }) =>
-      addItem(listId, item),
-    apply: (items, item) => [
-      {
-        ...item,
-        checked: false,
-        addedBy: viewer,
-        checkedBy: null,
-        checkedAt: null,
-        createdAt: new Date().toISOString(),
-      },
-      ...items,
-    ],
-  });
-
-  const toggle = useListChange(options, {
-    mutationFn: ({ itemId, checked }: { itemId: string; checked: boolean }) =>
+  const toggle = useListChange(callbacks, {
+    mutationFn: ({ itemId, checked }: { listId: string; itemId: string; checked: boolean }) =>
       updateItem(listId, itemId, { checked }),
     apply: (items, { itemId, checked }) =>
       items.map((item) =>
@@ -70,13 +48,13 @@ export function useShoppingList(listId: string, viewer: Person) {
       ),
   });
 
-  const remove = useListChange(options, {
-    mutationFn: (itemId: string) => deleteItem(listId, itemId),
-    apply: (items, itemId) => items.filter((item) => item.id !== itemId),
+  const remove = useListChange(callbacks, {
+    mutationFn: ({ itemId }: { listId: string; itemId: string }) => deleteItem(listId, itemId),
+    apply: (items, { itemId }) => items.filter((item) => item.id !== itemId),
   });
 
-  const clearChecked = useListChange(options, {
-    mutationFn: () => clearCheckedItems(listId),
+  const clearChecked = useListChange(callbacks, {
+    mutationFn: (_vars: { listId: string }) => clearCheckedItems(listId),
     apply: (items) => items.filter((item) => !item.checked),
   });
 
@@ -86,26 +64,60 @@ export function useShoppingList(listId: string, viewer: Person) {
     gone: isListGone(refetchError),
     /** The last change that failed, for people; cleared by the next change */
     error,
-    add: (name: string, quantity: string | null) =>
-      add.mutate({ id: crypto.randomUUID(), name, quantity }),
-    toggle: (itemId: string, checked: boolean) => toggle.mutate({ itemId, checked }),
-    remove: (itemId: string) => remove.mutate(itemId),
-    clearChecked: () => clearChecked.mutate(),
+    add: (name: string, quantity: string | null) => add(listId, name, quantity),
+    toggle: (itemId: string, checked: boolean) => toggle.mutate({ listId, itemId, checked }),
+    remove: (itemId: string) => remove.mutate({ listId, itemId }),
+    clearChecked: () => clearChecked.mutate({ listId }),
   };
 }
 
-function useListChange<Vars>(
-  {
-    queryClient,
-    listId,
-    onStart,
-    onError,
-  }: {
-    queryClient: QueryClient;
-    listId: string;
-    onStart: () => void;
-    onError: (err: unknown) => void;
-  },
+/** Adds an item to any list, optimistically when that list is on screen or cached */
+export function useAddItem(viewer: Person, callbacks: ChangeCallbacks) {
+  const add = useListChange(callbacks, {
+    mutationFn: ({
+      listId,
+      ...item
+    }: {
+      listId: string;
+      id: string;
+      name: string;
+      quantity: string | null;
+    }) => addItem(listId, item),
+    apply: (items, { listId: _listId, ...item }) => [
+      {
+        ...item,
+        checked: false,
+        addedBy: viewer,
+        checkedBy: null,
+        checkedAt: null,
+        createdAt: new Date().toISOString(),
+      },
+      ...items,
+    ],
+  });
+  return (listId: string, name: string, quantity: string | null) =>
+    add.mutate({ listId, id: crypto.randomUUID(), name, quantity });
+}
+
+type ChangeCallbacks = { onStart: () => void; onError: (err: unknown) => void };
+
+/** The message for the last change that failed, and the callbacks that keep it current */
+export function useChangeError(): { error: string | null; callbacks: ChangeCallbacks } {
+  const [error, setError] = useState<string | null>(null);
+  return {
+    error,
+    callbacks: {
+      onStart: () => setError(null),
+      onError: (err) =>
+        setError(
+          errorMessage(err, "Couldn't save that change. Check your connection and try again."),
+        ),
+    },
+  };
+}
+
+function useListChange<Vars extends { listId: string }>(
+  { onStart, onError }: ChangeCallbacks,
   {
     mutationFn,
     apply,
@@ -114,16 +126,15 @@ function useListChange<Vars>(
     apply: (items: ShoppingItem[], vars: Vars) => ShoppingItem[];
   },
 ) {
-  // Typed key, so the cache reads and writes below know the data is a ShoppingList
-  const { queryKey } = listQuery(listId);
-  // Shared by every change to this list, so we know when the last one finishes
-  const mutationKey = [...queryKey, "change"];
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey,
+    mutationKey: changeKey,
     mutationFn,
     onMutate: async (vars) => {
       onStart();
+      // Typed key, so the cache reads and writes below know the data is a ShoppingList
+      const { queryKey } = listQuery(vars.listId);
       // A poll that's already on its way would overwrite the optimistic change with older data
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData(queryKey);
@@ -133,17 +144,22 @@ function useListChange<Vars>(
       );
       return { previous };
     },
-    onError: (err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+    onError: (err, vars, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(listQuery(vars.listId).queryKey, context.previous);
       onError(err);
     },
-    onSettled: () => {
-      // Refetch after the last of several quick changes, so an early response can't undo a later one.
-      // Everything under "shopping", so the counts on the dashboard follow too. Not awaited: the
-      // change would count as running until the refetch ends, and the next one would skip its refetch.
-      if (queryClient.isMutating({ mutationKey }) === 1) {
-        void queryClient.invalidateQueries({ queryKey: shoppingKeys.all });
-      }
-    },
+    onSettled: () => refetchAfterLastChange(queryClient),
   });
+}
+
+/**
+ * Refetches after the last of several quick changes, so an early response can't undo a later one.
+ * Everything under "shopping", so list counts follow too. Not awaited: the change would count as
+ * running until the refetch ends, and the next one would skip its refetch.
+ */
+function refetchAfterLastChange(queryClient: QueryClient) {
+  if (queryClient.isMutating({ mutationKey: changeKey }) === 1) {
+    void queryClient.invalidateQueries({ queryKey: shoppingKeys.all });
+  }
 }

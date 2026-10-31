@@ -46,7 +46,7 @@ export function JoinHouseholdPage() {
     setJoinError(null);
     try {
       await acceptInvite(code);
-      await navigate({ to: "/dashboard" });
+      await navigate({ to: "/lists" });
     } catch (err) {
       setJoinError(errorMessage(err, "Couldn't join the household. Try again."));
       setJoining(false);

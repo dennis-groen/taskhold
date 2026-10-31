@@ -3,6 +3,7 @@ import { Link, getRouteApi } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
 import { BackLink } from "@/components/back-link.tsx";
+import { Group, GroupHeading } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -65,7 +66,7 @@ export function InviteMembersPage() {
 
   return (
     <>
-      {!created && <BackLink to="/dashboard" />}
+      {!created && <BackLink to="/household" label="Household" />}
       <PageHeading
         title={created ? `${household.name} is ready` : `Invite people to ${household.name}`}
       >
@@ -127,17 +128,19 @@ export function InviteMembersPage() {
         </div>
       )}
 
-      <section className="mt-10">
-        <h2 className="mb-3 text-sm font-medium">Already in {household.name}</h2>
-        <HouseholdMembers members={household.members} currentUserId={user.id} />
+      <section className="mt-6">
+        <GroupHeading>Already in {household.name}</GroupHeading>
+        <Group>
+          <HouseholdMembers members={household.members} currentUserId={user.id} />
+        </Group>
       </section>
 
       {created && (
         <Link
-          to="/dashboard"
+          to="/lists"
           className={cn(buttonVariants({ variant: "link", size: "lg" }), "mt-6 h-11 px-0")}
         >
-          Go to your household
+          Go to your shopping lists
         </Link>
       )}
     </>

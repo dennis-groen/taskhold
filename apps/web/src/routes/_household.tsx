@@ -1,8 +1,8 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
-import { AppShell } from "@/components/layout/app-shell.tsx";
-import { SignOutButton } from "@/features/auth/components/sign-out-button.tsx";
+import { HouseholdShell } from "@/components/layout/household-shell.tsx";
 import { fetchCurrentHousehold } from "@/features/households/households.api.ts";
+import { QuickAdd } from "@/features/shopping/components/quick-add.tsx";
 
 // Pages for people who belong to a household; loads that household once for all of them
 export const Route = createFileRoute("/_household")({
@@ -19,8 +19,8 @@ export const Route = createFileRoute("/_household")({
 function HouseholdLayout() {
   const { user } = Route.useRouteContext();
   return (
-    <AppShell user={user} actions={<SignOutButton />}>
+    <HouseholdShell addButton={<QuickAdd viewer={user} />}>
       <Outlet />
-    </AppShell>
+    </HouseholdShell>
   );
 }

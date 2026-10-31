@@ -1,22 +1,28 @@
+import { CaretRightIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { BackLink } from "@/components/back-link.tsx";
+import { Group } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-import { AddItemForm } from "../components/add-item-form.tsx";
+import { AddRow } from "../components/add-row.tsx";
 import { DeleteListButton } from "../components/delete-list-button.tsx";
 import { ListNotFound } from "../components/list-not-found.tsx";
+import { SharedWithLine } from "../components/shared-with-line.tsx";
 import { ShoppingItemRow } from "../components/shopping-item-row.tsx";
 import { useShoppingList } from "../hooks/use-shopping-list.ts";
 import { groupItems } from "../shopping-items.ts";
 
 const routeApi = getRouteApi("/_household/lists/$listId");
 
-export function ShoppingListPage() {
+export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
   const { listId } = routeApi.useParams();
   const { user } = routeApi.useRouteContext();
   const { list, gone, error, add, toggle, remove, clearChecked } = useShoppingList(listId, user);
+  const [cartOpen, setCartOpen] = useState(false);
 
   if (gone) return <ListNotFound />;
 
@@ -30,49 +36,62 @@ export function ShoppingListPage() {
 
   return (
     <>
-      <BackLink to="/dashboard" />
+      <BackLink to="/lists" label="Shopping" />
       <PageHeading title={list.name}>
-        {list.items.length === 0
-          ? "Add what you need. Everyone in your household sees changes within a few seconds."
-          : open.length === 0
-            ? "Everything's checked off."
-            : `${open.length} to buy.`}
+        <SharedWithLine otherMembers={otherMembers} />
       </PageHeading>
 
-      <div className="mt-8">
-        <AddItemForm onAdd={add} />
+      <Group className="mt-6">
+        <AddRow label="Add item" withQuantity maxLength={100} onAdd={add} />
         {error && (
-          <p role="alert" className="mt-2 text-sm text-destructive">
+          <p role="alert" className="px-4 py-2 text-sm text-destructive">
             {error}
           </p>
         )}
-      </div>
-
-      {open.length > 0 && (
-        <ul aria-label="To buy" className="mt-4 divide-y rounded-xl border">
-          {open.map((item) => (
-            <ShoppingItemRow key={item.id} {...rowProps(item)} />
-          ))}
-        </ul>
-      )}
-
-      {checked.length > 0 && (
-        <section className="mt-8">
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <h2 className="text-sm font-medium">Checked off</h2>
-            <Button variant="ghost" size="sm" className="-mr-2.5" onClick={clearChecked}>
-              Clear checked off
-            </Button>
-          </div>
-          <ul aria-label="Checked off" className="divide-y rounded-xl border">
-            {checked.map((item) => (
+        {open.length > 0 ? (
+          <ul aria-label="To buy" className="divide-y">
+            {open.map((item) => (
               <ShoppingItemRow key={item.id} {...rowProps(item)} />
             ))}
           </ul>
+        ) : (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+            {checked.length > 0
+              ? "Everything's in the cart."
+              : "Nothing to buy. Add the first item."}
+          </p>
+        )}
+      </Group>
+
+      {checked.length > 0 && (
+        <section className="mt-6" aria-label="In cart">
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              variant="ghost"
+              aria-expanded={cartOpen}
+              onClick={() => setCartOpen((isOpen) => !isOpen)}
+              className="-ml-2 h-11 px-2 text-muted-foreground"
+            >
+              <CaretRightIcon className={cn("transition-transform", cartOpen && "rotate-90")} />
+              In cart ({checked.length})
+            </Button>
+            <Button className="h-11 px-5" onClick={clearChecked}>
+              Done shopping
+            </Button>
+          </div>
+          {cartOpen && (
+            <Group className="mt-2">
+              <ul className="divide-y">
+                {checked.map((item) => (
+                  <ShoppingItemRow key={item.id} {...rowProps(item)} />
+                ))}
+              </ul>
+            </Group>
+          )}
         </section>
       )}
 
-      <div className="mt-12 border-t pt-6">
+      <div className="mt-12">
         <DeleteListButton list={list} />
       </div>
     </>
