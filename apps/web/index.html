@@ -3,8 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>taskhold</title>
+    <meta
+      name="description"
+      content="Shopping lists, chores and to-dos for the people you live with."
+    />
     <!-- Applies the theme before the first paint, so dark mode doesn't flash white. The same rule
          as components/theme-provider.tsx: the person's choice, else the system setting. -->
     <script>
