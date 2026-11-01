@@ -93,6 +93,23 @@ describe("managing members", () => {
     );
   });
 
+  it("replaces the invite code when someone is removed, so they can't rejoin with it", async () => {
+    const owner = await signUp();
+    const member = await signUp();
+    const { inviteCode: oldCode } = await householdWith(owner, member);
+
+    const removed = await owner.api.households.current.members[":userId"].$delete({
+      param: { userId: member.id },
+    });
+    const { household } = await json(removed, 200);
+    expect(household.inviteCode).not.toBe(oldCode);
+
+    const rejoin = await member.api.households.invites[":code"].accept.$post({
+      param: { code: oldCode },
+    });
+    expect(await errorCode(rejoin, 404)).toBe("INVITE_NOT_FOUND");
+  });
+
   it("can't remove someone from another household", async () => {
     const owner = await signUp();
     const stranger = await signUp();

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
+import { secureHeaders } from "hono/secure-headers";
 
 import { authRoutes } from "./features/auth/auth.routes.ts";
 import { choreRoutes } from "./features/chores/chores.routes.ts";
@@ -22,6 +23,17 @@ export const app = new Hono()
   .onError(errorHandler)
   .use(requestId())
   .use(requestLogger())
+  // API responses are JSON or redirects, never pages: nothing in them may load or run anything,
+  // and they may not be framed. The web app's own policy is in apps/web/content-security-policy.ts.
+  .use(
+    secureHeaders({
+      contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+      xFrameOptions: "DENY",
+      // HTTPS only, for this host. Hono's default adds includeSubDomains, which would also force
+      // HTTPS on every other subdomain of the production domain.
+      strictTransportSecurity: "max-age=15552000",
+    }),
+  )
   .use(
     bodyLimit({
       maxSize: MAX_BODY_BYTES,

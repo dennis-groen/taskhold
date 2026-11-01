@@ -122,7 +122,10 @@ export async function leaveHousehold(userId: string): Promise<{ householdDeleted
   });
 }
 
-/** Owner only: removes another member from the owner's household */
+/**
+ * Owner only: removes another member from the owner's household. The invite code is replaced
+ * too: every member can see it, so the removed member would otherwise still know how to rejoin.
+ */
 export async function removeMember(ownerId: string, memberId: string): Promise<Household> {
   if (ownerId === memberId) throw cannotRemoveSelf();
 
@@ -133,6 +136,7 @@ export async function removeMember(ownerId: string, memberId: string): Promise<H
       tx,
     );
     if (!removed) throw memberNotFound();
+    await replaceInviteCode(owner.householdId, tx);
     annotate("household", { removed_member_id: memberId });
     return owner.householdId;
   });
@@ -143,12 +147,8 @@ export async function removeMember(ownerId: string, memberId: string): Promise<H
 export async function regenerateInviteCode(ownerId: string): Promise<Household> {
   const householdId = await transaction(async (tx) => {
     const owner = await lockMembershipOf(ownerId, tx, { ownerOnly: true });
-    for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
-      if (await householdsDal.updateInviteCode(owner.householdId, generateInviteCode(), tx)) {
-        return owner.householdId;
-      }
-    }
-    throw new Error("Could not generate a unique invite code");
+    await replaceInviteCode(owner.householdId, tx);
+    return owner.householdId;
   });
   return getHousehold(householdId);
 }
@@ -198,6 +198,13 @@ async function findByInviteCode(userId: string, rawCode: string) {
   }
   annotate("invite", { household_id: household.id });
   return household;
+}
+
+async function replaceInviteCode(householdId: string, tx: Transaction) {
+  for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
+    if (await householdsDal.updateInviteCode(householdId, generateInviteCode(), tx)) return;
+  }
+  throw new Error("Could not generate a unique invite code");
 }
 
 async function insertWithFreshInviteCode(name: string, tx: Transaction) {

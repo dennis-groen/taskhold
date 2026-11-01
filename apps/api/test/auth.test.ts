@@ -3,6 +3,18 @@ import { describe, expect, it } from "vitest";
 import { app } from "../src/app.ts";
 import { anonymous, errorCode, json, signUp } from "./helpers.ts";
 
+describe("response headers", () => {
+  it("forbid API responses from loading anything or being framed", async () => {
+    const response = await anonymous.viewer.$get();
+    expect(response.headers.get("content-security-policy")).toBe(
+      "default-src 'none'; frame-ancestors 'none'",
+    );
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("strict-transport-security")).toBe("max-age=15552000");
+  });
+});
+
 describe("sessions", () => {
   it("tells signed-out visitors they aren't signed in, without an error", async () => {
     expect(await json(await anonymous.viewer.$get(), 200)).toEqual({ user: null, household: null });

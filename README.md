@@ -56,7 +56,7 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 
 - A signed-in user without a household is sent to `/onboarding`, where they create a household or join one with an 8-character invite code. A user belongs to at most one household.
 - `/invite` shows the household's code and a shareable link (`/join/ABCD-EFGH`). Opening the link while signed out goes through sign-in and comes back to it.
-- The owner can remove members (on `/household`) and replace the invite code (on `/invite`); the old code and link stop working immediately.
+- The owner can remove members (on `/household`) and replace the invite code (on `/invite`); the old code and link stop working immediately. Removing a member replaces the code too, because every member can see it and the removed one would otherwise know how to rejoin.
 - Anyone can leave. If the owner leaves, the member who joined earliest becomes the owner. If the last member leaves, the household is deleted.
 - Every change to who is in a household locks the household row in a transaction, so simultaneous joins, leaves and removals can't leave a household without members or without an owner.
 - Each account can try 10 invite codes that match nothing per 15 minutes; after that, preview and accept return 429. Misses are stored in `invite_code_attempt`, so the limit holds across restarts and API instances.
@@ -102,8 +102,28 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 
 - The app follows the device's light or dark setting, and switches live when that setting changes.
 - Under Household > Appearance, people can pick Light or Dark instead. The choice is saved in `localStorage` (`taskhold-theme`), so it's per device, and it wins over the device setting from then on. There's no option to go back to following the device; clearing site data resets it.
-- A small inline script in `apps/web/index.html` applies the theme before the first paint, so dark mode doesn't flash white. `components/theme-provider.tsx` follows the same rule after that. A future Content Security Policy needs to allow that script by its hash.
+- A small inline script in `apps/web/index.html` applies the theme before the first paint, so dark mode doesn't flash white. `components/theme-provider.tsx` follows the same rule after that. The Content Security Policy allows it by its hash, which the build computes (see "Security headers").
 - The dark theme uses a lighter violet for `--primary` than the light theme, with dark text on primary buttons. The light theme's violet was under 2:1 contrast against dark cards; this one is over 6:1.
+
+## Security headers
+
+- **Web app:** `apps/web/content-security-policy.ts` is a Vite plugin that adds a Content Security Policy to the built `index.html` as a `<meta>` tag.
+  - **Scripts:** only the app's own files run, plus inline scripts allowed by their SHA-256 hash, today just the theme script. The build hashes every inline script in the final HTML, so editing the theme script can't break the policy.
+  - **Images:** only from the app itself, `data:` URLs and Google's profile-picture host (`*.googleusercontent.com`).
+  - **Everything else:** data requests go only to the app's own origin, and plugins and `<base>` tags are blocked.
+  - **Development:** the dev server has no policy, because Vite's hot reloading uses inline scripts. Use `pnpm --filter @taskhold/web exec vite preview` to try the production build with the policy; it proxies `/api` to port 3000 like the dev server.
+- **Not covered by a `<meta>` tag:** it can't stop other sites from framing the app (`frame-ancestors`). Whatever serves the web app in production should send `Content-Security-Policy: frame-ancestors 'none'` (or `X-Frame-Options: DENY`) as a header.
+- **API responses** get Hono's `secureHeaders`: a policy of `default-src 'none'; frame-ancestors 'none'` (they're JSON or redirects, never pages), plus `X-Frame-Options: DENY`, `nosniff` and the usual set. HSTS applies to the app's host only (no `includeSubDomains`), so it doesn't affect other subdomains of the production domain.
+
+## Production settings
+
+- `pnpm --filter @taskhold/api start` runs with `NODE_ENV=production`, set in the script itself, so `.env` can't override it.
+- **Database timeouts** (`apps/api/src/db/client.ts`):
+  - waiting for a connection gives up after 5 seconds;
+  - Postgres cancels any statement after 10 seconds, including one waiting on a row lock;
+  - Postgres ends a session that sits in an open transaction for 10 seconds.
+
+  Every query the app runs takes milliseconds, so these only stop something stuck from holding one of the pool's 10 connections forever.
 
 ## Request limits
 

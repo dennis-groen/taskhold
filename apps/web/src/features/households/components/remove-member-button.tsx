@@ -28,7 +28,7 @@ export function RemoveMemberButton({
         </Button>
       }
       title={`Remove ${member.name}?`}
-      description={`${firstName} loses access to ${householdName} right away. They can come back with the invite code, so get a new code if they shouldn't.`}
+      description={`${firstName} loses access to ${householdName} right away. The invite code changes too, so they can't use it to rejoin.`}
       confirmLabel={`Remove ${firstName}`}
       destructive
       onConfirm={async () => {
