@@ -89,8 +89,8 @@ features/
     hooks/                use-todos: the to-dos plus optimistic changes
     components/           to-do form, row, sheet (with move to chores), new-to-do drawer, add button
     pages/                Personal page
-components/               shared: shadcn ui/, layout/ (household shell with nav, onboarding app shell, page heading, group), small app-wide pieces (add row, shared-with line, confirm dialog, avatar)
-lib/                      shared: RPC client and errorMessage(), dates (due groups and labels), utils
+components/               shared: shadcn ui/, layout/ (household shell with nav, onboarding app shell, page heading, group), theme provider and toggle, small app-wide pieces (add row, shared-with line, confirm dialog, avatar)
+lib/                      shared: RPC client and errorMessage(), dates (due groups and labels), theme context and useTheme(), utils
 ```
 
 - Server data that changes while a page is open (shopping lists, chores, to-dos) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { Group, GroupHeading } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
+import { ThemeToggle } from "@/components/theme-toggle.tsx";
 import { UserAvatar } from "@/components/user-avatar.tsx";
 
 import { HouseholdMembers } from "../components/household-members.tsx";
@@ -55,6 +56,11 @@ export function HouseholdOverviewPage({ accountAction }: { accountAction?: React
           </span>
           {accountAction}
         </div>
+      </Group>
+
+      <GroupHeading>Appearance</GroupHeading>
+      <Group className="p-4">
+        <ThemeToggle />
       </Group>
 
       <div className="mt-8">

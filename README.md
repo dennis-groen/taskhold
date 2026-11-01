@@ -98,6 +98,13 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - Wide events log only to-do ids and counts, never names or notes.
 - Table: `todo` in `apps/api/src/features/todos/todos.schema.ts`. Deleting an account deletes its to-dos.
 
+## Light and dark mode
+
+- The app follows the device's light or dark setting, and switches live when that setting changes.
+- Under Household > Appearance, people can pick Light or Dark instead. The choice is saved in `localStorage` (`taskhold-theme`), so it's per device, and it wins over the device setting from then on. There's no option to go back to following the device; clearing site data resets it.
+- A small inline script in `apps/web/index.html` applies the theme before the first paint, so dark mode doesn't flash white. `components/theme-provider.tsx` follows the same rule after that. A future Content Security Policy needs to allow that script by its hash.
+- The dark theme uses a lighter violet for `--primary` than the light theme, with dark text on primary buttons. The light theme's violet was under 2:1 contrast against dark cards; this one is over 6:1.
+
 ## Request limits
 
 Request bodies over 64 KB get 413 before any handler reads them (`bodyLimit` in `apps/api/src/app.ts`).
