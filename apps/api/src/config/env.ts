@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+/** A setting that may be missing or left empty (as in .env.example); both mean unset */
+const optionalString = () =>
+  z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -23,6 +31,13 @@ const envSchema = z.object({
   // Folder with the web app's build (apps/web/dist) to serve next to the API, as in the Docker
   // image. Unset in development, where Vite serves the web app.
   WEB_ROOT: z.string().min(1).optional(),
+  // Web Push keys for chore reminders (generate a pair with `pnpm --filter @taskhold/api exec
+  // web-push generate-vapid-keys`). Without them reminders are switched off.
+  VAPID_PUBLIC_KEY: optionalString(),
+  VAPID_PRIVATE_KEY: optionalString(),
+  // Who push services can contact about this sender: a mailto: or https: URL. Defaults to
+  // BETTER_AUTH_URL when that's https.
+  VAPID_SUBJECT: optionalString(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   // json for log collectors; pretty is readable in a terminal. Defaults to pretty in development.
   LOG_FORMAT: z.enum(["json", "pretty"]).optional(),

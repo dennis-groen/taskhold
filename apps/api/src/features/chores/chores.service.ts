@@ -173,6 +173,31 @@ export async function clearDoneChores(userId: string): Promise<number> {
   return removed;
 }
 
+/**
+ * For reminders: names of the person's chores that aren't done and are due on or before `today`,
+ * split into due today and overdue. Their chores are the ones assigned to them or to nobody.
+ */
+export async function findDueChores(
+  userId: string,
+  today: Temporal.PlainDate,
+): Promise<{ today: string[]; overdue: string[] }> {
+  const due = { today: [] as string[], overdue: [] as string[] };
+  const household = await householdsService.findMembership(userId);
+  if (!household) return due;
+
+  const records = await choresDal.findChores(household.id);
+  const latest = await choresDal.findLatestCompletions(records.map((record) => record.id));
+  for (const record of records) {
+    const chore = toChore(record, latest.get(record.id) ?? null);
+    if (chore.done || !chore.dueOn) continue;
+    if (chore.assignee && chore.assignee.id !== userId) continue;
+    const order = Temporal.PlainDate.compare(chore.dueOn, today);
+    if (order === 0) due.today.push(chore.name);
+    else if (order < 0) due.overdue.push(chore.name);
+  }
+  return due;
+}
+
 async function checkChore(
   householdId: string,
   chore: { repeat: Repeat | null; dueOn: Temporal.PlainDate | null; assigneeId: string | null },

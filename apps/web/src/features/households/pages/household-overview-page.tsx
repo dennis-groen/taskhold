@@ -16,14 +16,16 @@ const householdRoute = getRouteApi("/_household");
 
 /**
  * `accountAction` is the sign-out button and `deleteAccount` the delete-account button, which
- * belong to the auth feature
+ * belong to the auth feature; `reminders` is the reminders feature's settings
  */
 export function HouseholdOverviewPage({
   accountAction,
   deleteAccount,
+  reminders,
 }: {
   accountAction?: ReactNode;
   deleteAccount?: (household: Household, currentUserId: string) => ReactNode;
+  reminders?: ReactNode;
 }) {
   const household = householdRoute.useLoaderData();
   const { user } = householdRoute.useRouteContext();
@@ -67,6 +69,8 @@ export function HouseholdOverviewPage({
           {accountAction}
         </div>
       </Group>
+
+      {reminders}
 
       <GroupHeading>Appearance</GroupHeading>
       <Group className="p-4">

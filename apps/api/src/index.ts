@@ -5,6 +5,7 @@ import { pool } from "./db/client.ts";
 import { stopFeed } from "./lib/live-changes.ts";
 import { logger } from "./lib/logger.ts";
 import { describeError } from "./lib/wide-event.ts";
+import { startReminders } from "./features/reminders/reminders.scheduler.ts";
 import { createServer } from "./server.ts";
 
 // Something escaped every handler, so the process is in an unknown state. Log it the same way as
@@ -22,10 +23,13 @@ const server = serve({ fetch: createServer(env.WEB_ROOT).fetch, port: env.PORT }
   logger.info({ port: info.port }, `API running on http://localhost:${info.port}`);
 });
 
+const stopReminders = startReminders();
+
 // Stop taking requests, let in-flight ones finish, then release database connections. Live
 // streams never finish by themselves, so they're ended first; browsers reconnect to the new server.
 function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, `${signal} received, shutting down`);
+  stopReminders();
   void stopFeed();
   server.close(() => {
     void pool.end().finally(() => process.exit(0));

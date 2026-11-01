@@ -22,5 +22,12 @@ export const plainDate = customType<{ data: Temporal.PlainDate; driverData: stri
   fromDriver: (value) => Temporal.PlainDate.from(value),
 });
 
+/** A `time` (without time zone): a time of day, read as a Temporal.PlainTime */
+export const plainTime = customType<{ data: Temporal.PlainTime; driverData: string }>({
+  dataType: () => "time",
+  toDriver: (value) => value.toString(),
+  fromDriver: (value) => Temporal.PlainTime.from(value),
+});
+
 /** Default for a column that records when its row was written */
 export const now = sql`now()`;

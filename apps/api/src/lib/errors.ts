@@ -5,7 +5,8 @@ export type ErrorKind =
   | "forbidden"
   | "not_found"
   | "conflict"
-  | "too_many_requests";
+  | "too_many_requests"
+  | "unavailable";
 
 /** Body of every error response */
 export type ApiErrorBody = { error: { code: string; message: string } };

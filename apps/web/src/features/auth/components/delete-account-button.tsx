@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/confirm-dialog.tsx";
 import { Button } from "@/components/ui/button";
+import { forgetPushDevice } from "@/lib/push-device.ts";
 import { queryClient } from "@/router.tsx";
 
 import { deleteAccount } from "../auth.api.ts";
@@ -37,6 +38,8 @@ export function DeleteAccountButton({
       destructive
       onConfirm={async () => {
         await deleteAccount();
+        // The server removed the account's devices; this unsubscribes the browser too
+        await forgetPushDevice();
         // Nothing from the deleted account should be on screen or in memory afterwards
         queryClient.clear();
         await navigate({ to: "/" });

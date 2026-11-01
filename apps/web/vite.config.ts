@@ -38,6 +38,8 @@ export default defineConfig({
         // The first service worker takes over pages already open, so a later update can reload them.
         // Updates themselves still wait for the prompt.
         clientsClaim: true,
+        // Shows chore reminders (public/push-handler.js)
+        importScripts: ["/push-handler.js"],
       },
     }),
   ],
