@@ -7,9 +7,9 @@ import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { SharedWithLine } from "@/components/shared-with-line.tsx";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/api-client.ts";
+import { DUE_GROUPS, dueGroup, dueLabel, today as todayOnDevice } from "@/lib/dates.ts";
 import { cn } from "@/lib/utils";
 
-import { DUE_GROUPS, dueGroup, dueLabel, today as todayOnDevice } from "../chore-dates.ts";
 import { clearDoneChores, type Chore } from "../chores.api.ts";
 import { choreKeys } from "../chores.queries.ts";
 import type { Member } from "../components/chore-form.tsx";

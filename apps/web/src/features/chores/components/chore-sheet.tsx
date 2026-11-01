@@ -11,8 +11,8 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
+import { pastDateLabel } from "@/lib/dates.ts";
 
-import { pastDateLabel } from "../chore-dates.ts";
 import { deleteChore, updateChore, type Chore, type ChoreInput } from "../chores.api.ts";
 import { choreKeys, choreQuery } from "../chores.queries.ts";
 import { ChoreForm, type Member } from "./chore-form.tsx";

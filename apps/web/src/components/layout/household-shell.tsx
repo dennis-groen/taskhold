@@ -1,4 +1,4 @@
-import { BroomIcon, HouseIcon, ShoppingCartIcon, type Icon } from "@phosphor-icons/react";
+import { BroomIcon, HouseIcon, LockIcon, ShoppingCartIcon, type Icon } from "@phosphor-icons/react";
 import { Link, type LinkProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
@@ -9,11 +9,11 @@ type NavItem = { to: LinkProps["to"]; label: string; icon: Icon };
 const NAV: NavItem[] = [
   { to: "/lists", label: "Shopping", icon: ShoppingCartIcon },
   { to: "/chores", label: "Chores", icon: BroomIcon },
+  { to: "/personal", label: "Personal", icon: LockIcon },
   { to: "/household", label: "Household", icon: HouseIcon },
 ];
 
 // On phones the add button sits in the middle of the bar, with half the tabs on either side.
-// With an odd number of tabs the right half has one fewer, centred in its half.
 const NAV_LEFT = NAV.slice(0, Math.ceil(NAV.length / 2));
 const NAV_RIGHT = NAV.slice(Math.ceil(NAV.length / 2));
 

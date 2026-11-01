@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { errorMessage } from "@/lib/api-client.ts";
+import { today } from "@/lib/dates.ts";
 import { firstName } from "@/lib/shared-with.ts";
 
-import { today } from "../chore-dates.ts";
 import type { ChoreInput, Repeat } from "../chores.api.ts";
 
 export type Member = { id: string; name: string; image: string | null };

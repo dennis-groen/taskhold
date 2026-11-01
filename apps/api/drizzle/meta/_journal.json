@@ -36,6 +36,13 @@
       "when": 1793539401850,
       "tag": "0004_chores",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793541076945,
+      "tag": "0005_todos",
+      "breakpoints": true
     }
   ]
 }

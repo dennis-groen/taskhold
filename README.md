@@ -66,7 +66,7 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 
 - Every member of a household can create, open, change and delete all of its lists. Lists are on `/lists` (the Shopping tab), and each one opens at `/lists/:listId`.
 - Items have a name and an optional free-text quantity ("2", "500 g"). Checking one off records who did it; "Clear checked off" removes everything that's been bought.
-- The round + button (in the left rail on wide screens, in the bottom bar on phones) opens a quick-add sheet from any page except Chores, where it adds a chore. It adds to the list that's open, or the first list, and chips switch to another list.
+- The round + button (in the left rail on wide screens, in the bottom bar on phones) opens a quick-add sheet from any page except Chores and Personal, where it adds a chore or a to-do. It adds to the list that's open, or the first list, and chips switch to another list.
 - Ticked items move to "In cart"; "Done shopping" clears them.
 - Changes show straight away (optimistic updates with React Query) and roll back with a message if the API rejects them.
 - An open list checks for changes from other members every 5 seconds while the tab is visible, and refetches when you come back to the tab. If someone deletes the list, the page says so.
@@ -87,6 +87,16 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - Done one-off chores collapse into "Done"; "Clear done" removes them.
 - The page checks for changes from other members every 10 seconds while the tab is visible.
 - Tables: `chore` and `chore_completion` in `apps/api/src/features/chores/chores.schema.ts`. A check constraint keeps repeat settings consistent and makes repeating chores have a due date. Deleting a household or a chore deletes its history.
+
+## Private to-dos
+
+- To-dos are on `/personal` (the Personal tab). They belong to a person, not a household: only they can see or change them, and other members of the household get a 404 for every one. They stay with the person when they leave or switch households.
+- A to-do has a name, an optional due date and optional notes. It doesn't repeat; repeating household work belongs in Chores.
+- The page groups to-dos like chores (Overdue, Today, This week, Later, Anytime). Done ones collapse into "Done", and "Clear done" removes them.
+- Adding, ticking off and removing show straight away (optimistic updates), and to-dos can carry a client-generated id so a retried add doesn't duplicate. There's no polling, since nobody else changes them; the list refetches when the window gets focus.
+- "Move to household chores" turns a to-do into a one-off chore with the same name and due date, assigned to nobody, and deletes the to-do. Notes aren't shared: they're deleted with it. Moving without a household fails and keeps the to-do.
+- Wide events log only to-do ids and counts, never names or notes.
+- Table: `todo` in `apps/api/src/features/todos/todos.schema.ts`. Deleting an account deletes its to-dos.
 
 ## Request limits
 

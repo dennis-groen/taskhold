@@ -6,6 +6,7 @@ import { authRoutes } from "./features/auth/auth.routes.ts";
 import { choreRoutes } from "./features/chores/chores.routes.ts";
 import { householdRoutes } from "./features/households/households.routes.ts";
 import { shoppingRoutes } from "./features/shopping/shopping.routes.ts";
+import { todoRoutes } from "./features/todos/todos.routes.ts";
 import { viewerRoutes } from "./features/viewer/viewer.routes.ts";
 import { errorHandler } from "./lib/error-handler.ts";
 import type { ApiErrorBody } from "./lib/errors.ts";
@@ -38,4 +39,5 @@ export const app = new Hono()
   .route("/viewer", viewerRoutes)
   .route("/households", householdRoutes)
   .route("/shopping", shoppingRoutes)
-  .route("/chores", choreRoutes);
+  .route("/chores", choreRoutes)
+  .route("/todos", todoRoutes);

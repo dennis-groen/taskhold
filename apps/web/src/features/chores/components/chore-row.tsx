@@ -3,9 +3,10 @@ import { useId } from "react";
 
 import { UserAvatar } from "@/components/user-avatar.tsx";
 import { Checkbox } from "@/components/ui/checkbox";
+import { daysBetween, dueLabel, pastDateLabel } from "@/lib/dates.ts";
 import { cn } from "@/lib/utils";
 
-import { daysBetween, dueLabel, pastDateLabel, repeatLabel } from "../chore-dates.ts";
+import { repeatLabel } from "../chore-dates.ts";
 import type { Chore } from "../chores.api.ts";
 
 /**

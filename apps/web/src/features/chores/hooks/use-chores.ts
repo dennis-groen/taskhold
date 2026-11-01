@@ -7,8 +7,9 @@ import {
 import { useState } from "react";
 
 import { errorMessage } from "@/lib/api-client.ts";
+import { today } from "@/lib/dates.ts";
 
-import { addInterval, today } from "../chore-dates.ts";
+import { addInterval } from "../chore-dates.ts";
 import { completeChore, undoCompletion, type Chore } from "../chores.api.ts";
 import { choreKeys, choresQuery } from "../chores.queries.ts";
 

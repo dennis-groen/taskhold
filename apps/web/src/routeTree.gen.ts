@@ -22,6 +22,7 @@ import { Route as OnboardingJoinRouteImport } from './routes/onboarding/join'
 import { Route as HouseholdChoresIndexRouteImport } from './routes/_household/chores/index'
 import { Route as HouseholdListsIndexRouteImport } from './routes/_household/lists/index'
 import { Route as HouseholdListsListIdRouteImport } from './routes/_household/lists/$listId'
+import { Route as HouseholdPersonalIndexRouteImport } from './routes/_household/personal/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -87,6 +88,11 @@ const HouseholdListsListIdRoute = HouseholdListsListIdRouteImport.update({
   path: '/lists/$listId',
   getParentRoute: () => HouseholdRoute,
 } as any)
+const HouseholdPersonalIndexRoute = HouseholdPersonalIndexRouteImport.update({
+  id: '/personal/',
+  path: '/personal/',
+  getParentRoute: () => HouseholdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/lists/$listId': typeof HouseholdListsListIdRoute
   '/chores/': typeof HouseholdChoresIndexRoute
   '/lists/': typeof HouseholdListsIndexRoute
+  '/personal/': typeof HouseholdPersonalIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByTo {
   '/lists/$listId': typeof HouseholdListsListIdRoute
   '/chores': typeof HouseholdChoresIndexRoute
   '/lists': typeof HouseholdListsIndexRoute
+  '/personal': typeof HouseholdPersonalIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/_household/lists/$listId': typeof HouseholdListsListIdRoute
   '/_household/chores/': typeof HouseholdChoresIndexRoute
   '/_household/lists/': typeof HouseholdListsIndexRoute
+  '/_household/personal/': typeof HouseholdPersonalIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/lists/$listId'
     | '/chores/'
     | '/lists/'
+    | '/personal/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/lists/$listId'
     | '/chores'
     | '/lists'
+    | '/personal'
   id:
     | '__root__'
     | '/'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/_household/lists/$listId'
     | '/_household/chores/'
     | '/_household/lists/'
+    | '/_household/personal/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -276,6 +288,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HouseholdListsListIdRouteImport
       parentRoute: typeof HouseholdRoute
     }
+    '/_household/personal/': {
+      id: '/_household/personal/'
+      path: '/personal'
+      fullPath: '/personal/'
+      preLoaderRoute: typeof HouseholdPersonalIndexRouteImport
+      parentRoute: typeof HouseholdRoute
+    }
   }
 }
 
@@ -286,6 +305,7 @@ interface HouseholdRouteChildren {
   HouseholdListsListIdRoute: typeof HouseholdListsListIdRoute
   HouseholdChoresIndexRoute: typeof HouseholdChoresIndexRoute
   HouseholdListsIndexRoute: typeof HouseholdListsIndexRoute
+  HouseholdPersonalIndexRoute: typeof HouseholdPersonalIndexRoute
 }
 
 const HouseholdRouteChildren: HouseholdRouteChildren = {
@@ -295,6 +315,7 @@ const HouseholdRouteChildren: HouseholdRouteChildren = {
   HouseholdListsListIdRoute: HouseholdListsListIdRoute,
   HouseholdChoresIndexRoute: HouseholdChoresIndexRoute,
   HouseholdListsIndexRoute: HouseholdListsIndexRoute,
+  HouseholdPersonalIndexRoute: HouseholdPersonalIndexRoute,
 }
 
 const HouseholdRouteWithChildren = HouseholdRoute._addFileChildren(

@@ -25,6 +25,7 @@ features/
     invite-code.ts            pure domain logic: generate and normalize codes
   shopping/               shopping lists and items, scoped to the user's household
   chores/                 chores and their completions; chore-dates.ts holds the due-date rules
+  todos/                  private to-dos, scoped to the user rather than a household; can move one to chores
   viewer/                 GET /api/viewer, composed from the auth and households services
 ```
 
@@ -40,7 +41,7 @@ Requests flow `routes → service → dal → database`, never backwards.
 
 - Services throw `AppError(kind, code, message)`. `lib/error-handler.ts` maps the `kind` to a status code and responds with `{ error: { code, message } }`.
 - Every request is logged as one wide event (`lib/request-logger.ts`). Services add what they know about the request with `annotate(group, fields)` from `lib/wide-event.ts`, using ids and counts, never names, codes or other user content. Don't log separate lines during a request: add to its event instead.
-- A feature may call another feature's service, never its DAL. `viewer` uses `auth` and `households` this way, and `shopping` asks `householdsService.getMembershipOf()` which household a user is in.
+- A feature may call another feature's service, never its DAL. `viewer` uses `auth` and `households` this way, `shopping` asks `householdsService.getMembershipOf()` which household a user is in, and `todos` calls `choresService.createChore()` to move a to-do to chores.
 - Data that belongs to a household is always queried with the household id in the `WHERE` clause, so an id from another household reads as missing (404) and never leaks.
 - Schema files may import other features' tables, because foreign keys cross features.
 - Each feature mounts under its own path in `app.ts`. A feature that needs a signed-in user builds its router with `protectedRouter()`, so every route in it returns 401 without a session and 403 for a state-changing request from another origin (`lib/same-origin.ts`).
@@ -78,15 +79,21 @@ features/
   chores/
     chores.api.ts         RPC calls and their response types
     chores.queries.ts     React Query keys and queryOptions
-    chore-dates.ts        today on this device, due groups and labels; the due-date rule mirrors the API's
+    chore-dates.ts        repeat rule (mirrors the API's) and repeat labels; general date helpers are in lib/dates.ts
     hooks/                use-chores: the chores plus optimistic marking done
     components/           chore form, row, sheet, new-chore drawer, add button, undo bar
     pages/                chores page
+  todos/
+    todos.api.ts          RPC calls and their response types
+    todos.queries.ts      React Query keys and queryOptions
+    hooks/                use-todos: the to-dos plus optimistic changes
+    components/           to-do form, row, sheet (with move to chores), new-to-do drawer, add button
+    pages/                Personal page
 components/               shared: shadcn ui/, layout/ (household shell with nav, onboarding app shell, page heading, group), small app-wide pieces (add row, shared-with line, confirm dialog, avatar)
-lib/                      shared: RPC client and errorMessage(), utils
+lib/                      shared: RPC client and errorMessage(), dates (due groups and labels), utils
 ```
 
-- Server data that changes while a page is open (shopping lists, chores) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
+- Server data that changes while a page is open (shopping lists, chores, to-dos) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
 - Optimistic changes follow `hooks/use-shopping-list.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
 - Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button, or the chores feature's add button on the chores page, into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
