@@ -11,7 +11,7 @@
     "build": "tsc",
     "start": "NODE_ENV=production node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
-    "auth:generate": "auth generate --config src/features/auth/auth.ts --output src/features/auth/auth.schema.ts --yes",
+    "auth:generate": "auth generate --config src/features/auth/auth.ts --output src/features/auth/auth.schema.ts --yes && node scripts/strip-auth-relations.mjs src/features/auth/auth.schema.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -23,7 +23,7 @@
     "@hono/node-server": "^2.1.5",
     "@hono/zod-validator": "^0.9.1",
     "better-auth": "^1.7.12",
-    "drizzle-orm": "^0.45.4",
+    "drizzle-orm": "1.0.0-rc.5",
     "hono": "^4.13.13",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
@@ -34,7 +34,7 @@
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
     "auth": "^1.7.12",
-    "drizzle-kit": "^0.31.11",
+    "drizzle-kit": "1.0.0-rc.5",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   }

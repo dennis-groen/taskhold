@@ -1,8 +1,9 @@
-import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { betterAuth } from "better-auth";
 
 import { env } from "../../config/env.ts";
 import { db } from "../../db/client.ts";
+import * as schema from "../../db/schema.ts";
 import { logger } from "../../lib/logger.ts";
 import { appendToEvent, describeError, keepEvent } from "../../lib/wide-event.ts";
 
@@ -40,7 +41,7 @@ const authLogger = logger.child({ component: "better-auth" });
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  database: drizzleAdapter(db, { provider: "pg" }),
+  database: drizzleAdapter(db, { provider: "pg", schema }),
   socialProviders: {
     google: {
       clientId: env.GOOGLE_CLIENT_ID,

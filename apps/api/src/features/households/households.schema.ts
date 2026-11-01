@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import { index, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 
 import { instant, now } from "../../db/columns.ts";
@@ -58,18 +57,3 @@ export const inviteCodeAttempt = pgTable(
     index("invite_code_attempt_userId_attemptedAt_idx").on(table.userId, table.attemptedAt),
   ],
 );
-
-export const householdRelations = relations(household, ({ many }) => ({
-  members: many(householdMember),
-}));
-
-export const householdMemberRelations = relations(householdMember, ({ one }) => ({
-  household: one(household, {
-    fields: [householdMember.householdId],
-    references: [household.id],
-  }),
-  user: one(user, {
-    fields: [householdMember.userId],
-    references: [user.id],
-  }),
-}));

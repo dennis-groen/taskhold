@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { check, index, integer, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 
 import { instant, now, plainDate } from "../../db/columns.ts";
@@ -63,18 +63,3 @@ export const choreCompletion = pgTable(
   },
   (table) => [index("chore_completion_choreId_createdAt_idx").on(table.choreId, table.createdAt)],
 );
-
-export const choreRelations = relations(chore, ({ one, many }) => ({
-  household: one(household, {
-    fields: [chore.householdId],
-    references: [household.id],
-  }),
-  completions: many(choreCompletion),
-}));
-
-export const choreCompletionRelations = relations(choreCompletion, ({ one }) => ({
-  chore: one(chore, {
-    fields: [choreCompletion.choreId],
-    references: [chore.id],
-  }),
-}));

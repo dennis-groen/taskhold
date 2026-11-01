@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import { index, pgTable, text } from "drizzle-orm/pg-core";
 
 import { instant, now } from "../../db/columns.ts";
@@ -46,18 +45,3 @@ export const shoppingItem = pgTable(
   },
   (table) => [index("shopping_item_listId_idx").on(table.listId)],
 );
-
-export const shoppingListRelations = relations(shoppingList, ({ one, many }) => ({
-  household: one(household, {
-    fields: [shoppingList.householdId],
-    references: [household.id],
-  }),
-  items: many(shoppingItem),
-}));
-
-export const shoppingItemRelations = relations(shoppingItem, ({ one }) => ({
-  list: one(shoppingList, {
-    fields: [shoppingItem.listId],
-    references: [shoppingList.id],
-  }),
-}));

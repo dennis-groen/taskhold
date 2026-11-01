@@ -1,0 +1,445 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "b608b010-aa15-49a1-80d1-9af530e53adb",
+  "prevIds": [
+    "9f8d6ae2-0aba-40d3-aac5-17de597415de"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "household_role"
+      ],
+      "writes": [
+        "s|enum|public.household_role",
+        "n|enum|public.household_role",
+        "e|enum|public.household_role",
+        "n|type|public.household_role"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "household"
+      ],
+      "writes": [
+        "s|tbl|public.household",
+        "n|tbl|public.household",
+        "e|tbl|public.household",
+        "n|rel|public.household",
+        "n|type|public.household",
+        "n|rel|public.household_pkey",
+        "n|rel|public.household_invite_code_unique"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "household_member"
+      ],
+      "writes": [
+        "s|tbl|public.household_member",
+        "n|tbl|public.household_member",
+        "e|tbl|public.household_member",
+        "n|rel|public.household_member",
+        "n|type|public.household_member",
+        "n|rel|public.household_member_pkey",
+        "n|rel|public.household_member_user_id_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.household_role"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "household_member",
+        "household_member_householdId_idx"
+      ],
+      "writes": [
+        "s|idx|public.household_member_householdId_idx",
+        "n|idx|public.household_member_householdId_idx",
+        "e|idx|public.household_member_householdId_idx",
+        "n|rel|public.household_member_householdId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.household_member",
+        "n|sch|public",
+        "n|col|public.household_member.household_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "household_member"
+      ],
+      "writes": [
+        "s|fk|public.household_member.household_member_household_id_household_id_fk",
+        "n|fk|public.household_member.household_member_household_id_household_id_fk",
+        "e|fk|public.household_member.household_member_household_id_household_id_fk",
+        "n|con|public.household_member.household_member_household_id_household_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.household_member",
+        "n|sch|public",
+        "n|tbl|public.household",
+        "n|sch|public",
+        "n|col|public.household_member.household_id",
+        "n|col|public.household.id",
+        "e|uniqueness|public.household.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "household_member"
+      ],
+      "writes": [
+        "s|fk|public.household_member.household_member_user_id_user_id_fk",
+        "n|fk|public.household_member.household_member_user_id_user_id_fk",
+        "e|fk|public.household_member.household_member_user_id_user_id_fk",
+        "n|con|public.household_member.household_member_user_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.household_member",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.household_member.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "household",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "household_member",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "household_role",
+        "values": [
+          "owner",
+          "member"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "invite_code",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "created_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "updated_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "household_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "user_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "role",
+        "type": "household_role",
+        "typeSchema": "public",
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "joined_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "household_member_householdId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "household_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "household_member_household_id_household_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "household_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "household",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "household_member_user_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "household_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "household_member_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "household_invite_code_unique",
+        "nameExplicit": false,
+        "columns": [
+          "invite_code"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household_member",
+        "name": "household_member_user_id_unique",
+        "nameExplicit": false,
+        "columns": [
+          "user_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    }
+  ]
+}

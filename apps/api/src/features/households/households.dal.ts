@@ -1,6 +1,6 @@
 // Data access for households: the only place that queries household tables.
 // Functions return plain records and take an optional executor so services can run them in a transaction.
-import { and, asc, count, eq, gte, lt, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, gte, lt } from "drizzle-orm";
 
 import { db, type Executor, type Transaction } from "../../db/client.ts";
 import { isUniqueViolation } from "../../db/errors.ts";
@@ -65,20 +65,23 @@ export async function isMember(
 }
 
 export function findHouseholdById(householdId: string, executor: Executor = db) {
-  return findHousehold(eq(household.id, householdId), executor);
+  return findHousehold({ id: householdId }, executor);
 }
 
 export function findHouseholdByInviteCode(inviteCode: string, executor: Executor = db) {
-  return findHousehold(eq(household.inviteCode, inviteCode), executor);
+  return findHousehold({ inviteCode }, executor);
 }
 
-async function findHousehold(where: SQL, executor: Executor): Promise<HouseholdRecord | null> {
+async function findHousehold(
+  where: { id: string } | { inviteCode: string },
+  executor: Executor,
+): Promise<HouseholdRecord | null> {
   const row = await executor.query.household.findFirst({
     where,
     with: {
       members: {
         with: { user: { columns: { id: true, name: true, image: true } } },
-        orderBy: [asc(householdMember.joinedAt)],
+        orderBy: { joinedAt: "asc" },
       },
     },
   });

@@ -1,0 +1,643 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "c51e611a-1042-4e13-a9ee-6bd123e21f6b",
+  "prevIds": [
+    "bdda8807-27f3-4ec3-9932-cfa337e0a874"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "chore_repeat_unit"
+      ],
+      "writes": [
+        "s|enum|public.chore_repeat_unit",
+        "n|enum|public.chore_repeat_unit",
+        "e|enum|public.chore_repeat_unit",
+        "n|type|public.chore_repeat_unit"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "chore"
+      ],
+      "writes": [
+        "s|tbl|public.chore",
+        "n|tbl|public.chore",
+        "e|tbl|public.chore",
+        "n|rel|public.chore",
+        "n|type|public.chore",
+        "n|rel|public.chore_pkey"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.chore_repeat_unit"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "chore_completion"
+      ],
+      "writes": [
+        "s|tbl|public.chore_completion",
+        "n|tbl|public.chore_completion",
+        "e|tbl|public.chore_completion",
+        "n|rel|public.chore_completion",
+        "n|type|public.chore_completion",
+        "n|rel|public.chore_completion_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "chore",
+        "chore_householdId_idx"
+      ],
+      "writes": [
+        "s|idx|public.chore_householdId_idx",
+        "n|idx|public.chore_householdId_idx",
+        "e|idx|public.chore_householdId_idx",
+        "n|rel|public.chore_householdId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.chore",
+        "n|sch|public",
+        "n|col|public.chore.household_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "chore_completion",
+        "chore_completion_choreId_createdAt_idx"
+      ],
+      "writes": [
+        "s|idx|public.chore_completion_choreId_createdAt_idx",
+        "n|idx|public.chore_completion_choreId_createdAt_idx",
+        "e|idx|public.chore_completion_choreId_createdAt_idx",
+        "n|rel|public.chore_completion_choreId_createdAt_idx"
+      ],
+      "reads": [
+        "n|tbl|public.chore_completion",
+        "n|sch|public",
+        "n|col|public.chore_completion.chore_id",
+        "n|col|public.chore_completion.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "chore"
+      ],
+      "writes": [
+        "s|fk|public.chore.chore_household_id_household_id_fk",
+        "n|fk|public.chore.chore_household_id_household_id_fk",
+        "e|fk|public.chore.chore_household_id_household_id_fk",
+        "n|con|public.chore.chore_household_id_household_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.chore",
+        "n|sch|public",
+        "n|tbl|public.household",
+        "n|sch|public",
+        "n|col|public.chore.household_id",
+        "n|col|public.household.id",
+        "e|uniqueness|public.household.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "chore"
+      ],
+      "writes": [
+        "s|fk|public.chore.chore_assignee_id_user_id_fk",
+        "n|fk|public.chore.chore_assignee_id_user_id_fk",
+        "e|fk|public.chore.chore_assignee_id_user_id_fk",
+        "n|con|public.chore.chore_assignee_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.chore",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.chore.assignee_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "chore_completion"
+      ],
+      "writes": [
+        "s|fk|public.chore_completion.chore_completion_chore_id_chore_id_fk",
+        "n|fk|public.chore_completion.chore_completion_chore_id_chore_id_fk",
+        "e|fk|public.chore_completion.chore_completion_chore_id_chore_id_fk",
+        "n|con|public.chore_completion.chore_completion_chore_id_chore_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.chore_completion",
+        "n|sch|public",
+        "n|tbl|public.chore",
+        "n|sch|public",
+        "n|col|public.chore_completion.chore_id",
+        "n|col|public.chore.id",
+        "e|uniqueness|public.chore.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "chore_completion"
+      ],
+      "writes": [
+        "s|fk|public.chore_completion.chore_completion_completed_by_id_user_id_fk",
+        "n|fk|public.chore_completion.chore_completion_completed_by_id_user_id_fk",
+        "e|fk|public.chore_completion.chore_completion_completed_by_id_user_id_fk",
+        "n|con|public.chore_completion.chore_completion_completed_by_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.chore_completion",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.chore_completion.completed_by_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "chore",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "chore_completion",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "chore_repeat_unit",
+        "values": [
+          "day",
+          "week"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "household_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "repeat_every",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "repeat_unit",
+        "type": "chore_repeat_unit",
+        "typeSchema": "public",
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "due_on",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "assignee_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "created_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "updated_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "chore_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "completed_by_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "completed_on",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "previous_due_on",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "created_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "chore_householdId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "household_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "chore_completion_choreId_createdAt_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "chore_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "chore_household_id_household_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "household_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "household",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "chore_assignee_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "assignee_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "chore_completion_chore_id_chore_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "chore_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "chore",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "chore_completion_completed_by_id_user_id_fk",
+        "nameExplicit": false,
+        "columns": [
+          "completed_by_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "chore_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "chore_completion_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore",
+        "name": "chore_repeat_check",
+        "value": "(\"chore\".\"repeat_every\" is null and \"chore\".\"repeat_unit\" is null) or (\"chore\".\"repeat_every\" > 0 and \"chore\".\"repeat_unit\" is not null and \"chore\".\"due_on\" is not null)",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

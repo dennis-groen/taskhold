@@ -1,0 +1,42 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "8822187f-5b1b-4d73-8304-b2ea1f2b233b",
+  "prevIds": [
+    "8a7f9de9-7735-45e9-abca-5ae41296227e"
+  ],
+  "footprints": [
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "chore"
+      ],
+      "writes": [
+        "s|ck|public.chore.chore_repeat_check"
+      ],
+      "reads": [
+        "n|tbl|public.chore",
+        "n|sch|public",
+        "n|col|public.chore.repeat_every",
+        "n|col|public.chore.repeat_unit",
+        "n|col|public.chore.due_on",
+        "e|col|public.chore.repeat_every",
+        "e|col|public.chore.repeat_unit",
+        "e|col|public.chore.due_on"
+      ],
+      "sqlHash": "4ddeeadc6c9ef578"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"chore\",\"chore_repeat_check\"]",
+      "set": {
+        "value": "(\"repeat_every\" is null and \"repeat_unit\" is null) or (\"repeat_every\" > 0 and \"repeat_unit\" is not null and \"due_on\" is not null)"
+      }
+    }
+  ]
+}

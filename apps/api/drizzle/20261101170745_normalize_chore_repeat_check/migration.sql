@@ -1,0 +1,1 @@
+ALTER TABLE "chore" DROP CONSTRAINT "chore_repeat_check", ADD CONSTRAINT "chore_repeat_check" CHECK (("repeat_every" is null and "repeat_unit" is null) or ("repeat_every" > 0 and "repeat_unit" is not null and "due_on" is not null));

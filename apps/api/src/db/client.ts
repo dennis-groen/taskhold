@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { countQuery, describeError } from "../lib/wide-event.ts";
-import * as schema from "./schema.ts";
+import { relations } from "./relations.ts";
 
 // Nothing the app does takes more than a few milliseconds, so anything slower is stuck. Without
 // limits, a stuck query or a transaction left open would hold its connection (and row locks)
@@ -26,7 +26,7 @@ pool.on("error", (err) => {
 });
 
 // Counts queries per request for the wide event. Query text and parameters aren't logged.
-export const db = drizzle({ client: pool, schema, logger: { logQuery: countQuery } });
+export const db = drizzle({ client: pool, relations, logger: { logQuery: countQuery } });
 
 export type Database = typeof db;
 export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
