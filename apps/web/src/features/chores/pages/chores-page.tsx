@@ -6,8 +6,8 @@ import { Group, GroupHeading } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { SharedWithLine } from "@/components/shared-with-line.tsx";
 import { Button } from "@/components/ui/button";
-import { errorMessage } from "@/lib/api-client.ts";
 import { DUE_GROUPS, dueGroup, dueLabel, today as todayOnDevice } from "@/lib/dates.ts";
+import { changeFailed, offerUndo } from "@/lib/feedback.ts";
 import { cn } from "@/lib/utils";
 
 import { clearDoneChores, type Chore } from "../chores.api.ts";
@@ -16,7 +16,6 @@ import type { Member } from "../components/chore-form.tsx";
 import { ChoreRow } from "../components/chore-row.tsx";
 import { ChoreSheet } from "../components/chore-sheet.tsx";
 import { NewChoreDrawer } from "../components/new-chore-drawer.tsx";
-import { UndoBar } from "../components/undo-bar.tsx";
 import { useChores } from "../hooks/use-chores.ts";
 
 type Filter = "all" | "mine" | "unassigned";
@@ -37,17 +36,11 @@ export function ChoresPage({
   members: Member[];
   otherMembers: string[];
 }) {
-  const { chores, error, complete, undo } = useChores(viewer);
+  const { chores, complete, undo } = useChores(viewer);
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
-  const [clearError, setClearError] = useState<string | null>(null);
-  const [lastDone, setLastDone] = useState<{
-    key: number;
-    choreId: string;
-    message: string;
-  } | null>(null);
   const today = todayOnDevice();
 
   const shown = chores.filter((chore) => {
@@ -60,23 +53,20 @@ export function ChoresPage({
 
   function markDone(chore: Chore) {
     const after = complete(chore);
-    setLastDone((last) => ({
-      key: (last?.key ?? 0) + 1,
-      choreId: chore.id,
-      message:
-        after.repeat && after.dueOn
-          ? `${chore.name} done. ${dueLabel(after.dueOn, today)}.`
-          : `${chore.name} done.`,
-    }));
+    offerUndo(
+      after.repeat && after.dueOn
+        ? `${chore.name} done. ${dueLabel(after.dueOn, today)}.`
+        : `${chore.name} done.`,
+      () => undo(chore.id),
+    );
   }
 
   async function clearDone() {
-    setClearError(null);
     try {
       await clearDoneChores();
       await queryClient.invalidateQueries({ queryKey: choreKeys.list() });
     } catch (err) {
-      setClearError(errorMessage(err, "Couldn't clear done chores. Try again."));
+      changeFailed(err, "Couldn't clear done chores. Try again.");
     }
   }
 
@@ -128,12 +118,6 @@ export function ChoresPage({
         />
       </Group>
 
-      {error && (
-        <p role="alert" className="mt-3 px-1 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
       {open.length === 0 && (
         <p className="px-4 py-10 text-center text-sm text-muted-foreground">
           {emptyMessage(filter, chores.length > 0)}
@@ -175,11 +159,6 @@ export function ChoresPage({
               Clear done
             </Button>
           </div>
-          {clearError && (
-            <p role="alert" className="px-1 text-sm text-destructive">
-              {clearError}
-            </p>
-          )}
           {doneOpen && (
             <Group className="mt-2">
               <ul className="divide-y">
@@ -200,15 +179,6 @@ export function ChoresPage({
         onUndo={undo}
         onClose={() => setOpenId(null)}
       />
-
-      {lastDone && (
-        <UndoBar
-          key={lastDone.key}
-          message={lastDone.message}
-          onUndo={() => undo(lastDone.choreId)}
-          onDismiss={() => setLastDone(null)}
-        />
-      )}
     </>
   );
 }

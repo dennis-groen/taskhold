@@ -118,6 +118,16 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Where toasts sit: above the bottom tab bar and its + button wherever that bar shows */
+:root {
+  --toast-bottom: 1.5rem;
+}
+@media (width < 64rem) {
+  :root:has([data-bottom-nav]) {
+    --toast-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

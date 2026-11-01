@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-import { useAddItem, useChangeError } from "../hooks/use-shopping-list.ts";
+import { useAddItem } from "../hooks/use-shopping-list.ts";
 import type { ShoppingListSummary } from "../shopping.api.ts";
 import { listsQuery } from "../shopping.queries.ts";
 import { NewListForm } from "./new-list-form.tsx";
@@ -79,8 +79,7 @@ function QuickAddForm({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [added, setAdded] = useState<{ count: number; text: string } | null>(null);
-  const { error, callbacks } = useChangeError();
-  const add = useAddItem(viewer, callbacks);
+  const add = useAddItem(viewer);
 
   if (!lists) return <div className="h-40" />;
 
@@ -141,14 +140,10 @@ function QuickAddForm({
       </div>
 
       <div className="h-6 pt-1.5 text-sm" aria-live="polite">
-        {error ? (
-          <span className="text-destructive">{error}</span>
-        ) : (
-          added && (
-            <span key={added.count} className="text-primary animate-in fade-in">
-              {added.text}
-            </span>
-          )
+        {added && (
+          <span key={added.count} className="text-primary animate-in fade-in">
+            {added.text}
+          </span>
         )}
       </div>
 

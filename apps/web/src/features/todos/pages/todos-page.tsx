@@ -15,7 +15,7 @@ import type { Todo } from "../todos.api.ts";
 
 /** The viewer's private to-dos, grouped by when they're due */
 export function TodosPage() {
-  const { todos, error, add, save, setDone, remove, clearDone } = useTodos();
+  const { todos, add, save, setDone, remove, clearDone } = useTodos();
   const [openId, setOpenId] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
   const [moved, setMoved] = useState<string | null>(null);
@@ -52,12 +52,7 @@ export function TodosPage() {
       </Group>
 
       <div aria-live="polite">
-        {error && (
-          <p role="alert" className="mt-3 px-1 text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        {moved && !error && (
+        {moved && (
           <p className="mt-3 px-1 text-sm text-muted-foreground">
             Moved {moved} to the household's chores.
           </p>

@@ -94,7 +94,7 @@ features/
     chores.queries.ts     React Query keys and queryOptions
     chore-dates.ts        repeat rule (mirrors the API's) and repeat labels; general date helpers are in lib/dates.ts
     hooks/                use-chores: the chores plus optimistic marking done
-    components/           chore form, row, sheet, new-chore drawer, add button, undo bar
+    components/           chore form, row, sheet, new-chore drawer, add button
     pages/                chores page
   todos/
     todos.api.ts          RPC calls and their response types
@@ -108,6 +108,7 @@ lib/                      shared: RPC client and errorMessage(), dates (due grou
 
 - Server data that changes while a page is open (shopping lists, chores, to-dos) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
 - Optimistic changes follow `hooks/use-shopping-list.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
+- Feedback after a change goes through `lib/feedback.ts`: `offerUndo` shows a toast with Undo (a ticked chore, a removed item or to-do, a cleared cart), and `changeFailed` shows a toast when a background change didn't save. Errors in forms and dialogs stay next to the form. Deletes and the undos that restore them share a mutation `scope`, so the restore can't reach the API before the delete.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
 - Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button, or the chores feature's add button on the chores page, into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
 - Inside a feature, imports are relative and folders are one level deep (`components/`, `pages/`, `hooks/`).

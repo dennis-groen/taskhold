@@ -4,9 +4,7 @@ import {
   useSuspenseQuery,
   type QueryClient,
 } from "@tanstack/react-query";
-import { useState } from "react";
-
-import { errorMessage } from "@/lib/api-client.ts";
+import { changeFailed, offerUndo } from "@/lib/feedback.ts";
 
 import {
   addItem,
@@ -28,11 +26,9 @@ const changeKey = [...shoppingKeys.all, "change"];
  */
 export function useShoppingList(listId: string, viewer: Person) {
   const { data: list, error: refetchError } = useSuspenseQuery(listQuery(listId));
-  const { error, callbacks } = useChangeError();
+  const add = useAddItem(viewer);
 
-  const add = useAddItem(viewer, callbacks);
-
-  const toggle = useListChange(callbacks, {
+  const toggle = useListChange({
     mutationFn: ({ itemId, checked }: { listId: string; itemId: string; checked: boolean }) =>
       updateItem(listId, itemId, { checked }),
     apply: (items, { itemId, checked }) =>
@@ -48,32 +44,62 @@ export function useShoppingList(listId: string, viewer: Person) {
       ),
   });
 
-  const remove = useListChange(callbacks, {
+  // Removals and the undos that put items back run one after another, so an undo can't reach the
+  // API before the removal it undoes
+  const removals = { id: `shopping-removals-${listId}` };
+
+  const remove = useListChange({
+    scope: removals,
     mutationFn: ({ itemId }: { listId: string; itemId: string }) => deleteItem(listId, itemId),
     apply: (items, { itemId }) => items.filter((item) => item.id !== itemId),
   });
 
-  const clearChecked = useListChange(callbacks, {
+  const clearChecked = useListChange({
+    scope: removals,
     mutationFn: (_vars: { listId: string }) => clearCheckedItems(listId),
     apply: (items) => items.filter((item) => !item.checked),
   });
+
+  // Puts removed items back as they were, keeping their ids so open screens still match
+  const restore = useListChange({
+    scope: removals,
+    mutationFn: async ({ items }: { listId: string; items: ShoppingItem[] }) => {
+      for (const { id, name, quantity, checked } of items) {
+        await addItem(listId, { id, name, quantity });
+        if (checked) await updateItem(listId, id, { checked });
+      }
+    },
+    apply: (items, vars) => [...vars.items, ...items],
+  });
+
+  function offerRestore(removed: ShoppingItem[], message: string) {
+    offerUndo(message, () => restore.mutate({ listId, items: removed }));
+  }
 
   return {
     list,
     /** Someone deleted the list while it was open */
     gone: isListGone(refetchError),
-    /** The last change that failed, for people; cleared by the next change */
-    error,
     add: (name: string, quantity: string | null) => add(listId, name, quantity),
     toggle: (itemId: string, checked: boolean) => toggle.mutate({ listId, itemId, checked }),
-    remove: (itemId: string) => remove.mutate({ listId, itemId }),
-    clearChecked: () => clearChecked.mutate({ listId }),
+    remove: (itemId: string) => {
+      const item = list.items.find((candidate) => candidate.id === itemId);
+      if (!item) return;
+      remove.mutate({ listId, itemId });
+      offerRestore([item], `${item.name} removed`);
+    },
+    clearChecked: () => {
+      const checked = list.items.filter((item) => item.checked);
+      if (checked.length === 0) return;
+      clearChecked.mutate({ listId });
+      offerRestore(checked, cleared(checked.length));
+    },
   };
 }
 
 /** Adds an item to any list, optimistically when that list is on screen or cached */
-export function useAddItem(viewer: Person, callbacks: ChangeCallbacks) {
-  const add = useListChange(callbacks, {
+export function useAddItem(viewer: Person) {
+  const add = useListChange({
     mutationFn: ({
       listId,
       ...item
@@ -99,40 +125,22 @@ export function useAddItem(viewer: Person, callbacks: ChangeCallbacks) {
     add.mutate({ listId, id: crypto.randomUUID(), name, quantity });
 }
 
-type ChangeCallbacks = { onStart: () => void; onError: (err: unknown) => void };
-
-/** The message for the last change that failed, and the callbacks that keep it current */
-export function useChangeError(): { error: string | null; callbacks: ChangeCallbacks } {
-  const [error, setError] = useState<string | null>(null);
-  return {
-    error,
-    callbacks: {
-      onStart: () => setError(null),
-      onError: (err) =>
-        setError(
-          errorMessage(err, "Couldn't save that change. Check your connection and try again."),
-        ),
-    },
-  };
-}
-
-function useListChange<Vars extends { listId: string }>(
-  { onStart, onError }: ChangeCallbacks,
-  {
-    mutationFn,
-    apply,
-  }: {
-    mutationFn: (vars: Vars) => Promise<unknown>;
-    apply: (items: ShoppingItem[], vars: Vars) => ShoppingItem[];
-  },
-) {
+function useListChange<Vars extends { listId: string }>({
+  scope,
+  mutationFn,
+  apply,
+}: {
+  scope?: { id: string };
+  mutationFn: (vars: Vars) => Promise<unknown>;
+  apply: (items: ShoppingItem[], vars: Vars) => ShoppingItem[];
+}) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: changeKey,
+    scope,
     mutationFn,
     onMutate: async (vars) => {
-      onStart();
       // Typed key, so the cache reads and writes below know the data is a ShoppingList
       const { queryKey } = listQuery(vars.listId);
       // A poll that's already on its way would overwrite the optimistic change with older data
@@ -147,10 +155,14 @@ function useListChange<Vars extends { listId: string }>(
     onError: (err, vars, context) => {
       if (context?.previous)
         queryClient.setQueryData(listQuery(vars.listId).queryKey, context.previous);
-      onError(err);
+      changeFailed(err, "Couldn't save that change. Check your connection and try again.");
     },
     onSettled: () => refetchAfterLastChange(queryClient),
   });
+}
+
+function cleared(count: number): string {
+  return count === 1 ? "1 item cleared" : `${count} items cleared`;
 }
 
 /**

@@ -101,8 +101,8 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - Every member of a household can create, open, change and delete all of its lists. Lists are on `/lists` (the Shopping tab), and each one opens at `/lists/:listId`.
 - Items have a name and an optional free-text quantity ("2", "500 g"). Checking one off records who did it; "Clear checked off" removes everything that's been bought.
 - The round + button (in the left rail on wide screens, in the bottom bar on phones) opens a quick-add sheet from any page except Chores and Personal, where it adds a chore or a to-do. It adds to the list that's open, or the first list, and chips switch to another list.
-- Ticked items move to "In cart"; "Done shopping" clears them.
-- Changes show straight away (optimistic updates with React Query) and roll back with a message if the API rejects them.
+- Ticked items move to "In cart"; "Done shopping" clears them. Removing an item or clearing the cart shows a toast with Undo, which puts the items back with the same ids, quantities and ticks.
+- Changes show straight away (optimistic updates with React Query) and roll back with a toast if the API rejects them.
 - Changes from other members show up straight away through live updates (see below). If someone deletes the list, the page says so.
 - Items can carry a client-generated id, so a retried add doesn't create a duplicate.
 - Tables: `shopping_list` and `shopping_item` in `apps/api/src/features/shopping/shopping.schema.ts`. Deleting a household deletes its lists; when someone leaves, the items they added stay.
@@ -116,7 +116,7 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - A chore can be assigned to one member, or to nobody ("Anyone"). Anyone can still do it, and the history records who did. When an assignee leaves the household, the chore shows as unassigned.
 - Due dates are plain dates (`YYYY-MM-DD`), with no time or timezone. "Today" and "overdue" follow the clock on each person's device, and the device sends its date when marking a chore done. The API accepts only a date within a day of the UTC date, which covers every timezone.
 - The page groups chores into Overdue, Today, This week, Later and Anytime, with filters for All, Mine and Anyone.
-- Ticking a chore shows a bar with Undo for a few seconds. Later, the most recent completion can still be undone from the chore's sheet, which puts its due date back. Older history can't be changed.
+- Ticking a chore shows a toast with Undo for a few seconds. Later, the most recent completion can still be undone from the chore's sheet, which puts its due date back. Older history can't be changed.
 - Doing a chore again on the same day changes nothing, so a double tap or two people at once count once.
 - Done one-off chores collapse into "Done"; "Clear done" removes them.
 - Changes from other members show up straight away through live updates (see below).
@@ -126,7 +126,7 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 
 - To-dos are on `/personal` (the Personal tab). They belong to a person, not a household: only they can see or change them, and other members of the household get a 404 for every one. They stay with the person when they leave or switch households.
 - A to-do has a name, an optional due date and optional notes. It doesn't repeat; repeating household work belongs in Chores.
-- The page groups to-dos like chores (Overdue, Today, This week, Later, Anytime). Done ones collapse into "Done", and "Clear done" removes them.
+- The page groups to-dos like chores (Overdue, Today, This week, Later, Anytime). Done ones collapse into "Done", and "Clear done" removes them. Deleting a to-do or clearing done ones shows a toast with Undo, which brings them back with their notes and due dates.
 - Adding, ticking off and removing show straight away (optimistic updates), and to-dos can carry a client-generated id so a retried add doesn't duplicate. Changes made on the person's other devices arrive through live updates; nobody else hears about them.
 - "Move to household chores" turns a to-do into a one-off chore with the same name and due date, assigned to nobody, and deletes the to-do. Notes aren't shared: they're deleted with it. Moving without a household fails and keeps the to-do.
 - Wide events log only to-do ids and counts, never names or notes.
@@ -144,7 +144,7 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - taskhold can be installed from the browser ("Install app" in Chrome and Edge, "Add to Home Screen" on iPhone and Android). The manifest is `apps/web/public/manifest.webmanifest`; the icons are next to it.
 - `vite-plugin-pwa` generates a service worker (`sw.js`) at build time. It keeps the app itself (HTML, JS, CSS, fonts, icons) on the device, so the installed app opens without a connection. API responses are never cached: they're private and live. Navigations under `/api` (such as the Google sign-in callback) always go to the server.
 - When the API can't be reached, the app shows "Can't reach taskhold" (`components/root-error.tsx`) instead of the sign-in page, and tries again when the device is back online.
-- After a deploy, open apps download the new version in the background (they check every hour too) and show "A new version of taskhold is ready" (`components/update-prompt.tsx`). Nothing switches until the person taps Reload.
+- After a deploy, open apps download the new version in the background (they check every hour too) and show a "A new version of taskhold is ready" toast (`components/update-prompt.tsx`). Nothing switches until the person taps Reload.
 - The service worker only exists in production builds. To try it locally, run `pnpm --filter @taskhold/web build` and `pnpm --filter @taskhold/web preview` (with the API running).
 - `index.html` sets `viewport-fit=cover`, so the `env(safe-area-inset-*)` padding works on phones with a notch or home indicator.
 

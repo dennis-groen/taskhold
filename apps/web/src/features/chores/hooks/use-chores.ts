@@ -4,10 +4,9 @@ import {
   useSuspenseQuery,
   type QueryClient,
 } from "@tanstack/react-query";
-import { useState } from "react";
 
-import { errorMessage } from "@/lib/api-client.ts";
 import { today } from "@/lib/dates.ts";
+import { changeFailed } from "@/lib/feedback.ts";
 
 import { addInterval } from "../chore-dates.ts";
 import { completeChore, undoCompletion, type Chore } from "../chores.api.ts";
@@ -25,13 +24,11 @@ const changeKey = [...choreKeys.all, "change"];
 export function useChores(viewer: Person) {
   const { data: chores } = useSuspenseQuery(choresQuery());
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
 
   const complete = useMutation({
     mutationKey: changeKey,
     mutationFn: ({ chore, on }: { chore: Chore; on: string }) => completeChore(chore.id, on),
     onMutate: async ({ chore, on }) => {
-      setError(null);
       const { queryKey } = choresQuery();
       // A poll that's already on its way would overwrite the optimistic change with older data
       await queryClient.cancelQueries({ queryKey });
@@ -43,7 +40,7 @@ export function useChores(viewer: Person) {
     },
     onError: (err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(choresQuery().queryKey, context.previous);
-      setError(errorMessage(err, "Couldn't mark that done. Check your connection and try again."));
+      changeFailed(err, "Couldn't mark that done. Check your connection and try again.");
     },
     onSettled: () => refetchAfterLastChange(queryClient),
   });
@@ -51,21 +48,18 @@ export function useChores(viewer: Person) {
   const undo = useMutation({
     mutationKey: changeKey,
     mutationFn: (choreId: string) => undoCompletion(choreId),
-    onMutate: () => setError(null),
     // Not optimistic: only the API knows the due date to go back to
     onSuccess: (detail) => {
       queryClient.setQueryData(choresQuery().queryKey, (list) =>
         list?.map((item) => (item.id === detail.id ? toListChore(detail) : item)),
       );
     },
-    onError: (err) => setError(errorMessage(err, "Couldn't undo that. Try again.")),
+    onError: (err) => changeFailed(err, "Couldn't undo that. Try again."),
     onSettled: () => refetchAfterLastChange(queryClient),
   });
 
   return {
     chores,
-    /** The last change that failed, for people; cleared by the next change */
-    error,
     /** Marks the chore done today. Returns the chore as it is now, for an undo message. */
     complete: (chore: Chore) => {
       const on = today();

@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { Outlet, createRootRouteWithContext, redirect } from "@tanstack/react-router";
 
 import { RootError } from "@/components/root-error.tsx";
+import { Toaster } from "@/components/ui/sonner";
 import { UpdatePrompt } from "@/components/update-prompt.tsx";
 import { ViewerUnavailableError, fetchViewer } from "@/features/auth/auth.api.ts";
 
@@ -45,6 +46,12 @@ function RootLayout() {
     <>
       <Outlet />
       <UpdatePrompt />
+      {/* Brief notices after an action: undo, failed saves, a new version. Not for form errors. */}
+      <Toaster
+        position="bottom-center"
+        offset={{ bottom: "var(--toast-bottom)" }}
+        mobileOffset={{ bottom: "var(--toast-bottom)" }}
+      />
     </>
   );
 }

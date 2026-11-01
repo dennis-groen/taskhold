@@ -21,7 +21,7 @@ const routeApi = getRouteApi("/_household/lists/$listId");
 export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
   const { listId } = routeApi.useParams();
   const { user } = routeApi.useRouteContext();
-  const { list, gone, error, add, toggle, remove, clearChecked } = useShoppingList(listId, user);
+  const { list, gone, add, toggle, remove, clearChecked } = useShoppingList(listId, user);
   const [cartOpen, setCartOpen] = useState(false);
 
   if (gone) return <ListNotFound />;
@@ -43,11 +43,6 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
 
       <Group className="mt-6">
         <AddRow label="Add item" withQuantity maxLength={100} onAdd={add} />
-        {error && (
-          <p role="alert" className="px-4 py-2 text-sm text-destructive">
-            {error}
-          </p>
-        )}
         {open.length > 0 ? (
           <ul aria-label="To buy" className="divide-y">
             {open.map((item) => (
