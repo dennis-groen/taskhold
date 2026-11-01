@@ -42,7 +42,7 @@ export function useShoppingList(listId: string, viewer: Person) {
               ...item,
               checked,
               checkedBy: checked ? viewer : null,
-              checkedAt: checked ? new Date().toISOString() : null,
+              checkedAt: checked ? Temporal.Now.instant().toString() : null,
             }
           : item,
       ),
@@ -90,7 +90,7 @@ export function useAddItem(viewer: Person, callbacks: ChangeCallbacks) {
         addedBy: viewer,
         checkedBy: null,
         checkedAt: null,
-        createdAt: new Date().toISOString(),
+        createdAt: Temporal.Now.instant().toString(),
       },
       ...items,
     ],

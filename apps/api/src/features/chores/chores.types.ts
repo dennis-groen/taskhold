@@ -8,8 +8,8 @@ export type ChoreCompletion = {
   /** Null when the person who did it has deleted their account */
   completedBy: { id: string; name: string } | null;
   /** The date it was done, where the person was */
-  completedOn: string;
-  createdAt: Date;
+  completedOn: Temporal.PlainDate;
+  createdAt: Temporal.Instant;
 };
 
 export type Chore = {
@@ -18,7 +18,7 @@ export type Chore = {
   /** Null for a one-off chore */
   repeat: Repeat | null;
   /** "YYYY-MM-DD". Always set for a repeating chore; a one-off one may have none. */
-  dueOn: string | null;
+  dueOn: Temporal.PlainDate | null;
   /** Null when nobody is assigned, or the assignee has left the household */
   assignee: { id: string; name: string; image: string | null } | null;
   lastCompletion: ChoreCompletion | null;

@@ -23,7 +23,7 @@ const HISTORY_LENGTH = 10;
 type ChoreInput = {
   name: string;
   repeat: Repeat | null;
-  dueOn: string | null;
+  dueOn: Temporal.PlainDate | null;
   assigneeId: string | null;
 };
 
@@ -110,7 +110,7 @@ export async function deleteChore(userId: string, choreId: string): Promise<void
 export async function completeChore(
   userId: string,
   choreId: string,
-  today: string,
+  today: Temporal.PlainDate,
 ): Promise<ChoreDetail> {
   annotate("chores", { chore_id: choreId });
   if (!couldBeToday(today)) throw implausibleToday();
@@ -124,7 +124,9 @@ export async function completeChore(
     const [latest] = await choresDal.findCompletions(choreId, 1, tx);
     const { repeatEvery, repeatUnit } = current;
     const repeats = repeatEvery !== null && repeatUnit !== null;
-    const alreadyDone = repeats ? latest?.completedOn === today : latest !== undefined;
+    const alreadyDone = repeats
+      ? latest !== undefined && latest.completedOn.equals(today)
+      : latest !== undefined;
     annotate("chores", { repeats, already_done: alreadyDone });
     if (alreadyDone) return;
 
@@ -172,7 +174,7 @@ export async function clearDoneChores(userId: string): Promise<number> {
 
 async function checkChore(
   householdId: string,
-  chore: { repeat: Repeat | null; dueOn: string | null; assigneeId: string | null },
+  chore: { repeat: Repeat | null; dueOn: Temporal.PlainDate | null; assigneeId: string | null },
 ) {
   if (chore.repeat && !chore.dueOn) throw dueDateRequired();
   if (chore.assigneeId && !(await householdsService.isMemberOf(householdId, chore.assigneeId))) {

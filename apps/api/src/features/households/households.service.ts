@@ -24,7 +24,7 @@ const MAX_INVITE_CODE_ATTEMPTS = 5;
 // budget of codes that match nothing. With 40-bit codes this makes guessing any household's code
 // take far longer than an account is worth.
 const INVITE_GUESS_LIMIT = 10;
-const INVITE_GUESS_WINDOW_MS = 15 * 60 * 1000;
+const INVITE_GUESS_WINDOW = Temporal.Duration.from({ minutes: 15 });
 
 /** The household a user belongs to, or null when they haven't created or joined one */
 export async function findMembership(userId: string): Promise<Membership | null> {
@@ -184,7 +184,7 @@ async function getHousehold(householdId: string): Promise<Household> {
 
 /** Looks up the household behind a code, counting misses against the user's guess budget */
 async function findByInviteCode(userId: string, rawCode: string) {
-  const windowStart = new Date(Date.now() - INVITE_GUESS_WINDOW_MS);
+  const windowStart = Temporal.Now.instant().subtract(INVITE_GUESS_WINDOW);
   const failures = await householdsDal.countFailedInviteAttempts(userId, windowStart);
   annotate("invite", { recent_failed_attempts: failures });
   if (failures >= INVITE_GUESS_LIMIT) throw tooManyInviteAttempts();

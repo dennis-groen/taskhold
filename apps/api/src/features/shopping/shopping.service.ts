@@ -75,7 +75,7 @@ export async function updateItem(
     quantity: changes.quantity,
     // Checking records who and when; unchecking clears both
     ...(changes.checked !== undefined && {
-      checkedAt: changes.checked ? new Date() : null,
+      checkedAt: changes.checked ? Temporal.Now.instant() : null,
       checkedById: changes.checked ? userId : null,
     }),
   });

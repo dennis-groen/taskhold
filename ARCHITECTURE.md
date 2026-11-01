@@ -93,6 +93,22 @@ lib/                      shared: RPC client and errorMessage(), utils
 - Inside a feature, imports are relative and folders are one level deep (`components/`, `pages/`, `hooks/`).
 - Shared code (`components/`, `lib/`) never imports a feature or a route.
 
+## Dates and times
+
+Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal), not `Date`.
+
+- **API:** Node 26 has `Temporal` built in. `db/columns.ts` defines two column types:
+  - `instant()` reads a `timestamp` column as a `Temporal.Instant`, in UTC;
+  - `plainDate()` reads a `date` column as a `Temporal.PlainDate`.
+
+  Schemas use them instead of `timestamp()` and `date()`, with `.default(now)` instead of `.defaultNow()`. Both produce the same SQL as before. Timestamps are stored in UTC, and `now()` defaults assume the database's time zone is UTC, as it is in `compose.yaml`.
+
+- **Better Auth's tables** (`auth.schema.ts`, generated) keep `Date`, because Better Auth reads and writes those columns itself.
+- **Responses:** Temporal values become ISO strings in JSON: instants like `2026-11-01T13:42:14.4528Z`, dates like `2026-11-01`. The web app's RPC types see them as strings.
+- **Web:** `main.tsx` imports `temporal-polyfill/global` first, which installs `Temporal` only in browsers without one (Safari, and older Chrome and Firefox). Don't use `Temporal` at module top level in a file that might load before it.
+- **Comparing timestamps:** use `Temporal.Instant.compare`, not string comparison. ISO strings vary in precision (`…:00Z` vs `…:00.5Z`).
+- **Not converted:** `performance.now()` stays for measuring request durations, because it's monotonic and not a date. pino's log timestamps come from pino itself.
+
 ## Enforced by lint
 
 `.oxlintrc.json` turns these rules into `no-restricted-imports` errors, so `pnpm check` fails when a file reaches across a boundary:

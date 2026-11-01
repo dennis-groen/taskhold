@@ -1,3 +1,7 @@
+// First, so Temporal exists before any other module runs. Installs only where the browser has no
+// Temporal of its own (Safari, older Chrome and Firefox).
+import "temporal-polyfill/global";
+
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";

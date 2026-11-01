@@ -14,7 +14,7 @@ Both apps are organized in feature slices, with routes, services and a data acce
 
 ## Getting started
 
-Requires Node 24+, pnpm 12 and Docker.
+Requires Node 26+ (for its built-in `Temporal`), pnpm 12 and Docker.
 
 ```bash
 pnpm install

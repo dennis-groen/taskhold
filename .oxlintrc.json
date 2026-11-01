@@ -107,7 +107,11 @@
         "browser": true
       },
       "rules": {
-        "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }],
+        // Side-effect imports: stylesheets, and polyfills that install themselves
+        "import/no-unassigned-import": [
+          "warn",
+          { "allow": ["**/*.css", "temporal-polyfill/global"] }
+        ],
         "react/react-in-jsx-scope": "off",
         "react/rules-of-hooks": "error",
         "react/only-export-components": ["warn", { "allowConstantExport": true }]

@@ -12,26 +12,26 @@ export type ChoreRecord = {
   name: string;
   repeatEvery: number | null;
   repeatUnit: RepeatUnit | null;
-  dueOn: string | null;
+  dueOn: Temporal.PlainDate | null;
   /** Null when nobody is assigned, or the assignee has left the household */
   assignee: { id: string; name: string; image: string | null } | null;
-  createdAt: Date;
+  createdAt: Temporal.Instant;
 };
 
 export type CompletionRecord = {
   id: string;
   choreId: string;
   completedBy: { id: string; name: string } | null;
-  completedOn: string;
-  previousDueOn: string | null;
-  createdAt: Date;
+  completedOn: Temporal.PlainDate;
+  previousDueOn: Temporal.PlainDate | null;
+  createdAt: Temporal.Instant;
 };
 
 export type ChoreValues = {
   name: string;
   repeatEvery: number | null;
   repeatUnit: RepeatUnit | null;
-  dueOn: string | null;
+  dueOn: Temporal.PlainDate | null;
   assigneeId: string | null;
 };
 
@@ -111,7 +111,7 @@ export async function lockChore(
   id: string;
   repeatEvery: number | null;
   repeatUnit: RepeatUnit | null;
-  dueOn: string | null;
+  dueOn: Temporal.PlainDate | null;
 } | null> {
   const rows = await tx
     .select({
@@ -195,9 +195,9 @@ type CompletionRow = {
   choreId: string;
   completedById: string | null;
   completedByName: string | null;
-  completedOn: string;
-  previousDueOn: string | null;
-  createdAt: Date;
+  completedOn: Temporal.PlainDate;
+  previousDueOn: Temporal.PlainDate | null;
+  createdAt: Temporal.Instant;
 };
 
 function toCompletionRecord({
@@ -250,8 +250,8 @@ export async function insertCompletion(
   values: {
     choreId: string;
     completedById: string;
-    completedOn: string;
-    previousDueOn: string | null;
+    completedOn: Temporal.PlainDate;
+    previousDueOn: Temporal.PlainDate | null;
   },
   executor: Executor = db,
 ): Promise<void> {

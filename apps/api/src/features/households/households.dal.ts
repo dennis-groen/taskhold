@@ -22,7 +22,7 @@ export type MemberRecord = {
   name: string;
   image: string | null;
   role: HouseholdRole;
-  joinedAt: Date;
+  joinedAt: Temporal.Instant;
 };
 
 export type HouseholdRecord = {
@@ -212,7 +212,7 @@ export async function updateInviteCode(
 /** How many codes this user tried since `since` that matched no household */
 export async function countFailedInviteAttempts(
   userId: string,
-  since: Date,
+  since: Temporal.Instant,
   executor: Executor = db,
 ): Promise<number> {
   const rows = await executor
@@ -225,7 +225,7 @@ export async function countFailedInviteAttempts(
 /** Records a code that matched no household, and drops this user's attempts older than `prunedBefore` */
 export async function recordFailedInviteAttempt(
   userId: string,
-  prunedBefore: Date,
+  prunedBefore: Temporal.Instant,
   executor: Executor = db,
 ): Promise<void> {
   await executor.insert(inviteCodeAttempt).values({ userId });

@@ -1,44 +1,33 @@
-// Dates are "YYYY-MM-DD" strings with no timezone. "Today" is the date on this device, which is
-// what the API expects too. The math runs in UTC so adding days never trips over daylight saving.
+// Dates arrive from the API as "YYYY-MM-DD" strings and are worked on as Temporal.PlainDates:
+// calendar days with no time or time zone. "Today" is the date on this device, which is what the
+// API expects too.
 import type { Repeat } from "./chores.api.ts";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /** Today's date on this device */
-export function today(now = new Date()): string {
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+export function today(): string {
+  return Temporal.Now.plainDateISO().toString();
 }
 
 /** The date `every` days or weeks after `date`. Must match the API's rule. */
 export function addInterval(date: string, { every, unit }: Repeat): string {
-  const days = unit === "week" ? every * 7 : every;
-  return new Date(parseDate(date) + days * DAY_MS).toISOString().slice(0, 10);
+  return Temporal.PlainDate.from(date)
+    .add(unit === "week" ? { weeks: every } : { days: every })
+    .toString();
 }
 
 /** Whole days from `from` to `to`: negative when `to` is earlier */
 export function daysBetween(from: string, to: string): number {
-  return Math.round((parseDate(to) - parseDate(from)) / DAY_MS);
+  return Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: "days" })
+    .days;
 }
-
-function parseDate(date: string): number {
-  const [year, month, day] = date.split("-").map(Number);
-  return Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1);
-}
-
-const weekday = new Intl.DateTimeFormat("en", { weekday: "long", timeZone: "UTC" });
-const shortDate = new Intl.DateTimeFormat("en", {
-  day: "numeric",
-  month: "short",
-  timeZone: "UTC",
-});
 
 /** "Friday" within the next week, "Nov 14" further out */
 export function formatDate(date: string, from: string): string {
   const days = daysBetween(from, date);
-  const time = parseDate(date);
-  return days > 0 && days < 7 ? weekday.format(time) : shortDate.format(time);
+  return Temporal.PlainDate.from(date).toLocaleString(
+    "en",
+    days > 0 && days < 7 ? { weekday: "long" } : { day: "numeric", month: "short" },
+  );
 }
 
 export type DueGroup = "overdue" | "today" | "week" | "later" | "anytime";
@@ -80,5 +69,5 @@ export function pastDateLabel(date: string, on: string): string {
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
-  return shortDate.format(parseDate(date));
+  return Temporal.PlainDate.from(date).toLocaleString("en", { day: "numeric", month: "short" });
 }

@@ -6,7 +6,10 @@ const choreName = z
   .min(1, "Give the chore a name.")
   .max(60, "Keep the name under 60 characters.");
 
-const date = z.iso.date("Use a date like 2026-03-14.");
+// Validated as an ISO date, then handed to the service as a calendar day
+const date = z.iso
+  .date("Use a date like 2026-03-14.")
+  .transform((value) => Temporal.PlainDate.from(value));
 
 const repeat = z
   .object({

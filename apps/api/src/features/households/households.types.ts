@@ -7,7 +7,7 @@ export type HouseholdMember = {
   name: string;
   image: string | null;
   role: HouseholdRole;
-  joinedAt: Date;
+  joinedAt: Temporal.Instant;
 };
 
 export type Household = {

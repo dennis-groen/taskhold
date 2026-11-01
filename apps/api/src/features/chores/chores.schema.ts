@@ -1,5 +1,7 @@
 import { relations, sql } from "drizzle-orm";
-import { check, date, index, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { check, index, integer, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
+
+import { instant, now, plainDate } from "../../db/columns.ts";
 
 import { user } from "../auth/auth.schema.ts";
 import { household } from "../households/households.schema.ts";
@@ -23,13 +25,13 @@ export const chore = pgTable(
     repeatEvery: integer("repeat_every"),
     repeatUnit: repeatUnit("repeat_unit"),
     // When it's next due. A one-off chore may have none; a repeating one always has one.
-    dueOn: date("due_on", { mode: "string" }),
+    dueOn: plainDate("due_on"),
     // Who it's assigned to; anyone can still do it. Only meaningful while they're a member.
     assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
+    createdAt: instant("created_at").default(now).notNull(),
+    updatedAt: instant("updated_at")
+      .default(now)
+      .$onUpdate(() => Temporal.Now.instant())
       .notNull(),
   },
   (table) => [
@@ -54,10 +56,10 @@ export const choreCompletion = pgTable(
     // People can leave or delete their account; what they did stays in the history
     completedById: text("completed_by_id").references(() => user.id, { onDelete: "set null" }),
     // The date where the person was when they did it, which the next due date counts from
-    completedOn: date("completed_on", { mode: "string" }).notNull(),
+    completedOn: plainDate("completed_on").notNull(),
     // The chore's due date before this completion moved it, so undoing can restore it
-    previousDueOn: date("previous_due_on", { mode: "string" }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    previousDueOn: plainDate("previous_due_on"),
+    createdAt: instant("created_at").default(now).notNull(),
   },
   (table) => [index("chore_completion_choreId_createdAt_idx").on(table.choreId, table.createdAt)],
 );

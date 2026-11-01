@@ -1,5 +1,7 @@
 import { relations } from "drizzle-orm";
-import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, pgTable, text } from "drizzle-orm/pg-core";
+
+import { instant, now } from "../../db/columns.ts";
 
 import { user } from "../auth/auth.schema.ts";
 import { household } from "../households/households.schema.ts";
@@ -14,10 +16,10 @@ export const shoppingList = pgTable(
       .notNull()
       .references(() => household.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
+    createdAt: instant("created_at").default(now).notNull(),
+    updatedAt: instant("updated_at")
+      .default(now)
+      .$onUpdate(() => Temporal.Now.instant())
       .notNull(),
   },
   (table) => [index("shopping_list_householdId_idx").on(table.householdId)],
@@ -39,8 +41,8 @@ export const shoppingItem = pgTable(
     addedById: text("added_by_id").references(() => user.id, { onDelete: "set null" }),
     checkedById: text("checked_by_id").references(() => user.id, { onDelete: "set null" }),
     // Null while the item still needs buying
-    checkedAt: timestamp("checked_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    checkedAt: instant("checked_at"),
+    createdAt: instant("created_at").default(now).notNull(),
   },
   (table) => [index("shopping_item_listId_idx").on(table.listId)],
 );

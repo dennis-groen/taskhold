@@ -1,5 +1,7 @@
 import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
+
+import { instant, now } from "../../db/columns.ts";
 
 // Schema files may reference other features' tables: foreign keys cross slices by nature
 import { user } from "../auth/auth.schema.ts";
@@ -13,10 +15,10 @@ export const household = pgTable("household", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   inviteCode: text("invite_code").notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => new Date())
+  createdAt: instant("created_at").default(now).notNull(),
+  updatedAt: instant("updated_at")
+    .default(now)
+    .$onUpdate(() => Temporal.Now.instant())
     .notNull(),
 });
 
@@ -35,7 +37,7 @@ export const householdMember = pgTable(
       .unique()
       .references(() => user.id, { onDelete: "cascade" }),
     role: householdRole("role").notNull(),
-    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    joinedAt: instant("joined_at").default(now).notNull(),
   },
   (table) => [index("household_member_householdId_idx").on(table.householdId)],
 );
@@ -50,7 +52,7 @@ export const inviteCodeAttempt = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
+    attemptedAt: instant("attempted_at").default(now).notNull(),
   },
   (table) => [
     index("invite_code_attempt_userId_attemptedAt_idx").on(table.userId, table.attemptedAt),

@@ -86,7 +86,7 @@ function markedDone(chore: Chore, person: Person, on: string): Chore {
       id: crypto.randomUUID(),
       completedBy: person,
       completedOn: on,
-      createdAt: new Date().toISOString(),
+      createdAt: Temporal.Now.instant().toString(),
     },
   };
 }

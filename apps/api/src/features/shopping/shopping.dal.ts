@@ -20,14 +20,14 @@ export type ItemRecord = {
   quantity: string | null;
   addedBy: { id: string; name: string } | null;
   checkedBy: { id: string; name: string } | null;
-  checkedAt: Date | null;
-  createdAt: Date;
+  checkedAt: Temporal.Instant | null;
+  createdAt: Temporal.Instant;
 };
 
 export type ItemChanges = {
   name?: string;
   quantity?: string | null;
-  checkedAt?: Date | null;
+  checkedAt?: Temporal.Instant | null;
   checkedById?: string | null;
 };
 

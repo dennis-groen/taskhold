@@ -17,8 +17,8 @@ export type ShoppingItem = {
   /** Null when the person who added it has left */
   addedBy: { id: string; name: string } | null;
   checkedBy: { id: string; name: string } | null;
-  checkedAt: Date | null;
-  createdAt: Date;
+  checkedAt: Temporal.Instant | null;
+  createdAt: Temporal.Instant;
 };
 
 export type ShoppingList = {
