@@ -66,3 +66,25 @@ describe("serving the web app next to the API", () => {
     expect(await encoded.text()).not.toContain("root:");
   });
 });
+
+describe("request logging behind the web server", () => {
+  it("names the API route that handled the request, not the web app's catch-all", async () => {
+    const { handlerRoute } = await import("../src/lib/request-logger.ts");
+    const { Hono } = await import("hono");
+    const routes: string[] = [];
+    // Same composition as production: the API first, then catch-alls, with a probe at the end
+    const probe = new Hono()
+      .use("*", async (c, next) => {
+        await next();
+        routes.push(handlerRoute(c));
+      })
+      .route("/", server);
+
+    await probe.request("/api/viewer");
+    // Answered by the sign-in check before reaching its handler
+    await probe.request("/api/shopping/lists/abc", { method: "PATCH" });
+    await probe.request("/api/auth/get-session");
+    await probe.request("/api/nope");
+    expect(routes).toEqual(["/api/viewer", "/api/shopping/lists/:listId", "/api/auth/*", "/api/*"]);
+  });
+});

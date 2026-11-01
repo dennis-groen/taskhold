@@ -139,12 +139,17 @@ To try the image locally:
 docker build -t taskhold .
 ```
 
-**Coolify:** create an application from the Git repository with the Dockerfile build pack:
+**Coolify** (live at https://taskhold.lunexa.dev, project `taskhold` on `coolify.example.com`):
 
-- port `3000`;
-- health check path `/api/health`;
-- the variables above;
-- `TRUSTED_PROXIES` set to the address range of Coolify's proxy network, so rate limiting sees real client IPs.
+- **Application:** built from `main` of the GitHub repository with the Dockerfile build pack, on port 3000. The health check calls `GET /api/health`. Coolify's scan suggests `compose.yaml`, but that file is only the local dev database.
+- **Database:** a Coolify database, PostgreSQL 18, not publicly reachable. `DATABASE_URL` is its internal URL, ending in `/taskhold`.
+- **Domains:** `https://taskhold.lunexa.dev`, with `www` redirecting to it. Remove the extra hosts Coolify generates, such as `sslip.io`. On any host other than the one in `BETTER_AUTH_URL`, saving gets a 403 and sign-in doesn't work.
+- **Variables:** set them as runtime-only ("Not available during build"); the build doesn't need any.
+- **Client IPs:** requests pass through Cloudflare, then Coolify's Traefik.
+  - Traefik replaces `X-Forwarded-For` with the Cloudflare edge server it saw, so the API puts Cloudflare's `CF-Connecting-IP` first in the chain it gives Better Auth (`lib/connection.ts`).
+  - `TRUSTED_PROXIES` lists Coolify's proxy network (`10.0.0.0/24`) and Cloudflare's ranges (https://www.cloudflare.com/ips/), so Better Auth skips both and rate-limits by the visitor's IP.
+  - A forged `CF-Connecting-IP` sent straight to the server is ignored: Traefik records the sender's real address as the hop, and that address isn't trusted.
+  - Update the Cloudflare part if Cloudflare changes its ranges.
 
 ## Production settings
 

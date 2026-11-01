@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
-import { routePath } from "hono/route";
+import { matchedRoutes } from "hono/route";
 
 import { env } from "../config/env.ts";
-import { socketAddress } from "./connection.ts";
+import { forwardedChain, socketAddress } from "./connection.ts";
 import { logger } from "./logger.ts";
 import { recordError, startEvent, type WideEvent } from "./wide-event.ts";
 
@@ -47,15 +47,15 @@ function complete(event: WideEvent, c: Context, status: number, durationMs: numb
     outcome: status >= 500 ? "server_error" : status >= 400 ? "client_error" : "success",
     http: {
       method: c.req.method,
-      // The route pattern, e.g. /api/shopping/lists/:listId, also when middleware answered first
-      route: routePath(c, -1),
+      route: handlerRoute(c),
       path,
       status_code: status,
       duration_ms,
     },
     client: {
       address: socketAddress(c),
-      ...(env.TRUSTED_PROXIES.length > 0 && { forwarded_for: c.req.header("x-forwarded-for") }),
+      // The chain Better Auth picks the client from, when behind proxies
+      ...(env.TRUSTED_PROXIES.length > 0 && { forwarded_for: forwardedChain(c) }),
       user_agent: c.req.header("user-agent"),
     },
     ...context,
@@ -77,6 +77,21 @@ function complete(event: WideEvent, c: Context, status: number, durationMs: numb
   if (status >= 500) logger.error(line, message);
   else if (status >= 400) logger.warn(line, message);
   else logger.info(line, message);
+}
+
+/**
+ * The pattern of the route that handled the request, e.g. /api/shopping/lists/:listId. After the
+ * request, `routeIndex` points at the route that responded. When that was middleware (an auth or
+ * origin check answering first), use the route the request was headed for instead.
+ */
+export function handlerRoute(c: Context): string {
+  const routes = matchedRoutes(c);
+  const responded = routes[c.req.routeIndex];
+  const headedFor = routes
+    .slice(c.req.routeIndex + 1)
+    .find((route) => route.method !== "ALL" && route.path.startsWith("/api"));
+  const route = responded?.method === "ALL" && headedFor ? headedFor : responded;
+  return route?.path ?? c.req.path;
 }
 
 function redactPath(path: string): string {
