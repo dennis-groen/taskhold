@@ -4,33 +4,10 @@ import { and, asc, count, eq, gte, lt } from "drizzle-orm";
 
 import { db, type Executor, type Transaction } from "../../db/client.ts";
 import { isUniqueViolation } from "../../db/errors.ts";
-import {
-  household,
-  householdMember,
-  inviteCodeAttempt,
-  type HouseholdRole,
-} from "./households.schema.ts";
+import { household, householdMember, inviteCodeAttempt } from "./households.schema.ts";
+import type { HouseholdRecord, MembershipRecord } from "./households.types.ts";
 
-export type MembershipRecord = {
-  householdId: string;
-  householdName: string;
-  role: HouseholdRole;
-};
-
-export type MemberRecord = {
-  userId: string;
-  name: string;
-  image: string | null;
-  role: HouseholdRole;
-  joinedAt: Temporal.Instant;
-};
-
-export type HouseholdRecord = {
-  id: string;
-  name: string;
-  inviteCode: string;
-  members: MemberRecord[];
-};
+export type { HouseholdRecord, MemberRecord, MembershipRecord } from "./households.types.ts";
 
 export async function findMembershipByUserId(
   userId: string,
@@ -103,7 +80,7 @@ async function findHousehold(
 
 /** Returns null when the invite code is already taken, so the caller can try another */
 export async function insertHousehold(
-  values: { name: string; inviteCode: string },
+  values: Pick<typeof household.$inferInsert, "name" | "inviteCode">,
   executor: Executor = db,
 ): Promise<{ id: string } | null> {
   const rows = await executor
@@ -116,7 +93,7 @@ export async function insertHousehold(
 
 /** Returns false when the user already belongs to a household (one per user, enforced by the database) */
 export async function insertMember(
-  values: { householdId: string; userId: string; role: HouseholdRole },
+  values: Pick<typeof householdMember.$inferInsert, "householdId" | "userId" | "role">,
   executor: Executor = db,
 ): Promise<boolean> {
   const rows = await executor
@@ -175,7 +152,7 @@ export async function deleteMember(
 }
 
 export async function setMemberRole(
-  values: { householdId: string; userId: string; role: HouseholdRole },
+  values: Pick<typeof householdMember.$inferInsert, "householdId" | "userId" | "role">,
   executor: Executor = db,
 ): Promise<void> {
   await executor

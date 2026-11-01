@@ -8,6 +8,7 @@ import type { ChoreDetail } from "../chores/chores.types.ts";
 import * as todosDal from "./todos.dal.ts";
 import { todoIdTaken, todoNotFound } from "./todos.errors.ts";
 import type { Todo } from "./todos.types.ts";
+import type { CreateTodoInput, UpdateTodoInput } from "./todos.validation.ts";
 
 // Names and notes are private, so the wide event only ever gets ids and counts
 
@@ -17,10 +18,7 @@ export async function getTodos(userId: string): Promise<Todo[]> {
   return records.map(toTodo);
 }
 
-export async function createTodo(
-  userId: string,
-  input: { id?: string; name: string; notes?: string | null; dueOn?: Temporal.PlainDate | null },
-): Promise<Todo> {
+export async function createTodo(userId: string, input: CreateTodoInput): Promise<Todo> {
   const id = input.id ?? crypto.randomUUID();
   annotate("todos", { todo_id: id });
   const inserted = await todosDal.insertTodo({
@@ -40,12 +38,7 @@ export async function createTodo(
 export async function updateTodo(
   userId: string,
   todoId: string,
-  changes: {
-    name?: string;
-    notes?: string | null;
-    dueOn?: Temporal.PlainDate | null;
-    done?: boolean;
-  },
+  changes: UpdateTodoInput,
 ): Promise<Todo> {
   annotate("todos", { todo_id: todoId });
   const ref = { userId, todoId };

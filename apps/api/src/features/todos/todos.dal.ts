@@ -3,23 +3,13 @@
 import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db, type Executor } from "../../db/client.ts";
+import type { Todo } from "./todos.types.ts";
 import { todo } from "./todos.schema.ts";
 
-export type TodoRecord = {
-  id: string;
-  name: string;
-  notes: string | null;
-  dueOn: Temporal.PlainDate | null;
-  doneAt: Temporal.Instant | null;
-  createdAt: Temporal.Instant;
-};
-
-export type TodoChanges = {
-  name?: string;
-  notes?: string | null;
-  dueOn?: Temporal.PlainDate | null;
-  doneAt?: Temporal.Instant | null;
-};
+export type TodoRecord = Pick<Todo, "id" | "name" | "notes" | "dueOn" | "doneAt" | "createdAt">;
+export type TodoChanges = Partial<
+  Pick<typeof todo.$inferInsert, "name" | "notes" | "dueOn" | "doneAt">
+>;
 
 const fields = {
   id: todo.id,
@@ -53,11 +43,11 @@ export async function findTodo(
 /** Returns false when a to-do with that id already exists, e.g. a retried request */
 export async function insertTodo(
   values: {
-    id?: string;
-    userId: string;
-    name: string;
-    notes: string | null;
-    dueOn: Temporal.PlainDate | null;
+    id?: typeof todo.$inferInsert.id;
+    userId: typeof todo.$inferInsert.userId;
+    name: typeof todo.$inferInsert.name;
+    notes: typeof todo.$inferInsert.notes;
+    dueOn: typeof todo.$inferInsert.dueOn;
   },
   executor: Executor = db,
 ): Promise<boolean> {

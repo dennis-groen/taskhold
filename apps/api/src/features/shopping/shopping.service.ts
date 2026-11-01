@@ -5,6 +5,7 @@ import * as householdsService from "../households/households.service.ts";
 import * as shoppingDal from "./shopping.dal.ts";
 import { itemIdTaken, itemNotFound, listNotFound } from "./shopping.errors.ts";
 import type { ShoppingItem, ShoppingList, ShoppingListSummary } from "./shopping.types.ts";
+import type { AddItemInput, UpdateItemInput } from "./shopping.validation.ts";
 
 export async function getLists(userId: string): Promise<ShoppingListSummary[]> {
   const household = await householdsService.getMembershipOf(userId);
@@ -42,7 +43,7 @@ export async function deleteList(userId: string, listId: string): Promise<void> 
 export async function addItem(
   userId: string,
   listId: string,
-  input: { id?: string; name: string; quantity?: string | null },
+  input: AddItemInput,
 ): Promise<ShoppingItem> {
   const list = await findListOf(userId, listId);
   const id = input.id ?? crypto.randomUUID();
@@ -64,7 +65,7 @@ export async function addItem(
 export async function updateItem(
   userId: string,
   ref: { listId: string; itemId: string },
-  changes: { name?: string; quantity?: string | null; checked?: boolean },
+  changes: UpdateItemInput,
 ): Promise<ShoppingItem> {
   const list = await findListOf(userId, ref.listId);
   const itemRef = { listId: list.id, itemId: ref.itemId };

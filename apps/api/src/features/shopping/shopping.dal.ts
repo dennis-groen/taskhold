@@ -6,30 +6,13 @@ import { alias } from "drizzle-orm/pg-core";
 import { db, type Executor } from "../../db/client.ts";
 import { user } from "../auth/auth.schema.ts";
 import { shoppingItem, shoppingList } from "./shopping.schema.ts";
+import type { ShoppingItemRecord, ShoppingListSummary } from "./shopping.types.ts";
 
-export type ListSummaryRecord = {
-  id: string;
-  name: string;
-  itemCount: number;
-  openCount: number;
-};
-
-export type ItemRecord = {
-  id: string;
-  name: string;
-  quantity: string | null;
-  addedBy: { id: string; name: string } | null;
-  checkedBy: { id: string; name: string } | null;
-  checkedAt: Temporal.Instant | null;
-  createdAt: Temporal.Instant;
-};
-
-export type ItemChanges = {
-  name?: string;
-  quantity?: string | null;
-  checkedAt?: Temporal.Instant | null;
-  checkedById?: string | null;
-};
+export type ListSummaryRecord = ShoppingListSummary;
+export type ItemRecord = ShoppingItemRecord;
+export type ItemChanges = Partial<
+  Pick<typeof shoppingItem.$inferInsert, "name" | "quantity" | "checkedAt" | "checkedById">
+>;
 
 export async function findListsByHousehold(
   householdId: string,
@@ -65,7 +48,7 @@ export async function findList(
 }
 
 export async function insertList(
-  values: { householdId: string; name: string },
+  values: Pick<typeof shoppingList.$inferInsert, "householdId" | "name">,
   executor: Executor = db,
 ): Promise<{ id: string }> {
   const rows = await executor
@@ -161,11 +144,11 @@ export async function findItem(
 /** Returns false when an item with that id already exists, e.g. a retried request */
 export async function insertItem(
   values: {
-    id?: string;
-    listId: string;
-    name: string;
-    quantity: string | null;
-    addedById: string;
+    id?: typeof shoppingItem.$inferInsert.id;
+    listId: typeof shoppingItem.$inferInsert.listId;
+    name: typeof shoppingItem.$inferInsert.name;
+    quantity: typeof shoppingItem.$inferInsert.quantity;
+    addedById: typeof shoppingItem.$inferInsert.addedById;
   },
   executor: Executor = db,
 ): Promise<boolean> {

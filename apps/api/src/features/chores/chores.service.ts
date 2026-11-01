@@ -16,16 +16,10 @@ import {
   nothingToUndo,
 } from "./chores.errors.ts";
 import type { Chore, ChoreCompletion, ChoreDetail, Repeat } from "./chores.types.ts";
+import type { CreateChoreInput, UpdateChoreInput } from "./chores.validation.ts";
 
 /** How many past completions a chore's detail shows */
 const HISTORY_LENGTH = 10;
-
-type ChoreInput = {
-  name: string;
-  repeat: Repeat | null;
-  dueOn: Temporal.PlainDate | null;
-  assigneeId: string | null;
-};
 
 export async function getChores(userId: string): Promise<Chore[]> {
   const household = await householdsService.getMembershipOf(userId);
@@ -41,7 +35,7 @@ export async function getChore(userId: string, choreId: string): Promise<ChoreDe
   return loadDetail(household.id, choreId);
 }
 
-export async function createChore(userId: string, input: ChoreInput): Promise<ChoreDetail> {
+export async function createChore(userId: string, input: CreateChoreInput): Promise<ChoreDetail> {
   const household = await householdsService.getMembershipOf(userId);
   await checkChore(household.id, input);
   const { id } = await choresDal.insertChore({
@@ -55,7 +49,7 @@ export async function createChore(userId: string, input: ChoreInput): Promise<Ch
 export async function updateChore(
   userId: string,
   choreId: string,
-  changes: Partial<ChoreInput>,
+  changes: UpdateChoreInput,
 ): Promise<ChoreDetail> {
   annotate("chores", { chore_id: choreId });
   const household = await householdsService.getMembershipOf(userId);
@@ -192,7 +186,7 @@ async function loadDetail(householdId: string, choreId: string): Promise<ChoreDe
   };
 }
 
-function toValues(input: ChoreInput) {
+function toValues(input: CreateChoreInput) {
   return {
     name: input.name,
     repeatEvery: input.repeat?.every ?? null,

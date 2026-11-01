@@ -5,35 +5,14 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, type Executor, type Transaction } from "../../db/client.ts";
 import { user } from "../auth/auth.schema.ts";
 import { householdMember } from "../households/households.schema.ts";
+import type { CompletionRecord, ChoreRecord } from "./chores.types.ts";
 import { chore, choreCompletion, type RepeatUnit } from "./chores.schema.ts";
 
-export type ChoreRecord = {
-  id: string;
-  name: string;
-  repeatEvery: number | null;
-  repeatUnit: RepeatUnit | null;
-  dueOn: Temporal.PlainDate | null;
-  /** Null when nobody is assigned, or the assignee has left the household */
-  assignee: { id: string; name: string; image: string | null } | null;
-  createdAt: Temporal.Instant;
-};
-
-export type CompletionRecord = {
-  id: string;
-  choreId: string;
-  completedBy: { id: string; name: string } | null;
-  completedOn: Temporal.PlainDate;
-  previousDueOn: Temporal.PlainDate | null;
-  createdAt: Temporal.Instant;
-};
-
-export type ChoreValues = {
-  name: string;
-  repeatEvery: number | null;
-  repeatUnit: RepeatUnit | null;
-  dueOn: Temporal.PlainDate | null;
-  assigneeId: string | null;
-};
+export type { CompletionRecord, ChoreRecord } from "./chores.types.ts";
+export type ChoreValues = Pick<
+  typeof chore.$inferInsert,
+  "name" | "repeatEvery" | "repeatUnit" | "dueOn" | "assigneeId"
+>;
 
 function selectChores(executor: Executor) {
   return (
@@ -127,7 +106,7 @@ export async function lockChore(
 }
 
 export async function insertChore(
-  values: ChoreValues & { householdId: string },
+  values: ChoreValues & Pick<typeof chore.$inferInsert, "householdId">,
   executor: Executor = db,
 ): Promise<{ id: string }> {
   const rows = await executor.insert(chore).values(values).returning({ id: chore.id });
@@ -190,15 +169,14 @@ const completionFields = {
   createdAt: choreCompletion.createdAt,
 };
 
-type CompletionRow = {
-  id: string;
-  choreId: string;
-  completedById: string | null;
-  completedByName: string | null;
-  completedOn: Temporal.PlainDate;
-  previousDueOn: Temporal.PlainDate | null;
-  createdAt: Temporal.Instant;
-};
+function selectCompletions(executor: Executor) {
+  return executor
+    .select(completionFields)
+    .from(choreCompletion)
+    .leftJoin(user, eq(user.id, choreCompletion.completedById));
+}
+
+type CompletionRow = Awaited<ReturnType<typeof selectCompletions>>[number];
 
 function toCompletionRecord({
   completedById,
@@ -236,10 +214,7 @@ export async function findCompletions(
   limit: number,
   executor: Executor = db,
 ): Promise<CompletionRecord[]> {
-  const rows = await executor
-    .select(completionFields)
-    .from(choreCompletion)
-    .leftJoin(user, eq(user.id, choreCompletion.completedById))
+  const rows = await selectCompletions(executor)
     .where(eq(choreCompletion.choreId, choreId))
     .orderBy(...newestFirst)
     .limit(limit);

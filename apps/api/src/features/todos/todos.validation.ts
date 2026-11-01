@@ -1,43 +1,46 @@
+import { createInsertSchema, createUpdateSchema } from "drizzle-orm/zod";
 import { z } from "zod";
 
-const todoName = z
-  .string()
-  .trim()
-  .min(1, "Write what you need to do.")
-  .max(100, "Keep it under 100 characters.");
+import { plainDateInputSchema } from "../../db/zod.ts";
+import { todo } from "./todos.schema.ts";
 
-// Blank means no notes
-const notes = z
-  .string()
-  .trim()
-  .max(1000, "Keep notes under 1000 characters.")
-  .transform((value) => value || null)
-  .nullable();
+const todoName = (schema: z.ZodString) =>
+  schema.trim().min(1, "Write what you need to do.").max(100, "Keep it under 100 characters.");
 
-const dueOn = z.iso
-  .date("Use a date like 2026-03-14.")
-  .transform((value) => Temporal.PlainDate.from(value))
-  .nullable();
+const notes = (schema: z.ZodString) =>
+  schema
+    .trim()
+    .max(1000, "Keep notes under 1000 characters.")
+    .transform((value) => value || null);
+
+const todoFields = {
+  id: (schema: z.ZodString) => schema.pipe(z.uuid()),
+  name: todoName,
+  notes,
+  dueOn: () => plainDateInputSchema,
+};
 
 export const todoParam = z.object({
   todoId: z.string().min(1).max(64),
 });
 
-export const createTodoBody = z.object({
-  // Optional client-chosen id, so an optimistically added to-do keeps its identity
-  id: z.uuid().optional(),
-  name: todoName,
-  notes: notes.optional(),
-  dueOn: dueOn.optional(),
-});
+export const createTodoBody = createInsertSchema(todo, todoFields)
+  .pick({
+    // Optional client-chosen id, so an optimistically added to-do keeps its identity
+    id: true,
+    name: true,
+    notes: true,
+    dueOn: true,
+  })
+  // Drizzle makes nullable/defaulted insert fields optional at runtime; mirror that in API types.
+  .partial({ id: true, notes: true, dueOn: true });
 
 export const updateTodoBody = z
-  .object({
-    name: todoName.optional(),
-    notes: notes.optional(),
-    dueOn: dueOn.optional(),
-    done: z.boolean().optional(),
-  })
+  .object(createUpdateSchema(todo, todoFields).pick({ name: true, notes: true, dueOn: true }).shape)
+  .extend({ done: z.boolean().optional() })
   .refine((body) => Object.values(body).some((value) => value !== undefined), {
     message: "Nothing to change.",
   });
+
+export type CreateTodoInput = z.output<typeof createTodoBody>;
+export type UpdateTodoInput = z.output<typeof updateTodoBody>;

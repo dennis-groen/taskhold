@@ -16,6 +16,7 @@ import {
   tooManyInviteAttempts,
 } from "./households.errors.ts";
 import type { Household, InvitePreview, Membership } from "./households.types.ts";
+import type { CreateHouseholdInput } from "./households.validation.ts";
 import { generateInviteCode, normalizeInviteCode } from "./invite-code.ts";
 
 const MAX_INVITE_CODE_ATTEMPTS = 5;
@@ -54,7 +55,10 @@ export async function getHouseholdOf(userId: string): Promise<Household> {
 }
 
 /** Creates a household with the user as its owner. Fails if they're already in one. */
-export async function createHousehold(userId: string, name: string): Promise<Household> {
+export async function createHousehold(
+  userId: string,
+  name: CreateHouseholdInput["name"],
+): Promise<Household> {
   const householdId = await transaction(async (tx) => {
     const created = await insertWithFreshInviteCode(name, tx);
     const added = await householdsDal.insertMember(
