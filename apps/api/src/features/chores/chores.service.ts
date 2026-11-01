@@ -4,6 +4,7 @@
 // A repeating chore's next due date counts from the day it was done, not from when it was due, so a
 // household that falls behind doesn't come back to a pile of overdue chores.
 import { transaction } from "../../db/client.ts";
+import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
 import { addInterval, couldBeToday } from "./chore-dates.ts";
@@ -43,6 +44,7 @@ export async function createChore(userId: string, input: CreateChoreInput): Prom
     ...toValues(input),
   });
   annotate("chores", { chore_id: id, repeats: input.repeat !== null });
+  await changed(household.id);
   return loadDetail(household.id, id);
 }
 
@@ -86,6 +88,7 @@ export async function updateChore(
       tx,
     );
   });
+  await changed(household.id);
   return loadDetail(household.id, choreId);
 }
 
@@ -94,6 +97,7 @@ export async function deleteChore(userId: string, choreId: string): Promise<void
   const household = await householdsService.getMembershipOf(userId);
   const deleted = await choresDal.deleteChore({ householdId: household.id, choreId });
   if (!deleted) throw choreNotFound();
+  await changed(household.id);
 }
 
 /**
@@ -132,6 +136,7 @@ export async function completeChore(
       await choresDal.updateChore(ref, { dueOn: addInterval(today, repeatEvery, repeatUnit) }, tx);
     }
   });
+  await changed(household.id);
   return loadDetail(household.id, choreId);
 }
 
@@ -155,6 +160,7 @@ export async function undoLastCompletion(userId: string, choreId: string): Promi
       await choresDal.updateChore(ref, { dueOn: latest.previousDueOn }, tx);
     }
   });
+  await changed(household.id);
   return loadDetail(household.id, choreId);
 }
 
@@ -163,6 +169,7 @@ export async function clearDoneChores(userId: string): Promise<number> {
   const household = await householdsService.getMembershipOf(userId);
   const removed = await choresDal.deleteDoneOneOffChores(household.id);
   annotate("chores", { removed_count: removed });
+  if (removed > 0) await changed(household.id);
   return removed;
 }
 
@@ -219,4 +226,9 @@ function toCompletion(record: choresDal.CompletionRecord): ChoreCompletion {
     completedOn: record.completedOn,
     createdAt: record.createdAt,
   };
+}
+
+/** Tells everyone in the household that its chores changed */
+function changed(householdId: string) {
+  return announce({ householdId, topic: "chores" });
 }

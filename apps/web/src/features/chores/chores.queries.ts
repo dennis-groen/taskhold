@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 
 import { errorCode } from "@/lib/api-client.ts";
+import { isLive } from "@/lib/live-updates.ts";
 
 import { fetchChore, fetchChores } from "./chores.api.ts";
 
@@ -11,15 +12,16 @@ export const choreKeys = {
   detail: (choreId: string) => [...choreKeys.all, "detail", choreId] as const,
 };
 
-/** How often the chores page checks for changes from other members */
+/** How often the chores page checks for changes from other members while live updates are down */
 const CHORES_POLL_INTERVAL = 10_000;
 
 export const choresQuery = () =>
   queryOptions({
     queryKey: choreKeys.list(),
     queryFn: fetchChores,
-    // Pauses while the tab is hidden and refetches when it's visible again
-    refetchInterval: CHORES_POLL_INTERVAL,
+    // Changes from others normally arrive through live updates. Without them it polls, pausing
+    // while the tab is hidden.
+    refetchInterval: () => (isLive() ? false : CHORES_POLL_INTERVAL),
   });
 
 export const choreQuery = (choreId: string) =>

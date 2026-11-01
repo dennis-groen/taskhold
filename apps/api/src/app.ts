@@ -6,6 +6,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { authRoutes } from "./features/auth/auth.routes.ts";
 import { choreRoutes } from "./features/chores/chores.routes.ts";
 import { householdRoutes } from "./features/households/households.routes.ts";
+import { liveRoutes } from "./features/live/live.routes.ts";
 import { shoppingRoutes } from "./features/shopping/shopping.routes.ts";
 import { todoRoutes } from "./features/todos/todos.routes.ts";
 import { viewerRoutes } from "./features/viewer/viewer.routes.ts";
@@ -52,4 +53,5 @@ export const app = new Hono()
   .route("/households", householdRoutes)
   .route("/shopping", shoppingRoutes)
   .route("/chores", choreRoutes)
-  .route("/todos", todoRoutes);
+  .route("/todos", todoRoutes)
+  .route("/live", liveRoutes);

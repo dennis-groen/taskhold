@@ -4,6 +4,7 @@
 // Every change to who is in a household runs in a transaction that locks the household row,
 // so concurrent joins, leaves and removals in one household happen one at a time.
 import { transaction, type Transaction } from "../../db/client.ts";
+import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsDal from "./households.dal.ts";
 import {
@@ -67,6 +68,7 @@ export async function createHousehold(
     );
     // Throwing rolls back the household created above
     if (!added) throw alreadyInHousehold();
+    await membershipChanged({ userId }, tx);
     return created.id;
   });
   annotate("household", { id: householdId, role: "owner" });
@@ -94,6 +96,7 @@ export async function acceptInvite(userId: string, rawCode: string): Promise<Hou
       tx,
     );
     if (!added) throw alreadyInHousehold();
+    await membershipChanged({ householdId: household.id, userId }, tx);
   });
   annotate("household", { id: household.id, role: "member" });
   return getHousehold(household.id);
@@ -119,6 +122,7 @@ async function leave(userId: string, tx: Transaction): Promise<{ householdDelete
   const membership = await lockMembershipOf(userId, tx);
   const { householdId } = membership;
   await householdsDal.deleteMember({ householdId, userId }, tx);
+  await membershipChanged({ householdId, userId }, tx);
 
   const successor = await householdsDal.findEarliestMember(householdId, tx);
   if (!successor) {
@@ -148,6 +152,7 @@ export async function removeMember(ownerId: string, memberId: string): Promise<H
     );
     if (!removed) throw memberNotFound();
     await replaceInviteCode(owner.householdId, tx);
+    await membershipChanged({ householdId: owner.householdId, userId: memberId }, tx);
     annotate("household", { removed_member_id: memberId });
     return owner.householdId;
   });
@@ -159,6 +164,7 @@ export async function regenerateInviteCode(ownerId: string): Promise<Household> 
   const householdId = await transaction(async (tx) => {
     const owner = await lockMembershipOf(ownerId, tx, { ownerOnly: true });
     await replaceInviteCode(owner.householdId, tx);
+    await membershipChanged({ householdId: owner.householdId }, tx);
     return owner.householdId;
   });
   return getHousehold(householdId);
@@ -227,4 +233,17 @@ async function insertWithFreshInviteCode(name: string, tx: Transaction) {
     if (created) return created;
   }
   throw new Error("Could not generate a unique invite code");
+}
+
+/**
+ * Announces, when the transaction commits, that a household's members (or invite code) changed,
+ * to everyone in it and to the person who joined or left, whose live stream follows them.
+ */
+async function membershipChanged(
+  target: { householdId?: string; userId?: string },
+  tx: Transaction,
+): Promise<void> {
+  if (target.householdId)
+    await announce({ householdId: target.householdId, topic: "household" }, tx);
+  if (target.userId) await announce({ userId: target.userId, topic: "household" }, tx);
 }

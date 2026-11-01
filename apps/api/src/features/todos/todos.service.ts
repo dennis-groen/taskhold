@@ -2,6 +2,7 @@
 // it; someone else's to-do looks the same as one that doesn't exist. To-dos don't depend on a
 // household, except for moving one to the household's chores.
 import { transaction } from "../../db/client.ts";
+import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
 import type { ChoreDetail } from "../chores/chores.types.ts";
@@ -32,6 +33,7 @@ export async function createTodo(userId: string, input: CreateTodoInput): Promis
   // Not inserted: either a retry of an add that already went through, or someone else's id
   const record = await todosDal.findTodo({ userId, todoId: id });
   if (!record) throw inserted ? todoNotFound() : todoIdTaken();
+  if (inserted) await changed(userId);
   return toTodo(record);
 }
 
@@ -51,6 +53,7 @@ export async function updateTodo(
     }),
   });
   if (!updated) throw todoNotFound();
+  await changed(userId);
 
   const record = await todosDal.findTodo(ref);
   if (!record) throw todoNotFound();
@@ -61,12 +64,14 @@ export async function updateTodo(
 export async function deleteTodo(userId: string, todoId: string): Promise<void> {
   annotate("todos", { todo_id: todoId });
   await todosDal.deleteTodo({ userId, todoId });
+  await changed(userId);
 }
 
 /** Removes every done to-do. Returns how many went. */
 export async function clearDoneTodos(userId: string): Promise<number> {
   const removed = await todosDal.deleteDoneTodos(userId);
   annotate("todos", { removed_count: removed });
+  if (removed > 0) await changed(userId);
   return removed;
 }
 
@@ -80,6 +85,8 @@ export async function moveToChores(userId: string, todoId: string): Promise<Chor
     // Deleting first locks the row, so moving the same to-do twice at once makes one chore
     const removed = await todosDal.deleteTodo({ userId, todoId }, tx);
     if (!removed) throw todoNotFound();
+    // Sent when the transaction commits; createChore announces the new chore itself
+    await announce({ userId, topic: "todos" }, tx);
     // If this fails (e.g. not in a household), throwing rolls the delete back
     return choresService.createChore(userId, {
       name: removed.name.slice(0, 60),
@@ -88,6 +95,11 @@ export async function moveToChores(userId: string, todoId: string): Promise<Chor
       assigneeId: null,
     });
   });
+}
+
+/** Tells the person's other devices that their to-dos changed. Nobody else hears about it. */
+function changed(userId: string) {
+  return announce({ userId, topic: "todos" });
 }
 
 function toTodo(record: todosDal.TodoRecord): Todo {

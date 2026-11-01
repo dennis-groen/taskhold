@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 
 import { env } from "./config/env.ts";
 import { pool } from "./db/client.ts";
+import { stopFeed } from "./lib/live-changes.ts";
 import { logger } from "./lib/logger.ts";
 import { describeError } from "./lib/wide-event.ts";
 import { createServer } from "./server.ts";
@@ -21,9 +22,11 @@ const server = serve({ fetch: createServer(env.WEB_ROOT).fetch, port: env.PORT }
   logger.info({ port: info.port }, `API running on http://localhost:${info.port}`);
 });
 
-// Stop taking requests, let in-flight ones finish, then release database connections
+// Stop taking requests, let in-flight ones finish, then release database connections. Live
+// streams never finish by themselves, so they're ended first; browsers reconnect to the new server.
 function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, `${signal} received, shutting down`);
+  void stopFeed();
   server.close(() => {
     void pool.end().finally(() => process.exit(0));
   });

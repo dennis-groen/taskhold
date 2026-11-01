@@ -1,5 +1,6 @@
 // Who is using the app right now: composes the auth and households features through their services.
 import { transaction } from "../../db/client.ts";
+import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import { deleteUser, getSession } from "../auth/auth.service.ts";
 import { findMembership, leaveAnyHousehold } from "../households/households.service.ts";
@@ -25,6 +26,8 @@ export async function deleteAccount(userId: string): Promise<void> {
   await transaction(async (tx) => {
     await leaveAnyHousehold(userId, tx);
     await deleteUser(userId, tx);
+    // Closes the person's live streams on every device
+    await announce({ userId, topic: "account" }, tx);
   });
   annotate("account", { deleted: true });
 }
