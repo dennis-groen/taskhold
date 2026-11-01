@@ -1,10 +1,15 @@
 // Data access for households: the only place that queries household tables.
 // Functions return plain records and take an optional executor so services can run them in a transaction.
-import { and, asc, eq, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, gte, lt, type SQL } from "drizzle-orm";
 
 import { db, type Executor, type Transaction } from "../../db/client.ts";
 import { isUniqueViolation } from "../../db/errors.ts";
-import { household, householdMember, type HouseholdRole } from "./households.schema.ts";
+import {
+  household,
+  householdMember,
+  inviteCodeAttempt,
+  type HouseholdRole,
+} from "./households.schema.ts";
 
 export type MembershipRecord = {
   householdId: string;
@@ -187,4 +192,31 @@ export async function updateInviteCode(
     if (isUniqueViolation(err, "household_invite_code_unique")) return false;
     throw err;
   }
+}
+
+/** How many codes this user tried since `since` that matched no household */
+export async function countFailedInviteAttempts(
+  userId: string,
+  since: Date,
+  executor: Executor = db,
+): Promise<number> {
+  const rows = await executor
+    .select({ count: count() })
+    .from(inviteCodeAttempt)
+    .where(and(eq(inviteCodeAttempt.userId, userId), gte(inviteCodeAttempt.attemptedAt, since)));
+  return rows[0]?.count ?? 0;
+}
+
+/** Records a code that matched no household, and drops this user's attempts older than `prunedBefore` */
+export async function recordFailedInviteAttempt(
+  userId: string,
+  prunedBefore: Date,
+  executor: Executor = db,
+): Promise<void> {
+  await executor.insert(inviteCodeAttempt).values({ userId });
+  await executor
+    .delete(inviteCodeAttempt)
+    .where(
+      and(eq(inviteCodeAttempt.userId, userId), lt(inviteCodeAttempt.attemptedAt, prunedBefore)),
+    );
 }

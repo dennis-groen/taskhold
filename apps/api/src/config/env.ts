@@ -9,6 +9,17 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32, "Use at least 32 characters (pnpm exec auth secret)"),
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
+  // IPs or CIDR ranges of reverse proxies in front of the API, comma-separated. Empty when the
+  // API is reached directly. Decides which X-Forwarded-For hop is the real client.
+  TRUSTED_PROXIES: z
+    .string()
+    .default("")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
 });
 
 const parsed = envSchema.safeParse(process.env);

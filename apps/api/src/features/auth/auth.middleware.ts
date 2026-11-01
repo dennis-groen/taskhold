@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import { AppError } from "../../lib/errors.ts";
+import { requireSameOrigin } from "../../lib/same-origin.ts";
 import type { Session } from "./auth.ts";
 import { getSession } from "./auth.service.ts";
 
@@ -24,5 +25,8 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
   await next();
 });
 
-/** A router where every route requires a signed-in user, so `c.get("user")` is always set */
-export const protectedRouter = () => new Hono<AuthEnv>().use(requireAuth);
+/**
+ * A router where every route requires a signed-in user, so `c.get("user")` is always set,
+ * and every state-changing request must come from the app's own origin
+ */
+export const protectedRouter = () => new Hono<AuthEnv>().use(requireSameOrigin).use(requireAuth);

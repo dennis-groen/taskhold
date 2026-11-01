@@ -12,11 +12,18 @@ import {
   memberNotFound,
   notInHousehold,
   ownerOnly,
+  tooManyInviteAttempts,
 } from "./households.errors.ts";
 import type { Household, InvitePreview, Membership } from "./households.types.ts";
 import { generateInviteCode, normalizeInviteCode } from "./invite-code.ts";
 
 const MAX_INVITE_CODE_ATTEMPTS = 5;
+
+// An invite code is the only thing needed to join a household, so each account gets a small
+// budget of codes that match nothing. With 40-bit codes this makes guessing any household's code
+// take far longer than an account is worth.
+const INVITE_GUESS_LIMIT = 10;
+const INVITE_GUESS_WINDOW_MS = 15 * 60 * 1000;
 
 /** The household a user belongs to, or null when they haven't created or joined one */
 export async function findMembership(userId: string): Promise<Membership | null> {
@@ -54,8 +61,8 @@ export async function createHousehold(userId: string, name: string): Promise<Hou
   return getHousehold(householdId);
 }
 
-export async function previewInvite(rawCode: string): Promise<InvitePreview> {
-  const household = await findByInviteCode(rawCode);
+export async function previewInvite(userId: string, rawCode: string): Promise<InvitePreview> {
+  const household = await findByInviteCode(userId, rawCode);
   return {
     householdName: household.name,
     members: household.members.map(({ name, image }) => ({ name, image })),
@@ -64,7 +71,7 @@ export async function previewInvite(rawCode: string): Promise<InvitePreview> {
 
 /** Adds the user to the household behind the code. Fails if they're already in one. */
 export async function acceptInvite(userId: string, rawCode: string): Promise<Household> {
-  const household = await findByInviteCode(rawCode);
+  const household = await findByInviteCode(userId, rawCode);
   await transaction(async (tx) => {
     // The household may have been deleted, or its code replaced, since we looked it up
     const locked = await householdsDal.lockHousehold(household.id, tx);
@@ -162,10 +169,18 @@ async function getHousehold(householdId: string): Promise<Household> {
   };
 }
 
-async function findByInviteCode(rawCode: string) {
+/** Looks up the household behind a code, counting misses against the user's guess budget */
+async function findByInviteCode(userId: string, rawCode: string) {
+  const windowStart = new Date(Date.now() - INVITE_GUESS_WINDOW_MS);
+  const failures = await householdsDal.countFailedInviteAttempts(userId, windowStart);
+  if (failures >= INVITE_GUESS_LIMIT) throw tooManyInviteAttempts();
+
   const code = normalizeInviteCode(rawCode);
   const household = code ? await householdsDal.findHouseholdByInviteCode(code) : null;
-  if (!household) throw inviteNotFound();
+  if (!household) {
+    await householdsDal.recordFailedInviteAttempt(userId, windowStart);
+    throw inviteNotFound();
+  }
   return household;
 }
 

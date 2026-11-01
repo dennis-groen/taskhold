@@ -25,3 +25,10 @@ export const cannotRemoveSelf = () =>
 
 export const memberNotFound = () =>
   new AppError("not_found", "MEMBER_NOT_FOUND", "This person isn't in your household.");
+
+export const tooManyInviteAttempts = () =>
+  new AppError(
+    "too_many_requests",
+    "TOO_MANY_INVITE_ATTEMPTS",
+    "Too many codes didn't match. Wait 15 minutes, then check the code with the person who shared it.",
+  );

@@ -28,7 +28,10 @@ export const householdRoutes = protectedRouter()
     return c.json({ household }, 201);
   })
   .get("/invites/:code", validate("param", inviteCodeParam), async (c) => {
-    const invite = await householdsService.previewInvite(c.req.valid("param").code);
+    const invite = await householdsService.previewInvite(
+      c.get("user").id,
+      c.req.valid("param").code,
+    );
     return c.json({ invite }, 200);
   })
   .post("/invites/:code/accept", validate("param", inviteCodeParam), async (c) => {

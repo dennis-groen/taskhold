@@ -40,6 +40,23 @@ export const householdMember = pgTable(
   (table) => [index("household_member_householdId_idx").on(table.householdId)],
 );
 
+// One row per invite code that didn't match a household, so guessing codes can be capped per account
+export const inviteCodeAttempt = pgTable(
+  "invite_code_attempt",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("invite_code_attempt_userId_attemptedAt_idx").on(table.userId, table.attemptedAt),
+  ],
+);
+
 export const householdRelations = relations(household, ({ many }) => ({
   members: many(householdMember),
 }));

@@ -1,5 +1,11 @@
 /** What went wrong, in terms the HTTP layer can turn into a status code */
-export type ErrorKind = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict";
+export type ErrorKind =
+  | "bad_request"
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "conflict"
+  | "too_many_requests";
 
 /** Body of every error response */
 export type ApiErrorBody = { error: { code: string; message: string } };

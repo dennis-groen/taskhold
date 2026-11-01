@@ -10,6 +10,7 @@ const statusByKind = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  too_many_requests: 429,
 } as const satisfies Record<ErrorKind, ContentfulStatusCode>;
 
 /** Turns any thrown error into a JSON error response */
