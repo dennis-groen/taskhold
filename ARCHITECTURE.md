@@ -48,12 +48,23 @@ Requests flow `routes → service → dal → database`, never backwards.
 - When a rule depends on other rows (the last member leaving deletes the household, the owner leaving hands over ownership), the service locks the parent row first (`householdsDal.lockHousehold`) and re-reads under the lock. Concurrent requests then run one after another instead of acting on stale reads.
 - DB-specific error handling stays in the DAL: it turns a constraint conflict into a plain result (`null` or `false`) that the service can act on, using `onConflictDoNothing`, or a savepoint plus `db/errors.ts` where an insert can't skip conflicts.
 
+### Tests
+
+API integration tests live in `apps/api/test/`, one file per feature. `test/helpers.ts` provides:
+
+- `signUp()`: a user with a real session;
+- `householdWith()`: a household with the given users in it;
+- `json()` and `errorCode()`: they assert the status and return the typed body or the error code.
+
+Each test makes its own users and households, so tests don't depend on each other or on order. Web unit tests sit next to the code they test (`*.test.ts`).
+
 ### Adding an API feature
 
 1. Create `features/<name>/` with the files from the list above that it needs.
 2. Export its tables from `db/schema.ts`, then run `pnpm db:generate` and `pnpm db:migrate`.
 3. Mount its router in `app.ts` with `.route("/<name>", <name>Routes)`. The web app's RPC client picks it up from the types.
 4. In the service, `annotate("<name>", { ... })` the ids and counts someone debugging a request would want.
+5. Add `test/<name>.test.ts`, including a test that another household (or another person, for private data) gets a 404 for every route.
 
 ## Web (`apps/web/src`)
 

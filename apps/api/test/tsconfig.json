@@ -1,0 +1,12 @@
+{
+  // Type-checks the tests with the app's source; never emits
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "composite": false,
+    "declarationMap": false,
+    "tsBuildInfoFile": null
+  },
+  "include": ["../src", "."]
+}

@@ -175,6 +175,17 @@ pnpm db:generate
 pnpm db:migrate
 ```
 
+## Tests
+
+`pnpm test` runs both apps' tests with [Vitest](https://vitest.dev). In one app, `pnpm test:watch` reruns them on every change.
+
+- **API** (`apps/api/test/`): integration tests that call the Hono app in-process through its typed client, so no server has to run.
+  - They use their own database, `taskhold_test`, in the same Docker Postgres. It's created and migrated automatically, and emptied at the start of each run, so dev data is never touched. Set `TEST_DATABASE_URL` to use another database, e.g. in CI. Its name must end in `_test`: the tests refuse to run otherwise, because they empty every table.
+  - Test users get a real Better Auth session, so every request goes through the same sign-in and same-origin checks as in the app.
+  - The tests cover who can see and change what: other households and other people get 404s, the owner-only actions, and the invite-guess limit. They also cover the chore due-date and undo rules, retries with client-chosen ids, and moving a to-do to chores.
+- **Web** (`apps/web/src/**/*.test.ts`): unit tests for the date helpers and shopping-list sorting. The date helpers run twice, on native Temporal and on `temporal-polyfill`, because browsers without Temporal use the polyfill.
+- Vitest is installed once, at the workspace root.
+
 ## Scripts
 
 | Command              | What it does                                    |
@@ -183,7 +194,8 @@ pnpm db:migrate
 | `pnpm dev:api`       | Start only the API                              |
 | `pnpm dev:web`       | Start only the frontend                         |
 | `pnpm build`         | Build all apps                                  |
-| `pnpm typecheck`     | Typecheck all apps                              |
+| `pnpm typecheck`     | Typecheck all apps, tests included              |
+| `pnpm test`          | Run all tests (needs Postgres: `pnpm db:up`)    |
 | `pnpm lint`          | Lint everything with oxlint                     |
 | `pnpm format`        | Format everything with oxfmt                    |
 | `pnpm check`         | Format check, lint, typecheck                   |
