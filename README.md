@@ -112,12 +112,43 @@ Signed-in pages that need a household share one frame (`components/layout/househ
   - **Images:** only from the app itself, `data:` URLs and Google's profile-picture host (`*.googleusercontent.com`).
   - **Everything else:** data requests go only to the app's own origin, and plugins and `<base>` tags are blocked.
   - **Development:** the dev server has no policy, because Vite's hot reloading uses inline scripts. Use `pnpm --filter @taskhold/web exec vite preview` to try the production build with the policy; it proxies `/api` to port 3000 like the dev server.
-- **Not covered by a `<meta>` tag:** it can't stop other sites from framing the app (`frame-ancestors`). Whatever serves the web app in production should send `Content-Security-Policy: frame-ancestors 'none'` (or `X-Frame-Options: DENY`) as a header.
+- **Not covered by a `<meta>` tag:** it can't stop other sites from framing the app (`frame-ancestors`). The production server sends that as a header instead (see "Deploying").
 - **API responses** get Hono's `secureHeaders`: a policy of `default-src 'none'; frame-ancestors 'none'` (they're JSON or redirects, never pages), plus `X-Frame-Options: DENY`, `nosniff` and the usual set. HSTS applies to the app's host only (no `includeSubDomains`), so it doesn't affect other subdomains of the production domain.
+
+## Deploying
+
+The root `Dockerfile` builds one image for the whole app. The API serves the web app's build next to `/api` (`apps/api/src/server.ts`), so both share one origin, which the same-origin check, the session cookie and the CSP rely on.
+
+- **On start**, the container applies pending migrations (`dist/db/migrate.js`), then starts the API on port 3000 with `NODE_ENV=production`. It runs as the unprivileged `node` user, and its health check calls `/api/health`.
+- **Caching:** files under `/assets/` have content hashes in their names and are cached for a year; everything else, including `index.html`, is revalidated on every visit. Every app route returns `index.html`, a missing asset is a 404, and unknown `/api/*` paths get a JSON 404.
+- **Page headers:** the pages are sent with `frame-ancestors 'none'` and `X-Frame-Options: DENY`, which the `<meta>` policy can't set.
+- **Environment:** the image needs the same variables as `apps/api/.env.example`:
+  - `DATABASE_URL`;
+  - `BETTER_AUTH_URL`, the public `https://` origin;
+  - `BETTER_AUTH_SECRET`;
+  - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`;
+  - `TRUSTED_PROXIES`, the reverse proxy's addresses.
+
+  `.dockerignore` keeps `.env` files out of the image.
+
+- **Google:** in Google Cloud Console, add `https://<domain>/api/auth/callback/google` as an authorized redirect URI and `https://<domain>` as a JavaScript origin.
+
+To try the image locally:
+
+```bash
+docker build -t taskhold .
+```
+
+**Coolify:** create an application from the Git repository with the Dockerfile build pack:
+
+- port `3000`;
+- health check path `/api/health`;
+- the variables above;
+- `TRUSTED_PROXIES` set to the address range of Coolify's proxy network, so rate limiting sees real client IPs.
 
 ## Production settings
 
-- `pnpm --filter @taskhold/api start` runs with `NODE_ENV=production`, set in the script itself, so `.env` can't override it.
+- `pnpm --filter @taskhold/api start` runs with `NODE_ENV=production`, set in the script itself, so `.env` can't override it. The Docker image sets it too.
 - **Database timeouts** (`apps/api/src/db/client.ts`):
   - waiting for a connection gives up after 5 seconds;
   - Postgres cancels any statement after 10 seconds, including one waiting on a row lock;

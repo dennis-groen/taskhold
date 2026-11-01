@@ -1,0 +1,10 @@
+# Only source goes into the build; dependencies and output are made inside it
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.claude
+.vscode

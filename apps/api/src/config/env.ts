@@ -20,6 +20,9 @@ const envSchema = z.object({
         .map((entry) => entry.trim())
         .filter(Boolean),
     ),
+  // Folder with the web app's build (apps/web/dist) to serve next to the API, as in the Docker
+  // image. Unset in development, where Vite serves the web app.
+  WEB_ROOT: z.string().min(1).optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   // json for log collectors; pretty is readable in a terminal. Defaults to pretty in development.
   LOG_FORMAT: z.enum(["json", "pretty"]).optional(),

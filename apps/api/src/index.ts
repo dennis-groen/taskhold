@@ -1,10 +1,10 @@
 import { serve } from "@hono/node-server";
 
-import { app } from "./app.ts";
 import { env } from "./config/env.ts";
 import { pool } from "./db/client.ts";
 import { logger } from "./lib/logger.ts";
 import { describeError } from "./lib/wide-event.ts";
+import { createServer } from "./server.ts";
 
 // Something escaped every handler, so the process is in an unknown state. Log it the same way as
 // request errors, then exit and let the supervisor restart it.
@@ -17,7 +17,7 @@ process.on("unhandledRejection", (reason) => {
   process.exit(1);
 });
 
-const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
+const server = serve({ fetch: createServer(env.WEB_ROOT).fetch, port: env.PORT }, (info) => {
   logger.info({ port: info.port }, `API running on http://localhost:${info.port}`);
 });
 

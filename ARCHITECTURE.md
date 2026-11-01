@@ -6,10 +6,12 @@ Both apps are organized by feature (vertical slices). A feature folder holds eve
 
 ```
 index.ts                  starts the HTTP server, shuts down cleanly on SIGTERM/SIGINT
-app.ts                    composes the app: middleware, error handler, one router per feature
+server.ts                 the API plus, in production (WEB_ROOT), the web app's build on one origin
+app.ts                    composes the API: middleware, error handler, one router per feature
 client.ts                 typed RPC client for the web app (@taskhold/api/client)
 config/env.ts             environment, validated with zod at startup
-db/client.ts              Postgres pool, Drizzle instance, transaction()
+db/client.ts              Postgres pool (with timeouts), Drizzle instance, transaction()
+db/migrate.ts             applies migrations at container start
 db/schema.ts              every feature's tables, for migrations and relational queries
 lib/                      feature-agnostic helpers: AppError, error handler, validate(), logger, wide events
 features/
