@@ -9,3 +9,8 @@ const SIGNED_OUT: Viewer = { user: null, household: null };
 export function fetchViewer(): Promise<Viewer> {
   return parseResponse(api.viewer.$get()).catch(() => SIGNED_OUT);
 }
+
+/** Deletes the signed-in person's account; the API also clears the session cookie */
+export async function deleteAccount(): Promise<void> {
+  await parseResponse(api.viewer.$delete());
+}

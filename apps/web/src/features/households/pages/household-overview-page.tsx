@@ -10,11 +10,21 @@ import { UserAvatar } from "@/components/user-avatar.tsx";
 import { HouseholdMembers } from "../components/household-members.tsx";
 import { LeaveHouseholdButton } from "../components/leave-household-button.tsx";
 import { RemoveMemberButton } from "../components/remove-member-button.tsx";
+import type { Household } from "../households.api.ts";
 
 const householdRoute = getRouteApi("/_household");
 
-/** `accountAction` is the sign-out button, which belongs to the auth feature */
-export function HouseholdOverviewPage({ accountAction }: { accountAction?: ReactNode }) {
+/**
+ * `accountAction` is the sign-out button and `deleteAccount` the delete-account button, which
+ * belong to the auth feature
+ */
+export function HouseholdOverviewPage({
+  accountAction,
+  deleteAccount,
+}: {
+  accountAction?: ReactNode;
+  deleteAccount?: (household: Household, currentUserId: string) => ReactNode;
+}) {
   const household = householdRoute.useLoaderData();
   const { user } = householdRoute.useRouteContext();
   const isOwner = household.members.some(
@@ -63,8 +73,9 @@ export function HouseholdOverviewPage({ accountAction }: { accountAction?: React
         <ThemeToggle />
       </Group>
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-wrap gap-2">
         <LeaveHouseholdButton household={household} currentUserId={user.id} />
+        {deleteAccount?.(household, user.id)}
       </div>
     </>
   );

@@ -104,26 +104,33 @@ export async function acceptInvite(userId: string, rawCode: string): Promise<Hou
  * earliest takes over; if they were the last one, the household is deleted.
  */
 export async function leaveHousehold(userId: string): Promise<{ householdDeleted: boolean }> {
-  return transaction(async (tx) => {
-    const membership = await lockMembershipOf(userId, tx);
-    const { householdId } = membership;
-    await householdsDal.deleteMember({ householdId, userId }, tx);
+  return transaction((tx) => leave(userId, tx));
+}
 
-    const successor = await householdsDal.findEarliestMember(householdId, tx);
-    if (!successor) {
-      await householdsDal.deleteHousehold(householdId, tx);
-      annotate("household", { deleted: true });
-      return { householdDeleted: true };
-    }
-    if (membership.role === "owner") {
-      await householdsDal.setMemberRole(
-        { householdId, userId: successor.userId, role: "owner" },
-        tx,
-      );
-      annotate("household", { new_owner_id: successor.userId });
-    }
-    return { householdDeleted: false };
-  });
+/**
+ * For deleting an account: leaves the user's household the same way, in the caller's
+ * transaction, and does nothing when they aren't in one
+ */
+export async function leaveAnyHousehold(userId: string, tx: Transaction): Promise<void> {
+  if (await householdsDal.findMembershipByUserId(userId, tx)) await leave(userId, tx);
+}
+
+async function leave(userId: string, tx: Transaction): Promise<{ householdDeleted: boolean }> {
+  const membership = await lockMembershipOf(userId, tx);
+  const { householdId } = membership;
+  await householdsDal.deleteMember({ householdId, userId }, tx);
+
+  const successor = await householdsDal.findEarliestMember(householdId, tx);
+  if (!successor) {
+    await householdsDal.deleteHousehold(householdId, tx);
+    annotate("household", { deleted: true });
+    return { householdDeleted: true };
+  }
+  if (membership.role === "owner") {
+    await householdsDal.setMemberRole({ householdId, userId: successor.userId, role: "owner" }, tx);
+    annotate("household", { new_owner_id: successor.userId });
+  }
+  return { householdDeleted: false };
 }
 
 /**

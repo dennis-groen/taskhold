@@ -1,6 +1,8 @@
 // Who is using the app right now: composes the auth and households features through their services.
-import { getSession } from "../auth/auth.service.ts";
-import { findMembership } from "../households/households.service.ts";
+import { transaction } from "../../db/client.ts";
+import { annotate } from "../../lib/wide-event.ts";
+import { deleteUser, getSession } from "../auth/auth.service.ts";
+import { findMembership, leaveAnyHousehold } from "../households/households.service.ts";
 
 export async function getViewer(headers: Headers) {
   const session = await getSession(headers);
@@ -13,4 +15,16 @@ export async function getViewer(headers: Headers) {
     user: { id, name, email, image: image ?? null },
     household: await findMembership(id),
   };
+}
+
+/**
+ * Deletes the person's account and everything that was only theirs. Their household carries on
+ * as if they left: the earliest member becomes owner, or it's deleted if they were the last one.
+ */
+export async function deleteAccount(userId: string): Promise<void> {
+  await transaction(async (tx) => {
+    await leaveAnyHousehold(userId, tx);
+    await deleteUser(userId, tx);
+  });
+  annotate("account", { deleted: true });
 }

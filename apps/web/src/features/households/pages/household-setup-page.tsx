@@ -1,11 +1,13 @@
 import { CaretRightIcon, HouseLineIcon, KeyIcon, type Icon } from "@phosphor-icons/react";
 import { Link, getRouteApi, type LinkProps } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 
 const routeApi = getRouteApi("/onboarding/");
 
-export function HouseholdSetupPage() {
+/** `accountAction` is the delete-account button, which belongs to the auth feature */
+export function HouseholdSetupPage({ accountAction }: { accountAction?: ReactNode }) {
   const { user } = routeApi.useRouteContext();
   const firstName = user.name.trim().split(/\s+/)[0];
 
@@ -34,6 +36,8 @@ export function HouseholdSetupPage() {
           />
         </li>
       </ul>
+
+      {accountAction && <div className="mt-12 -ml-4">{accountAction}</div>}
     </>
   );
 }
