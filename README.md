@@ -112,6 +112,15 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - A small inline script in `apps/web/index.html` applies the theme before the first paint, so dark mode doesn't flash white. `components/theme-provider.tsx` follows the same rule after that. The Content Security Policy allows it by its hash, which the build computes (see "Security headers").
 - The dark theme uses a lighter violet for `--primary` than the light theme, with dark text on primary buttons. The light theme's violet was under 2:1 contrast against dark cards; this one is over 6:1.
 
+## Installing the app (PWA)
+
+- taskhold can be installed from the browser ("Install app" in Chrome and Edge, "Add to Home Screen" on iPhone and Android). The manifest is `apps/web/public/manifest.webmanifest`; the icons are next to it.
+- `vite-plugin-pwa` generates a service worker (`sw.js`) at build time. It keeps the app itself (HTML, JS, CSS, fonts, icons) on the device, so the installed app opens without a connection. API responses are never cached: they're private and live. Navigations under `/api` (such as the Google sign-in callback) always go to the server.
+- When the API can't be reached, the app shows "Can't reach taskhold" (`components/root-error.tsx`) instead of the sign-in page, and tries again when the device is back online.
+- After a deploy, open apps download the new version in the background (they check every hour too) and show "A new version of taskhold is ready" (`components/update-prompt.tsx`). Nothing switches until the person taps Reload.
+- The service worker only exists in production builds. To try it locally, run `pnpm --filter @taskhold/web build` and `pnpm --filter @taskhold/web preview` (with the API running).
+- `index.html` sets `viewport-fit=cover`, so the `env(safe-area-inset-*)` padding works on phones with a notch or home indicator.
+
 ## Security headers
 
 - **Web app:** `apps/web/content-security-policy.ts` is a Vite plugin that adds a Content Security Policy to the built `index.html` as a `<meta>` tag.

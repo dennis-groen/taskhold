@@ -1,7 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { Outlet, createRootRouteWithContext, redirect } from "@tanstack/react-router";
 
-import { fetchViewer } from "@/features/auth/auth.api.ts";
+import { RootError } from "@/components/root-error.tsx";
+import { UpdatePrompt } from "@/components/update-prompt.tsx";
+import { ViewerUnavailableError, fetchViewer } from "@/features/auth/auth.api.ts";
 
 import "@/styles/globals.css";
 
@@ -32,5 +34,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
     return { viewer };
   },
-  component: Outlet,
+  component: RootLayout,
+  errorComponent: ({ error }) => (
+    <RootError unreachable={error instanceof ViewerUnavailableError} />
+  ),
 });
+
+function RootLayout() {
+  return (
+    <>
+      <Outlet />
+      <UpdatePrompt />
+    </>
+  );
+}

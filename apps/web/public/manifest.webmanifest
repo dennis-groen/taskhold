@@ -1,12 +1,15 @@
 {
+  "id": "/",
   "name": "taskhold",
   "short_name": "taskhold",
   "description": "Shopping lists, chores and to-dos for the people you live with.",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#7008e7",
+  "theme_color": "#ffffff",
+  "categories": ["lifestyle", "productivity"],
   "icons": [
     {
       "src": "/icon-192.png",
