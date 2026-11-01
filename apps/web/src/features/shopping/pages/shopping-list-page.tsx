@@ -8,10 +8,10 @@ import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { AddRow } from "../components/add-row.tsx";
+import { AddRow } from "@/components/add-row.tsx";
 import { DeleteListButton } from "../components/delete-list-button.tsx";
 import { ListNotFound } from "../components/list-not-found.tsx";
-import { SharedWithLine } from "../components/shared-with-line.tsx";
+import { SharedWithLine } from "@/components/shared-with-line.tsx";
 import { ShoppingItemRow } from "../components/shopping-item-row.tsx";
 import { useShoppingList } from "../hooks/use-shopping-list.ts";
 import { groupItems } from "../shopping-items.ts";

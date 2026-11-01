@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
 
 import { authRoutes } from "./features/auth/auth.routes.ts";
+import { choreRoutes } from "./features/chores/chores.routes.ts";
 import { householdRoutes } from "./features/households/households.routes.ts";
 import { shoppingRoutes } from "./features/shopping/shopping.routes.ts";
 import { viewerRoutes } from "./features/viewer/viewer.routes.ts";
@@ -36,4 +37,5 @@ export const app = new Hono()
   .route("/auth", authRoutes)
   .route("/viewer", viewerRoutes)
   .route("/households", householdRoutes)
-  .route("/shopping", shoppingRoutes);
+  .route("/shopping", shoppingRoutes)
+  .route("/chores", choreRoutes);

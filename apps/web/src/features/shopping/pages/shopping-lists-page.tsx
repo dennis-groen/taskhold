@@ -6,7 +6,7 @@ import { Group } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 
 import { NewListForm } from "../components/new-list-form.tsx";
-import { SharedWithLine } from "../components/shared-with-line.tsx";
+import { SharedWithLine } from "@/components/shared-with-line.tsx";
 import { listsQuery } from "../shopping.queries.ts";
 
 function progress({ itemCount, openCount }: { itemCount: number; openCount: number }) {

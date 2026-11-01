@@ -41,6 +41,11 @@ export async function getMembershipOf(userId: string): Promise<Membership> {
   return membership;
 }
 
+/** Whether someone is in this household right now, e.g. before assigning them something */
+export function isMemberOf(householdId: string, userId: string): Promise<boolean> {
+  return householdsDal.isMember({ householdId, userId });
+}
+
 export async function getHouseholdOf(userId: string): Promise<Household> {
   const membership = await householdsDal.findMembershipByUserId(userId);
   if (!membership) throw notInHousehold();

@@ -6,7 +6,7 @@ import { errorMessage } from "@/lib/api-client.ts";
 
 import { createList } from "../shopping.api.ts";
 import { shoppingKeys } from "../shopping.queries.ts";
-import { AddRow } from "./add-row.tsx";
+import { AddRow } from "@/components/add-row.tsx";
 
 /** Creates a list and opens it */
 export function NewListForm({ onCreated }: { onCreated?: () => void }) {

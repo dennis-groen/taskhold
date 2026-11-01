@@ -66,13 +66,27 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 
 - Every member of a household can create, open, change and delete all of its lists. Lists are on `/lists` (the Shopping tab), and each one opens at `/lists/:listId`.
 - Items have a name and an optional free-text quantity ("2", "500 g"). Checking one off records who did it; "Clear checked off" removes everything that's been bought.
-- The round + button (in the left rail on wide screens, in the bottom bar on phones) opens a quick-add sheet from any page. It adds to the list that's open, or the first list, and chips switch to another list.
+- The round + button (in the left rail on wide screens, in the bottom bar on phones) opens a quick-add sheet from any page except Chores, where it adds a chore. It adds to the list that's open, or the first list, and chips switch to another list.
 - Ticked items move to "In cart"; "Done shopping" clears them.
 - Changes show straight away (optimistic updates with React Query) and roll back with a message if the API rejects them.
 - An open list checks for changes from other members every 5 seconds while the tab is visible, and refetches when you come back to the tab. If someone deletes the list, the page says so.
 - Items can carry a client-generated id, so a retried add doesn't create a duplicate.
 - Tables: `shopping_list` and `shopping_item` in `apps/api/src/features/shopping/shopping.schema.ts`. Deleting a household deletes its lists; when someone leaves, the items they added stay.
 - The API can also rename a list (`PATCH /api/shopping/lists/:listId`); the UI doesn't offer it yet.
+
+## Chores
+
+- Chores are on `/chores` (the Chores tab). Every member can add, change, delete and do any chore.
+- A chore is one-off or repeats every N days or weeks. A repeating chore always has a next due date; a one-off one may have none ("Anytime").
+- **The next due date counts from when it was done, not from when it was due.** A weekly chore done two days late is next due a week after it was done, so a household that falls behind doesn't come back to a pile of overdue chores.
+- A chore can be assigned to one member, or to nobody ("Anyone"). Anyone can still do it, and the history records who did. When an assignee leaves the household, the chore shows as unassigned.
+- Due dates are plain dates (`YYYY-MM-DD`), with no time or timezone. "Today" and "overdue" follow the clock on each person's device, and the device sends its date when marking a chore done. The API accepts only a date within a day of the UTC date, which covers every timezone.
+- The page groups chores into Overdue, Today, This week, Later and Anytime, with filters for All, Mine and Anyone.
+- Ticking a chore shows a bar with Undo for a few seconds. Later, the most recent completion can still be undone from the chore's sheet, which puts its due date back. Older history can't be changed.
+- Doing a chore again on the same day changes nothing, so a double tap or two people at once count once.
+- Done one-off chores collapse into "Done"; "Clear done" removes them.
+- The page checks for changes from other members every 10 seconds while the tab is visible.
+- Tables: `chore` and `chore_completion` in `apps/api/src/features/chores/chores.schema.ts`. A check constraint keeps repeat settings consistent and makes repeating chores have a due date. Deleting a household or a chore deletes its history.
 
 ## Request limits
 

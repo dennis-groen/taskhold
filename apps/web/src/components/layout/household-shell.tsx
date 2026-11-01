@@ -1,13 +1,21 @@
-import { HouseIcon, ShoppingCartIcon, type Icon } from "@phosphor-icons/react";
+import { BroomIcon, HouseIcon, ShoppingCartIcon, type Icon } from "@phosphor-icons/react";
 import { Link, type LinkProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-const NAV: { to: LinkProps["to"]; label: string; icon: Icon }[] = [
+type NavItem = { to: LinkProps["to"]; label: string; icon: Icon };
+
+const NAV: NavItem[] = [
   { to: "/lists", label: "Shopping", icon: ShoppingCartIcon },
+  { to: "/chores", label: "Chores", icon: BroomIcon },
   { to: "/household", label: "Household", icon: HouseIcon },
 ];
+
+// On phones the add button sits in the middle of the bar, with half the tabs on either side.
+// With an odd number of tabs the right half has one fewer, centred in its half.
+const NAV_LEFT = NAV.slice(0, Math.ceil(NAV.length / 2));
+const NAV_RIGHT = NAV.slice(Math.ceil(NAV.length / 2));
 
 /**
  * Frame for people in a household: a rail on the left on wide screens, a bar at the bottom on
@@ -49,22 +57,30 @@ export function HouseholdShell({
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-30 border-t bg-background pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <ul className="mx-auto flex h-16 max-w-[640px] items-center px-2">
-          <li className="flex-1">
-            <NavLink {...NAV[0]} />
-          </li>
+        <div className="mx-auto flex h-16 max-w-[640px] items-center px-2">
+          <NavHalf items={NAV_LEFT} />
           {/* The add button floats over this gap */}
-          <li className="w-20" aria-hidden />
-          <li className="flex-1">
-            <NavLink {...NAV[1]} />
-          </li>
-        </ul>
+          <div className="w-20 shrink-0" aria-hidden />
+          <NavHalf items={NAV_RIGHT} />
+        </div>
       </nav>
 
       <div className="fixed bottom-[calc(1.75rem+env(safe-area-inset-bottom))] left-1/2 z-40 -translate-x-1/2 lg:top-16 lg:bottom-auto lg:left-5 lg:translate-x-0">
         {addButton}
       </div>
     </div>
+  );
+}
+
+function NavHalf({ items }: { items: NavItem[] }) {
+  return (
+    <ul className="flex flex-1">
+      {items.map((item) => (
+        <li key={item.label} className="flex-1">
+          <NavLink {...item} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

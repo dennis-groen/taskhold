@@ -49,6 +49,21 @@ export async function findMembershipByUserId(
   return rows[0] ?? null;
 }
 
+/** Whether the user is currently a member of this household */
+export async function isMember(
+  ref: { householdId: string; userId: string },
+  executor: Executor = db,
+): Promise<boolean> {
+  const rows = await executor
+    .select({ id: householdMember.id })
+    .from(householdMember)
+    .where(
+      and(eq(householdMember.householdId, ref.householdId), eq(householdMember.userId, ref.userId)),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
 export function findHouseholdById(householdId: string, executor: Executor = db) {
   return findHousehold(eq(household.id, householdId), executor);
 }

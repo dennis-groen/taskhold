@@ -24,6 +24,7 @@ features/
     households.types.ts       shapes returned to clients
     invite-code.ts            pure domain logic: generate and normalize codes
   shopping/               shopping lists and items, scoped to the user's household
+  chores/                 chores and their completions; chore-dates.ts holds the due-date rules
   viewer/                 GET /api/viewer, composed from the auth and households services
 ```
 
@@ -72,16 +73,23 @@ features/
     shopping.api.ts       RPC calls and their response types
     shopping.queries.ts   React Query keys and queryOptions (loaders and components share them)
     hooks/                use-shopping-list: the list plus optimistic changes
-    components/           quick add (the round + button), add row, item row, delete-list button
+    components/           quick add (the round + button), new-list form, item row, delete-list button
     pages/                all lists, a single list
-components/               shared: shadcn ui/, layout/ (household shell with nav, onboarding app shell, page heading, group), small app-wide pieces
+  chores/
+    chores.api.ts         RPC calls and their response types
+    chores.queries.ts     React Query keys and queryOptions
+    chore-dates.ts        today on this device, due groups and labels; the due-date rule mirrors the API's
+    hooks/                use-chores: the chores plus optimistic marking done
+    components/           chore form, row, sheet, new-chore drawer, add button, undo bar
+    pages/                chores page
+components/               shared: shadcn ui/, layout/ (household shell with nav, onboarding app shell, page heading, group), small app-wide pieces (add row, shared-with line, confirm dialog, avatar)
 lib/                      shared: RPC client and errorMessage(), utils
 ```
 
-- Server data that changes while a page is open (shopping lists) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
+- Server data that changes while a page is open (shopping lists, chores) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
 - Optimistic changes follow `hooks/use-shopping-list.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
-- Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
+- Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button, or the chores feature's add button on the chores page, into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
 - Inside a feature, imports are relative and folders are one level deep (`components/`, `pages/`, `hooks/`).
 - Shared code (`components/`, `lib/`) never imports a feature or a route.
 
