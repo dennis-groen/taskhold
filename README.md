@@ -74,10 +74,53 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - Tables: `shopping_list` and `shopping_item` in `apps/api/src/features/shopping/shopping.schema.ts`. Deleting a household deletes its lists; when someone leaves, the items they added stay.
 - The API can also rename a list (`PATCH /api/shopping/lists/:listId`); the UI doesn't offer it yet.
 
-## Request limits and logging
+## Request limits
 
-- Request bodies over 64 KB get 413 before any handler reads them (`bodyLimit` in `apps/api/src/app.ts`).
-- The request logger (`apps/api/src/lib/request-logger.ts`) masks invite codes and `/api/auth` query strings, since both are credentials.
+Request bodies over 64 KB get 413 before any handler reads them (`bodyLimit` in `apps/api/src/app.ts`).
+
+## Logging
+
+The API logs with [pino](https://getpino.io) and writes **one wide event per request** (a "canonical log line"). Each event is a single line that holds everything known about the request once its response is ready, so one query answers questions that would otherwise mean joining many lines:
+
+```json
+{
+  "level": "warn",
+  "time": "2026-11-01T13:10:54.376Z",
+  "service": "taskhold-api",
+  "request_id": "fc724202-…",
+  "outcome": "client_error",
+  "http": {
+    "method": "GET",
+    "route": "/api/households/invites/:code",
+    "path": "/api/households/invites/[redacted]",
+    "status_code": 404,
+    "duration_ms": 8.4
+  },
+  "client": { "address": "::1", "user_agent": "…" },
+  "user": { "id": "…" },
+  "invite": { "recent_failed_attempts": 0, "matched": false },
+  "db": { "queries": 7 },
+  "error": { "type": "AppError", "kind": "not_found", "code": "INVITE_NOT_FOUND", "message": "…" },
+  "msg": "GET /api/households/invites/[redacted] 404 8.4ms"
+}
+```
+
+- **How an event is built:** `lib/request-logger.ts` starts an event for each request and writes it when the response is ready. Code anywhere in the request adds fields with `annotate(group, fields)` from `lib/wide-event.ts`; services add the user, household, invite and shopping details. The error handler records the error, and Better Auth's own messages go into `auth.logs`.
+- **Levels:** 5xx is `error`, 4xx is `warn`, everything else `info`. `/api/health` is logged at `debug`.
+- **Request ids:** every response has an `X-Request-Id` header. An incoming `X-Request-Id` (from a proxy, say) is reused. Lines written during a request with `logger` directly also carry its `request_id`.
+- **Sampling:** with `LOG_SAMPLE_RATE` below 1, only that share of fast, successful requests is kept. Errors, slow requests (over 1 s) and requests where Better Auth warned are always kept. Kept sampled events carry `sample_rate`, so counts can be weighted back up.
+- **What is never logged:**
+  - query strings (on `/api/auth` they carry OAuth codes and state);
+  - invite codes in paths (shown as `[redacted]`);
+  - request and response bodies, headers other than the user agent, and SQL parameters;
+  - Postgres `detail` messages, which quote the conflicting values.
+- **Outside requests:** startup, shutdown, a failing idle database connection, and uncaught exceptions are logged on lines of their own. Uncaught exceptions and unhandled rejections are logged as `fatal` and exit the process, so a supervisor can restart it.
+
+| Variable          | Default                                   |                                                                |
+| ----------------- | ----------------------------------------- | -------------------------------------------------------------- |
+| `LOG_LEVEL`       | `info`                                    | `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent` |
+| `LOG_FORMAT`      | `pretty` in development, `json` otherwise | JSON for log collectors, pretty for a terminal                 |
+| `LOG_SAMPLE_RATE` | `1`                                       | Share of fast, successful requests to keep                     |
 
 ## API client (Hono RPC)
 

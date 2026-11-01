@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { requestId } from "hono/request-id";
 
 import { authRoutes } from "./features/auth/auth.routes.ts";
 import { householdRoutes } from "./features/households/households.routes.ts";
@@ -17,6 +18,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 export const app = new Hono()
   .basePath("/api")
   .onError(errorHandler)
+  .use(requestId())
   .use(requestLogger())
   .use(
     bodyLimit({

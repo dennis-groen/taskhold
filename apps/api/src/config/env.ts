@@ -20,6 +20,11 @@ const envSchema = z.object({
         .map((entry) => entry.trim())
         .filter(Boolean),
     ),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  // json for log collectors; pretty is readable in a terminal. Defaults to pretty in development.
+  LOG_FORMAT: z.enum(["json", "pretty"]).optional(),
+  // Share of successful, fast requests to log (0 to 1). Errors and slow requests are always kept.
+  LOG_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -29,4 +34,8 @@ if (!parsed.success) {
   throw new Error(`Invalid environment variables:\n${z.prettifyError(parsed.error)}`);
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  LOG_FORMAT:
+    parsed.data.LOG_FORMAT ?? (parsed.data.NODE_ENV === "development" ? "pretty" : "json"),
+};

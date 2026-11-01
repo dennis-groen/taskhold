@@ -4,6 +4,7 @@
 // Every change to who is in a household runs in a transaction that locks the household row,
 // so concurrent joins, leaves and removals in one household happen one at a time.
 import { transaction, type Transaction } from "../../db/client.ts";
+import { annotate } from "../../lib/wide-event.ts";
 import * as householdsDal from "./households.dal.ts";
 import {
   alreadyInHousehold,
@@ -28,9 +29,9 @@ const INVITE_GUESS_WINDOW_MS = 15 * 60 * 1000;
 /** The household a user belongs to, or null when they haven't created or joined one */
 export async function findMembership(userId: string): Promise<Membership | null> {
   const membership = await householdsDal.findMembershipByUserId(userId);
-  return membership
-    ? { id: membership.householdId, name: membership.householdName, role: membership.role }
-    : null;
+  if (!membership) return null;
+  annotate("household", { id: membership.householdId, role: membership.role });
+  return { id: membership.householdId, name: membership.householdName, role: membership.role };
 }
 
 /** Like findMembership, for features that only work inside a household */
@@ -43,6 +44,7 @@ export async function getMembershipOf(userId: string): Promise<Membership> {
 export async function getHouseholdOf(userId: string): Promise<Household> {
   const membership = await householdsDal.findMembershipByUserId(userId);
   if (!membership) throw notInHousehold();
+  annotate("household", { id: membership.householdId, role: membership.role });
   return getHousehold(membership.householdId);
 }
 
@@ -58,6 +60,7 @@ export async function createHousehold(userId: string, name: string): Promise<Hou
     if (!added) throw alreadyInHousehold();
     return created.id;
   });
+  annotate("household", { id: householdId, role: "owner" });
   return getHousehold(householdId);
 }
 
@@ -83,6 +86,7 @@ export async function acceptInvite(userId: string, rawCode: string): Promise<Hou
     );
     if (!added) throw alreadyInHousehold();
   });
+  annotate("household", { id: household.id, role: "member" });
   return getHousehold(household.id);
 }
 
@@ -99,6 +103,7 @@ export async function leaveHousehold(userId: string): Promise<{ householdDeleted
     const successor = await householdsDal.findEarliestMember(householdId, tx);
     if (!successor) {
       await householdsDal.deleteHousehold(householdId, tx);
+      annotate("household", { deleted: true });
       return { householdDeleted: true };
     }
     if (membership.role === "owner") {
@@ -106,6 +111,7 @@ export async function leaveHousehold(userId: string): Promise<{ householdDeleted
         { householdId, userId: successor.userId, role: "owner" },
         tx,
       );
+      annotate("household", { new_owner_id: successor.userId });
     }
     return { householdDeleted: false };
   });
@@ -122,6 +128,7 @@ export async function removeMember(ownerId: string, memberId: string): Promise<H
       tx,
     );
     if (!removed) throw memberNotFound();
+    annotate("household", { removed_member_id: memberId });
     return owner.householdId;
   });
   return getHousehold(householdId);
@@ -152,6 +159,7 @@ async function lockMembershipOf(userId: string, tx: Transaction, options = { own
   await householdsDal.lockHousehold(before.householdId, tx);
   const membership = await householdsDal.findMembershipByUserId(userId, tx);
   if (!membership || membership.householdId !== before.householdId) throw notInHousehold();
+  annotate("household", { id: membership.householdId, role: membership.role });
   if (options.ownerOnly && membership.role !== "owner") throw ownerOnly();
   return membership;
 }
@@ -173,14 +181,17 @@ async function getHousehold(householdId: string): Promise<Household> {
 async function findByInviteCode(userId: string, rawCode: string) {
   const windowStart = new Date(Date.now() - INVITE_GUESS_WINDOW_MS);
   const failures = await householdsDal.countFailedInviteAttempts(userId, windowStart);
+  annotate("invite", { recent_failed_attempts: failures });
   if (failures >= INVITE_GUESS_LIMIT) throw tooManyInviteAttempts();
 
   const code = normalizeInviteCode(rawCode);
   const household = code ? await householdsDal.findHouseholdByInviteCode(code) : null;
+  annotate("invite", { matched: household !== null });
   if (!household) {
     await householdsDal.recordFailedInviteAttempt(userId, windowStart);
     throw inviteNotFound();
   }
+  annotate("invite", { household_id: household.id });
   return household;
 }
 

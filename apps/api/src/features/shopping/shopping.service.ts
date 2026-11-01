@@ -1,5 +1,6 @@
 // Business rules for shopping lists. Every member of a household can see and change all of its
 // lists; nobody else can, and a list from another household looks the same as one that doesn't exist.
+import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
 import * as shoppingDal from "./shopping.dal.ts";
 import { itemIdTaken, itemNotFound, listNotFound } from "./shopping.errors.ts";
@@ -13,22 +14,26 @@ export async function getLists(userId: string): Promise<ShoppingListSummary[]> {
 export async function createList(userId: string, name: string): Promise<ShoppingList> {
   const household = await householdsService.getMembershipOf(userId);
   const { id } = await shoppingDal.insertList({ householdId: household.id, name });
+  annotate("shopping", { list_id: id });
   return { id, name, items: [] };
 }
 
 export async function getList(userId: string, listId: string): Promise<ShoppingList> {
   const list = await findListOf(userId, listId);
   const items = await shoppingDal.findItems(list.id);
+  annotate("shopping", { item_count: items.length });
   return { id: list.id, name: list.name, items: items.map(toItem) };
 }
 
 export async function renameList(userId: string, listId: string, name: string): Promise<void> {
+  annotate("shopping", { list_id: listId });
   const household = await householdsService.getMembershipOf(userId);
   const renamed = await shoppingDal.renameList({ householdId: household.id, listId }, name);
   if (!renamed) throw listNotFound();
 }
 
 export async function deleteList(userId: string, listId: string): Promise<void> {
+  annotate("shopping", { list_id: listId });
   const household = await householdsService.getMembershipOf(userId);
   const deleted = await shoppingDal.deleteList({ householdId: household.id, listId });
   if (!deleted) throw listNotFound();
@@ -41,6 +46,7 @@ export async function addItem(
 ): Promise<ShoppingItem> {
   const list = await findListOf(userId, listId);
   const id = input.id ?? crypto.randomUUID();
+  annotate("shopping", { item_id: id });
   const inserted = await shoppingDal.insertItem({
     id,
     listId: list.id,
@@ -62,6 +68,7 @@ export async function updateItem(
 ): Promise<ShoppingItem> {
   const list = await findListOf(userId, ref.listId);
   const itemRef = { listId: list.id, itemId: ref.itemId };
+  annotate("shopping", { item_id: ref.itemId, checked: changes.checked });
 
   const updated = await shoppingDal.updateItem(itemRef, {
     name: changes.name,
@@ -85,16 +92,20 @@ export async function deleteItem(
   ref: { listId: string; itemId: string },
 ): Promise<void> {
   const list = await findListOf(userId, ref.listId);
+  annotate("shopping", { item_id: ref.itemId });
   await shoppingDal.deleteItem({ listId: list.id, itemId: ref.itemId });
 }
 
 /** Removes everything that's been checked off. Returns how many items went. */
 export async function clearCheckedItems(userId: string, listId: string): Promise<number> {
   const list = await findListOf(userId, listId);
-  return shoppingDal.deleteCheckedItems(list.id);
+  const removed = await shoppingDal.deleteCheckedItems(list.id);
+  annotate("shopping", { removed_count: removed });
+  return removed;
 }
 
 async function findListOf(userId: string, listId: string) {
+  annotate("shopping", { list_id: listId });
   const household = await householdsService.getMembershipOf(userId);
   const list = await shoppingDal.findList({ householdId: household.id, listId });
   if (!list) throw listNotFound();

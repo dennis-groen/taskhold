@@ -1,7 +1,7 @@
-import { getConnInfo } from "@hono/node-server/conninfo";
 import { Hono, type Context } from "hono";
 
 import { env } from "../../config/env.ts";
+import { socketAddress } from "../../lib/connection.ts";
 import { auth } from "./auth.ts";
 
 // Better Auth serves its own endpoints (sign-in, OAuth callbacks, session, sign-out)
@@ -21,13 +21,4 @@ function withClientIp(c: Context): Request {
   const forwarded = env.TRUSTED_PROXIES.length > 0 ? headers.get("x-forwarded-for") : null;
   headers.set("x-forwarded-for", forwarded ? `${forwarded}, ${peer}` : peer);
   return new Request(c.req.raw, { headers });
-}
-
-function socketAddress(c: Context): string | undefined {
-  try {
-    return getConnInfo(c).remote.address;
-  } catch {
-    // Not running on @hono/node-server (e.g. app.fetch in a script): no socket to read
-    return undefined;
-  }
 }

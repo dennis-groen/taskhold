@@ -3,6 +3,8 @@ import { betterAuth } from "better-auth";
 
 import { env } from "../../config/env.ts";
 import { db } from "../../db/client.ts";
+import { logger } from "../../lib/logger.ts";
+import { appendToEvent, describeError, keepEvent } from "../../lib/wide-event.ts";
 
 // Better Auth endpoints the app doesn't use. Each one is surface someone could call directly,
 // e.g. /update-user would let anyone replace their Google name and avatar with arbitrary values
@@ -33,6 +35,8 @@ const UNUSED_ENDPOINTS = [
   "/verify-password",
 ];
 
+const authLogger = logger.child({ component: "better-auth" });
+
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
@@ -49,6 +53,19 @@ export const auth = betterAuth({
   rateLimit: { enabled: env.NODE_ENV !== "test" },
   advanced: {
     ipAddress: { trustedProxies: env.TRUSTED_PROXIES },
+  },
+  // During a request its messages go on the request's wide event (auth.logs), otherwise on a line
+  // of their own. Only errors among the extra arguments are kept: others can be provider
+  // responses with tokens in them.
+  logger: {
+    level: "info",
+    log: (level, message, ...args) => {
+      const errors = args.filter((arg) => arg instanceof Error).map(describeError);
+      const entry = { level, message, ...(errors.length > 0 && { errors }) };
+      // A failed OAuth callback still answers with a redirect, so its status looks fine
+      if (level === "warn" || level === "error") keepEvent();
+      if (!appendToEvent("auth", "logs", entry)) authLogger[level](entry, message);
+    },
   },
 });
 

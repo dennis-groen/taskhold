@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { AppError, type ApiErrorBody, type ErrorKind } from "./errors.ts";
+import { recordError } from "./wide-event.ts";
 
 const statusByKind = {
   bad_request: 400,
@@ -15,6 +16,9 @@ const statusByKind = {
 
 /** Turns any thrown error into a JSON error response */
 export const errorHandler: ErrorHandler = (err, c) => {
+  // The request's wide event carries the error, stack included for unexpected ones
+  recordError(err);
+
   if (err instanceof AppError) {
     return c.json<ApiErrorBody>(
       { error: { code: err.code, message: err.message } },
@@ -29,7 +33,6 @@ export const errorHandler: ErrorHandler = (err, c) => {
     );
   }
 
-  console.error(err);
   return c.json<ApiErrorBody>(
     { error: { code: "INTERNAL_ERROR", message: "Something went wrong." } },
     500,

@@ -11,7 +11,7 @@ client.ts                 typed RPC client for the web app (@taskhold/api/client
 config/env.ts             environment, validated with zod at startup
 db/client.ts              Postgres pool, Drizzle instance, transaction()
 db/schema.ts              every feature's tables, for migrations and relational queries
-lib/                      feature-agnostic helpers: AppError, error handler, validate()
+lib/                      feature-agnostic helpers: AppError, error handler, validate(), logger, wide events
 features/
   auth/                   Better Auth instance, its tables, requireAuth and protectedRouter()
   households/
@@ -38,6 +38,7 @@ Requests flow `routes → service → dal → database`, never backwards.
 | `*.dal.ts`     | Runs Drizzle queries, returns plain records, takes an optional executor for transactions | Call services or decide what's allowed      |
 
 - Services throw `AppError(kind, code, message)`. `lib/error-handler.ts` maps the `kind` to a status code and responds with `{ error: { code, message } }`.
+- Every request is logged as one wide event (`lib/request-logger.ts`). Services add what they know about the request with `annotate(group, fields)` from `lib/wide-event.ts`, using ids and counts, never names, codes or other user content. Don't log separate lines during a request: add to its event instead.
 - A feature may call another feature's service, never its DAL. `viewer` uses `auth` and `households` this way, and `shopping` asks `householdsService.getMembershipOf()` which household a user is in.
 - Data that belongs to a household is always queried with the household id in the `WHERE` clause, so an id from another household reads as missing (404) and never leaks.
 - Schema files may import other features' tables, because foreign keys cross features.
@@ -50,6 +51,7 @@ Requests flow `routes → service → dal → database`, never backwards.
 1. Create `features/<name>/` with the files from the list above that it needs.
 2. Export its tables from `db/schema.ts`, then run `pnpm db:generate` and `pnpm db:migrate`.
 3. Mount its router in `app.ts` with `.route("/<name>", <name>Routes)`. The web app's RPC client picks it up from the types.
+4. In the service, `annotate("<name>", { ... })` the ids and counts someone debugging a request would want.
 
 ## Web (`apps/web/src`)
 
