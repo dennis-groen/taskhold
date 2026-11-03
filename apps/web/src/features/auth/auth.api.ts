@@ -1,3 +1,5 @@
+import { DetailedError } from "@taskhold/api/client";
+
 import { api, parseResponse, type InferResponseType } from "@/lib/api-client.ts";
 
 /** Who is signed in (if anyone) and which household they belong to */
@@ -11,14 +13,32 @@ export class ViewerUnavailableError extends Error {
   }
 }
 
+// Waits between attempts. A phone that was just woken up, or the installed app opened from
+// the home screen, can take a second or two to get its connection back.
+const RETRY_DELAYS_MS = [500, 1_000, 2_000];
+
 /**
  * Throws ViewerUnavailableError when the API can't be reached, so the app shows that instead of
  * sending a signed-in person to the sign-in page. Protected pages stay closed either way.
+ * Network failures and server errors are retried a few times first.
  */
-export function fetchViewer(): Promise<Viewer> {
-  return parseResponse(api.viewer.$get()).catch((error: unknown) => {
-    throw new ViewerUnavailableError({ cause: error });
-  });
+export async function fetchViewer(): Promise<Viewer> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await parseResponse(api.viewer.$get());
+    } catch (error) {
+      const delay = RETRY_DELAYS_MS[attempt];
+      if (delay === undefined || !isTransient(error)) {
+        throw new ViewerUnavailableError({ cause: error });
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
+/** No response at all, or the server (or a proxy in front of it) failing */
+function isTransient(error: unknown): boolean {
+  return !(error instanceof DetailedError) || (error.statusCode ?? 500) >= 500;
 }
 
 /** Deletes the signed-in person's account; the API also clears the session cookie */

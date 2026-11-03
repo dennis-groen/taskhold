@@ -67,6 +67,11 @@ function useRefetchOnLiveChanges() {
         void queryClient.invalidateQueries();
         return;
       }
+      if (message === "down") {
+        // Refetching restarts polling. A refetch that fails keeps what's on screen.
+        void queryClient.invalidateQueries();
+        return;
+      }
       const queryKey = TOPIC_KEYS[message];
       // The person's own change is still being saved. Refetching now would briefly undo it on
       // screen, and the change refetches when it's done anyway.

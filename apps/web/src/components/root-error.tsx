@@ -4,19 +4,29 @@ import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 
+const AUTO_RETRY = Temporal.Duration.from({ seconds: 10 });
+
 /**
  * Shown when a page can't load. `unreachable` means the API couldn't be reached at all. Most often the installed app was opened without a connection,
- * so that case says so, and tries again by itself when the device is back online.
+ * so that case says so, and keeps trying again by itself.
  */
 export function RootError({ unreachable }: { unreachable: boolean }) {
   const router = useRouter();
 
+  // Tries again by itself: when the device is back online, when the app is opened again, and
+  // every so often while it's on screen
   useEffect(() => {
     const retry = () => {
-      if (unreachable) void router.invalidate();
+      if (unreachable && document.visibilityState === "visible") void router.invalidate();
     };
+    const timer = setInterval(retry, AUTO_RETRY.total("milliseconds"));
     window.addEventListener("online", retry);
-    return () => window.removeEventListener("online", retry);
+    document.addEventListener("visibilitychange", retry);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", retry);
+    };
   }, [router, unreachable]);
 
   const Icon = unreachable ? CloudSlashIcon : WarningCircleIcon;

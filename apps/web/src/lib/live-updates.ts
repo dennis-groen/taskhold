@@ -3,8 +3,11 @@
 // down, pages fall back to polling (see isLive).
 import { useEffect, useSyncExternalStore } from "react";
 
-/** What the stream says: refetch one area, or refetch everything because changes may have been missed */
-export type LiveMessage = "shopping" | "chores" | "todos" | "household" | "resync";
+/**
+ * What the stream says: refetch one area, or refetch everything because changes may have been
+ * missed ("resync", once it's back). "down" says it was lost, so polling should start again.
+ */
+export type LiveMessage = "shopping" | "chores" | "todos" | "household" | "resync" | "down";
 
 const MESSAGES = new Set<string>(["shopping", "chores", "todos", "household", "resync"]);
 
@@ -25,8 +28,8 @@ export function useIsLive(): boolean {
 
 /**
  * Keeps a live stream open while mounted and calls `onMessage` for each change. Also calls it with
- * "resync" when the stream comes back after being down, and when it goes down, so polling
- * queries refetch and pick up their interval again.
+ * "down" when the stream is lost, so polling queries pick up their interval again, and "resync"
+ * when it comes back after being down.
  */
 export function useLiveUpdates(onMessage: (message: LiveMessage) => void) {
   useEffect(() => {
@@ -50,7 +53,9 @@ export function useLiveUpdates(onMessage: (message: LiveMessage) => void) {
       source.addEventListener("error", () => {
         if (live) {
           setLive(false);
-          onMessage("resync");
+          // Usually the connection itself is gone (a phone waking up, a train tunnel), so this is
+          // no time to reload anything that can't fail quietly
+          onMessage("down");
         }
         // Reconnecting is the browser's job, unless it gave up
         if (source?.readyState === EventSource.CLOSED) {
