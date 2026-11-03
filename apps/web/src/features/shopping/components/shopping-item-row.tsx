@@ -11,10 +11,13 @@ import type { ShoppingItem } from "../shopping.api.ts";
 export function ShoppingItemRow({
   item,
   viewerId,
+  settling = false,
   onToggle,
   onRemove,
 }: {
   item: ShoppingItem;
+  /** Just ticked or unticked here, and held in place for a moment (see useSettlingItems) */
+  settling?: boolean;
   viewerId: string;
   onToggle: (checked: boolean) => void;
   onRemove: () => void;
@@ -26,7 +29,10 @@ export function ShoppingItemRow({
   const other = person && person.id !== viewerId ? person : null;
 
   return (
-    <li className="flex min-h-13 items-center pr-1">
+    <li
+      data-settling={settling ? (item.checked ? "checked" : "open") : undefined}
+      className="flex min-h-13 items-center overflow-hidden pr-1"
+    >
       <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 self-stretch py-3 pl-4">
         <Checkbox
           // Base UI's checkbox is a span, which the surrounding label doesn't name

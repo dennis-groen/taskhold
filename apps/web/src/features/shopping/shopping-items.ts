@@ -5,13 +5,17 @@ function newestFirst(a: string, b: string): number {
   return Temporal.Instant.compare(Temporal.Instant.from(b), Temporal.Instant.from(a));
 }
 
-/** Splits a list into what's left to buy (newest first) and what's in the cart (latest first) */
-export function groupItems(items: ShoppingItem[]) {
+/**
+ * Splits a list into what's left to buy (newest first) and what's in the cart (latest first).
+ * Items in `settling` were just ticked off here: they stay in place among the open ones for now.
+ */
+export function groupItems(items: ShoppingItem[], settling: ReadonlySet<string> = new Set()) {
+  const inCart = (item: ShoppingItem) => item.checked && !settling.has(item.id);
   const open = items
-    .filter((item) => !item.checked)
+    .filter((item) => !inCart(item))
     .toSorted((a, b) => newestFirst(a.createdAt, b.createdAt));
   const checked = items
-    .filter((item) => item.checked)
+    .filter(inCart)
     .toSorted((a, b) => newestFirst(a.checkedAt ?? a.createdAt, b.checkedAt ?? b.createdAt));
   return { open, checked };
 }

@@ -28,4 +28,18 @@ describe("grouping shopping items", () => {
     expect(open.map((entry) => entry.id)).toEqual(["newer", "older"]);
     expect(checked.map((entry) => entry.id)).toEqual(["checked-last", "checked-first"]);
   });
+
+  it("keeps items ticked off just now in their place among the open ones", () => {
+    const { open, checked } = groupItems(
+      [
+        item("bread", "2026-11-01T13:00:00Z"),
+        item("milk", "2026-11-01T13:00:01Z", "2026-11-01T13:05:00Z"),
+        item("eggs", "2026-11-01T13:00:02Z"),
+        item("apples", "2026-11-01T12:00:00Z", "2026-11-01T13:04:00Z"),
+      ],
+      new Set(["milk"]),
+    );
+    expect(open.map((entry) => entry.id)).toEqual(["eggs", "milk", "bread"]);
+    expect(checked.map((entry) => entry.id)).toEqual(["apples"]);
+  });
 });

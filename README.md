@@ -101,7 +101,7 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - Every member of a household can create, open, change and delete all of its lists. Lists are on `/lists` (the Shopping tab), and each one opens at `/lists/:listId`.
 - Items have a name and an optional free-text quantity ("2", "500 g"). Checking one off records who did it; "Clear checked off" removes everything that's been bought.
 - The round + button (in the left rail on wide screens, in the bottom bar on phones) opens a quick-add sheet from any page except Chores and Personal, where it adds a chore or a to-do. It adds to the list that's open, or the first list, and chips switch to another list.
-- Ticked items move to "In cart"; "Done shopping" clears them. Removing an item or clearing the cart shows a toast with Undo, which puts the items back with the same ids, quantities and ticks.
+- Ticked items move to "In cart"; "Done shopping" clears them. Items you tick stay in place, crossed out, until you stop tapping for 2.5 seconds, then fold away into the cart together (`hooks/use-settling-items.ts`; no animation with the system's reduce-motion setting). A wrong tick can be undone with another tap where it is, and rows don't shift under your next tap. Others see the tick straight away. Removing an item or clearing the cart shows a toast with Undo, which puts the items back with the same ids, quantities and ticks.
 - Changes show straight away (optimistic updates with React Query) and roll back with a toast if the API rejects them.
 - Changes from other members show up straight away through live updates (see below). If someone deletes the list, the page says so.
 - Items can carry a client-generated id, so a retried add doesn't create a duplicate.

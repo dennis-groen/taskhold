@@ -14,6 +14,7 @@ import { ListNotFound } from "../components/list-not-found.tsx";
 import { RenameListButton } from "../components/rename-list-button.tsx";
 import { SharedWithLine } from "@/components/shared-with-line.tsx";
 import { ShoppingItemRow } from "../components/shopping-item-row.tsx";
+import { useSettlingItems } from "../hooks/use-settling-items.ts";
 import { useShoppingList } from "../hooks/use-shopping-list.ts";
 import { groupItems } from "../shopping-items.ts";
 
@@ -23,15 +24,19 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
   const { listId } = routeApi.useParams();
   const { user } = routeApi.useRouteContext();
   const { list, gone, add, toggle, remove, clearChecked } = useShoppingList(listId, user);
+  const { settling, touched, listRef } = useSettlingItems();
   const [cartOpen, setCartOpen] = useState(false);
 
   if (gone) return <ListNotFound />;
 
-  const { open, checked } = groupItems(list.items);
+  const { open, checked } = groupItems(list.items, settling);
   const rowProps = (item: (typeof list.items)[number]) => ({
     item,
     viewerId: user.id,
-    onToggle: (isChecked: boolean) => toggle(item.id, isChecked),
+    onToggle: (isChecked: boolean) => {
+      touched(item.id);
+      toggle(item.id, isChecked);
+    },
     onRemove: () => remove(item.id),
   });
 
@@ -45,9 +50,9 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
       <Group className="mt-6">
         <AddRow label="Add item" withQuantity maxLength={100} onAdd={add} />
         {open.length > 0 ? (
-          <ul aria-label="To buy" className="divide-y">
+          <ul ref={listRef} aria-label="To buy" className="divide-y">
             {open.map((item) => (
-              <ShoppingItemRow key={item.id} {...rowProps(item)} />
+              <ShoppingItemRow key={item.id} settling={settling.has(item.id)} {...rowProps(item)} />
             ))}
           </ul>
         ) : (
