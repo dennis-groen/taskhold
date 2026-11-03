@@ -1,7 +1,8 @@
-import { CaretRightIcon, LockIcon } from "@phosphor-icons/react";
+import { LockIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { AddRow } from "@/components/add-row.tsx";
+import { CollapsibleGroup } from "@/components/layout/collapsible-group.tsx";
 import { Group, GroupHeading } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,6 @@ import type { Todo } from "../todos.api.ts";
 export function TodosPage() {
   const { todos, add, save, setDone, remove, clearDone } = useTodos();
   const [openId, setOpenId] = useState<string | null>(null);
-  const [doneOpen, setDoneOpen] = useState(false);
   const [moved, setMoved] = useState<string | null>(null);
   const today = todayOnDevice();
 
@@ -83,27 +83,17 @@ export function TodosPage() {
       })}
 
       {done.length > 0 && (
-        <section className="mt-6" aria-label="Done">
-          <div className="flex items-center justify-between gap-2">
-            <Button
-              variant="ghost"
-              aria-expanded={doneOpen}
-              onClick={() => setDoneOpen((isOpen) => !isOpen)}
-              className="-ml-2 h-11 px-2 text-muted-foreground"
-            >
-              <CaretRightIcon className={cn("transition-transform", doneOpen && "rotate-90")} />
-              Done ({done.length})
-            </Button>
+        <CollapsibleGroup
+          label="Done"
+          count={done.length}
+          action={
             <Button variant="outline" className="h-11 px-5" onClick={clearDone}>
               Clear done
             </Button>
-          </div>
-          {doneOpen && (
-            <Group className="mt-2">
-              <ul className="divide-y">{done.map(row)}</ul>
-            </Group>
-          )}
-        </section>
+          }
+        >
+          <ul className="divide-y">{done.map(row)}</ul>
+        </CollapsibleGroup>
       )}
 
       <TodoSheet

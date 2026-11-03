@@ -1,7 +1,8 @@
-import { CaretRightIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { CollapsibleGroup } from "@/components/layout/collapsible-group.tsx";
 import { Group, GroupHeading } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { SharedWithLine } from "@/components/shared-with-line.tsx";
@@ -40,7 +41,6 @@ export function ChoresPage({
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [doneOpen, setDoneOpen] = useState(false);
   const today = todayOnDevice();
 
   const shown = chores.filter((chore) => {
@@ -144,31 +144,21 @@ export function ChoresPage({
       })}
 
       {done.length > 0 && (
-        <section className="mt-6" aria-label="Done">
-          <div className="flex items-center justify-between gap-2">
-            <Button
-              variant="ghost"
-              aria-expanded={doneOpen}
-              onClick={() => setDoneOpen((isOpen) => !isOpen)}
-              className="-ml-2 h-11 px-2 text-muted-foreground"
-            >
-              <CaretRightIcon className={cn("transition-transform", doneOpen && "rotate-90")} />
-              Done ({done.length})
-            </Button>
+        <CollapsibleGroup
+          label="Done"
+          count={done.length}
+          action={
             <Button variant="outline" className="h-11 px-5" onClick={() => void clearDone()}>
               Clear done
             </Button>
-          </div>
-          {doneOpen && (
-            <Group className="mt-2">
-              <ul className="divide-y">
-                {done.map((chore) => (
-                  <ChoreRow key={chore.id} {...rowProps(chore)} />
-                ))}
-              </ul>
-            </Group>
-          )}
-        </section>
+          }
+        >
+          <ul className="divide-y">
+            {done.map((chore) => (
+              <ChoreRow key={chore.id} {...rowProps(chore)} />
+            ))}
+          </ul>
+        </CollapsibleGroup>
       )}
 
       <ChoreSheet

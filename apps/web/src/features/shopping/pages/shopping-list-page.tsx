@@ -1,12 +1,10 @@
-import { CaretRightIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
-import { useState } from "react";
 
 import { BackLink } from "@/components/back-link.tsx";
-import { Group, GroupHeading } from "@/components/layout/group.tsx";
+import { CollapsibleGroup } from "@/components/layout/collapsible-group.tsx";
+import { Group } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 import { AddRow } from "@/components/add-row.tsx";
 import { DeleteListButton } from "../components/delete-list-button.tsx";
@@ -25,7 +23,6 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
   const { user } = routeApi.useRouteContext();
   const { list, gone, add, toggle, remove, clearChecked } = useShoppingList(listId, user);
   const { settling, touched, listRef } = useSettlingItems();
-  const [cartOpen, setCartOpen] = useState(false);
 
   if (gone) return <ListNotFound />;
 
@@ -53,67 +50,51 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
 
       <Group className="mt-6">
         <AddRow label="Add item" withQuantity maxLength={100} onAdd={add} />
-        {!sections &&
-          (open.length > 0 ? (
-            <div ref={listRef} data-settle-group>
-              <ul aria-label="To buy" className="divide-y">
-                {open.map(row)}
-              </ul>
-            </div>
-          ) : (
-            <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-              {checked.length > 0
-                ? "Everything's in the cart."
-                : "Nothing to buy. Add the first item."}
-            </p>
-          ))}
+        {open.length > 0 ? (
+          <div ref={listRef} className="divide-y">
+            {(sections ?? [{ category: null, items: open }]).map(({ category, items }) => (
+              // One card for the whole list, with a slim heading per category. Each part folds
+              // away as one when everything in it is ticked off (see useSettlingItems).
+              <section
+                key={category ?? "all"}
+                aria-label={category ?? "To buy"}
+                data-settle-group
+                className="overflow-hidden"
+              >
+                {category && (
+                  <h2 className="bg-muted/50 px-4 py-2 text-[0.8125rem] font-medium text-muted-foreground">
+                    {category}
+                  </h2>
+                )}
+                <ul className="divide-y">{items.map(row)}</ul>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+            {checked.length > 0
+              ? "Everything's in the cart."
+              : "Nothing to buy. Add the first item."}
+          </p>
+        )}
       </Group>
 
-      {sections && (
-        <div ref={listRef}>
-          {sections.map(({ category, items }) => (
-            // Folds away as one when everything in it is ticked off (see useSettlingItems)
-            <section
-              key={category}
-              aria-label={category}
-              data-settle-group
-              className="overflow-hidden"
-            >
-              <GroupHeading>{category}</GroupHeading>
-              <Group>
-                <ul className="divide-y">{items.map(row)}</ul>
-              </Group>
-            </section>
-          ))}
-        </div>
-      )}
-
       {checked.length > 0 && (
-        <section className="mt-6" aria-label="In cart">
-          <div className="flex items-center justify-between gap-2">
-            <Button
-              variant="ghost"
-              aria-expanded={cartOpen}
-              onClick={() => setCartOpen((isOpen) => !isOpen)}
-              className="-ml-2 h-11 px-2 text-muted-foreground"
-            >
-              <CaretRightIcon className={cn("transition-transform", cartOpen && "rotate-90")} />
-              In cart ({checked.length})
-            </Button>
+        <CollapsibleGroup
+          label="In cart"
+          count={checked.length}
+          action={
             <Button className="h-11 px-5" onClick={clearChecked}>
               Done shopping
             </Button>
-          </div>
-          {cartOpen && (
-            <Group className="mt-2">
-              <ul className="divide-y">
-                {checked.map((item) => (
-                  <ShoppingItemRow key={item.id} {...rowProps(item)} />
-                ))}
-              </ul>
-            </Group>
-          )}
-        </section>
+          }
+        >
+          <ul className="divide-y">
+            {checked.map((item) => (
+              <ShoppingItemRow key={item.id} {...rowProps(item)} />
+            ))}
+          </ul>
+        </CollapsibleGroup>
       )}
 
       <div className="mt-12 flex flex-wrap gap-x-6 gap-y-2">
