@@ -106,7 +106,7 @@ Signed-in pages that need a household share one frame (`components/layout/househ
 - Changes from other members show up straight away through live updates (see below). If someone deletes the list, the page says so.
 - Items can carry a client-generated id, so a retried add doesn't create a duplicate.
 - Tables: `shopping_list` and `shopping_item` in `apps/api/src/features/shopping/shopping.schema.ts`. Deleting a household deletes its lists; when someone leaves, the items they added stay.
-- The API can also rename a list (`PATCH /api/shopping/lists/:listId`); the UI doesn't offer it yet.
+- "Rename list" at the bottom of a list opens a sheet to change its name (`PATCH /api/shopping/lists/:listId`). Other members see the new name straight away through live updates.
 
 ## Chores
 

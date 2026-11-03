@@ -18,6 +18,10 @@ export async function createList(name: string): Promise<ShoppingList> {
   return (await parseResponse(lists.$post({ json: { name } }))).list;
 }
 
+export async function renameList(listId: string, name: string): Promise<void> {
+  await parseResponse(lists[":listId"].$patch({ param: { listId }, json: { name } }));
+}
+
 export async function deleteList(listId: string): Promise<void> {
   await parseResponse(lists[":listId"].$delete({ param: { listId } }));
 }
