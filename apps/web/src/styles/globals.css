@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+/* Sonner also adds these styles itself with an inline <style>, which the Content Security Policy
+   blocks in a build (content-security-policy.ts); without them toasts land off screen */
+@import "sonner/dist/styles.css";
 
 @custom-variant dark (&:is(.dark *));
 

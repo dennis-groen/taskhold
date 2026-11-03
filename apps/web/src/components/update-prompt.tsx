@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { useRegisterSW } from "virtual:pwa-register/react";
 
-// An app left open for days still hears about new versions
+// An app left open for days still hears about new versions. Phones pause this timer while the app
+// is in the background, so it also checks each time the app comes back to the front.
 const UPDATE_CHECK_INTERVAL = Temporal.Duration.from({ hours: 1 });
 
 /**
@@ -16,10 +17,13 @@ export function UpdatePrompt() {
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
       if (!registration) return;
-      setInterval(
-        () => void registration.update().catch(() => {}),
-        UPDATE_CHECK_INTERVAL.total("milliseconds"),
-      );
+      // Offline or the server is down: the next check will do
+      const check = () => void registration.update().catch(() => {});
+      setInterval(check, UPDATE_CHECK_INTERVAL.total("milliseconds"));
+      // An installed app is rarely reloaded: reopening it on a phone resumes the page as it was
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") check();
+      });
     },
   });
 
