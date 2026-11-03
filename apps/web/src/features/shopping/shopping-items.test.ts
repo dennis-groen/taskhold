@@ -17,15 +17,16 @@ function item(id: string, createdAt: string, checkedAt: string | null = null): S
 }
 
 describe("grouping shopping items", () => {
-  it("splits open and checked items, newest first, comparing times rather than text", () => {
+  it("puts what's left A to Z and the cart latest first, comparing times rather than text", () => {
     // "…13:00:00Z" sorts after "…13:00:00.5Z" as text, but is earlier
     const { open, checked } = groupItems([
-      item("older", "2026-11-01T13:00:00Z"),
-      item("newer", "2026-11-01T13:00:00.5Z"),
+      item("milk", "2026-11-01T13:00:00Z"),
+      item("Bread", "2026-11-01T13:00:00.5Z"),
+      item("eggs", "2026-11-01T12:00:00Z"),
       item("checked-first", "2026-11-01T12:00:00Z", "2026-11-01T13:00:00.25Z"),
       item("checked-last", "2026-11-01T12:00:00Z", "2026-11-01T13:00:01Z"),
     ]);
-    expect(open.map((entry) => entry.id)).toEqual(["newer", "older"]);
+    expect(open.map((entry) => entry.id)).toEqual(["Bread", "eggs", "milk"]);
     expect(checked.map((entry) => entry.id)).toEqual(["checked-last", "checked-first"]);
   });
 
@@ -39,7 +40,15 @@ describe("grouping shopping items", () => {
       ],
       new Set(["milk"]),
     );
-    expect(open.map((entry) => entry.id)).toEqual(["eggs", "milk", "bread"]);
+    expect(open.map((entry) => entry.id)).toEqual(["bread", "eggs", "milk"]);
     expect(checked.map((entry) => entry.id)).toEqual(["apples"]);
+  });
+
+  it("sorts numbers by value", () => {
+    const { open } = groupItems([
+      item("Batteries 10", "2026-11-01T13:00:00Z"),
+      item("Batteries 2", "2026-11-01T13:00:01Z"),
+    ]);
+    expect(open.map((entry) => entry.id)).toEqual(["Batteries 2", "Batteries 10"]);
   });
 });

@@ -10,11 +10,13 @@ const LEAVE = { duration: 300, easing: "cubic-bezier(0.4, 0, 0.2, 1)" };
  * tapping for a moment, then fold away to the cart together. A wrong tick can be taken back where
  * it is, and rows don't shift under the next tap.
  *
- * Put `listRef` on the list, and `data-settling` on rows whose id is in `settling`.
+ * Put `listRef` on the list, and `data-settling` on rows whose id is in `settling`. A part of
+ * the list marked `data-settle-group` (a category with its heading) folds away as one when every
+ * row in it is leaving.
  */
 export function useSettlingItems() {
   const [settling, setSettling] = useState<ReadonlySet<string>>(() => new Set());
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const leaving = useRef<Animation[]>([]);
 
@@ -35,18 +37,17 @@ export function useSettlingItems() {
   }
 
   async function settle() {
-    const rows = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-settling]") ?? [])];
-    const ticked = rows.filter((row) => row.dataset.settling === "checked");
+    const parts = leavingParts(listRef.current);
     const animate =
-      ticked.length > 0 &&
+      parts.length > 0 &&
       document.visibilityState === "visible" &&
       !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (animate) {
-      const animations = ticked.map((row) =>
-        row.animate(
+      const animations = parts.map((part) =>
+        part.animate(
           [
             // Rows have a minimum height, so that has to fold too
-            { height: `${row.offsetHeight}px`, minHeight: "0px", opacity: 1 },
+            { height: `${part.offsetHeight}px`, minHeight: "0px", opacity: 1 },
             // The text fades a little before the row has folded, so nothing overlaps
             { opacity: 0, offset: 0.7 },
             { height: "0px", minHeight: "0px", opacity: 0 },
@@ -71,4 +72,20 @@ export function useSettlingItems() {
   }
 
   return { settling, touched, listRef };
+}
+
+/** The ticked rows that fold away, with a whole group in place of its rows when all of them go */
+function leavingParts(list: HTMLElement | null): HTMLElement[] {
+  if (!list) return [];
+  const parts: HTMLElement[] = [];
+  for (const group of list.querySelectorAll<HTMLElement>("[data-settle-group]")) {
+    const rows = [...group.querySelectorAll<HTMLElement>("li")];
+    if (rows.length > 0 && rows.every(isLeaving)) parts.push(group);
+    else parts.push(...rows.filter(isLeaving));
+  }
+  return parts;
+}
+
+function isLeaving(row: HTMLElement): boolean {
+  return row.dataset.settling === "checked";
 }

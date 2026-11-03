@@ -3,7 +3,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { BackLink } from "@/components/back-link.tsx";
-import { Group } from "@/components/layout/group.tsx";
+import { Group, GroupHeading } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ import { SharedWithLine } from "@/components/shared-with-line.tsx";
 import { ShoppingItemRow } from "../components/shopping-item-row.tsx";
 import { useSettlingItems } from "../hooks/use-settling-items.ts";
 import { useShoppingList } from "../hooks/use-shopping-list.ts";
-import { groupItems } from "../shopping-items.ts";
+import { byCategory, groupItems } from "../shopping-items.ts";
 
 const routeApi = getRouteApi("/_household/lists/$listId");
 
@@ -30,6 +30,7 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
   if (gone) return <ListNotFound />;
 
   const { open, checked } = groupItems(list.items, settling);
+  const sections = byCategory(open);
   const rowProps = (item: (typeof list.items)[number]) => ({
     item,
     viewerId: user.id,
@@ -39,6 +40,9 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
     },
     onRemove: () => remove(item.id),
   });
+  const row = (item: (typeof list.items)[number]) => (
+    <ShoppingItemRow key={item.id} settling={settling.has(item.id)} {...rowProps(item)} />
+  );
 
   return (
     <>
@@ -49,20 +53,40 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: string[] }) {
 
       <Group className="mt-6">
         <AddRow label="Add item" withQuantity maxLength={100} onAdd={add} />
-        {open.length > 0 ? (
-          <ul ref={listRef} aria-label="To buy" className="divide-y">
-            {open.map((item) => (
-              <ShoppingItemRow key={item.id} settling={settling.has(item.id)} {...rowProps(item)} />
-            ))}
-          </ul>
-        ) : (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-            {checked.length > 0
-              ? "Everything's in the cart."
-              : "Nothing to buy. Add the first item."}
-          </p>
-        )}
+        {!sections &&
+          (open.length > 0 ? (
+            <div ref={listRef} data-settle-group>
+              <ul aria-label="To buy" className="divide-y">
+                {open.map(row)}
+              </ul>
+            </div>
+          ) : (
+            <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+              {checked.length > 0
+                ? "Everything's in the cart."
+                : "Nothing to buy. Add the first item."}
+            </p>
+          ))}
       </Group>
+
+      {sections && (
+        <div ref={listRef}>
+          {sections.map(({ category, items }) => (
+            // Folds away as one when everything in it is ticked off (see useSettlingItems)
+            <section
+              key={category}
+              aria-label={category}
+              data-settle-group
+              className="overflow-hidden"
+            >
+              <GroupHeading>{category}</GroupHeading>
+              <Group>
+                <ul className="divide-y">{items.map(row)}</ul>
+              </Group>
+            </section>
+          ))}
+        </div>
+      )}
 
       {checked.length > 0 && (
         <section className="mt-6" aria-label="In cart">
