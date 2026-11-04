@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Wordmark } from "@/components/wordmark.tsx";
 
 const AUTO_RETRY = Temporal.Duration.from({ seconds: 10 });
 
@@ -31,13 +32,15 @@ export function RootError({ unreachable }: { unreachable: boolean }) {
 
   const Icon = unreachable ? CloudSlashIcon : WarningCircleIcon;
   return (
-    <div className="flex min-h-dvh flex-col bg-muted/50 px-4 dark:bg-background">
+    <div className="flex min-h-dvh flex-col bg-canvas px-4">
       <header className="mx-auto w-full max-w-sm pt-[calc(2rem+env(safe-area-inset-top))]">
-        <span className="text-base font-semibold tracking-tight">taskhold</span>
+        <Wordmark />
       </header>
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-12">
-        <Icon className="size-8 text-muted-foreground" />
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+        <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Icon className="size-6" weight="duotone" />
+        </span>
+        <h1 className="mt-5 text-title">
           {unreachable ? "Can't reach taskhold" : "Something went wrong"}
         </h1>
         <p className="mt-2 text-pretty text-muted-foreground">

@@ -18,7 +18,7 @@ export function HouseholdSetupPage({ accountAction }: { accountAction?: ReactNod
         personal to-dos stay private.
       </PageHeading>
 
-      <ul className="mt-8 divide-y overflow-hidden rounded-xl border">
+      <ul className="mt-8 divide-y divide-border/80 overflow-hidden rounded-xl bg-card shadow-card">
         <li>
           <Choice
             to="/onboarding/create"
@@ -56,16 +56,24 @@ function Choice({
   return (
     <Link
       to={to}
-      className="group flex items-start gap-4 p-4 transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset sm:p-5"
+      className="group flex items-center gap-4 p-4 transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/60 active:bg-muted/70 focus-visible:ring-3 focus-visible:ring-ring/80 focus-visible:ring-inset sm:p-5"
     >
-      <ChoiceIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+      <span
+        aria-hidden
+        className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
+      >
+        <ChoiceIcon className="size-5.5" weight="duotone" />
+      </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-medium">{title}</span>
+        <span className="block font-semibold">{title}</span>
         <span className="mt-0.5 block text-sm text-pretty text-muted-foreground">
           {description}
         </span>
       </span>
-      <CaretRightIcon className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      <CaretRightIcon
+        weight="bold"
+        className="size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 ease-out group-hover:translate-x-0.5"
+      />
     </Link>
   );
 }

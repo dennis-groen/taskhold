@@ -27,7 +27,7 @@ export function DeleteAccountButton({
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="ghost" size="lg" className="h-11 px-4 text-destructive">
+        <Button variant="destructive-ghost" size="lg">
           <TrashIcon />
           Delete account
         </Button>

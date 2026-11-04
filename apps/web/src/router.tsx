@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 
 // Import the generated route tree
+import { PageSkeleton } from "./components/page-skeleton.tsx";
 import { routeTree } from "./routeTree.gen";
 
 export const queryClient = new QueryClient({
@@ -19,6 +20,9 @@ export const router = createRouter({
   context: { queryClient },
   // React Query decides when cached data is stale, so the router always runs loaders
   defaultPreloadStaleTime: 0,
+  // A page whose data takes a moment shows its shape instead of a blank screen
+  defaultPendingComponent: PageSkeleton,
+  defaultPendingMs: 300,
 });
 
 // Register the router instance for type safety

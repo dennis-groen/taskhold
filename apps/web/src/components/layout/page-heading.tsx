@@ -13,8 +13,13 @@ export function PageHeading({
 }) {
   return (
     <header>
-      <h1 className="text-3xl leading-tight font-semibold tracking-tight text-balance">{title}</h1>
-      {children && <p className="mt-3 text-base text-pretty text-muted-foreground">{children}</p>}
+      <h1 className="text-title break-words">{title}</h1>
+      {children && (
+        // A div, not a p: the line can hold faces (SharedWithLine) as well as text
+        <div className="mt-2 text-[0.9375rem] leading-6 text-pretty text-muted-foreground">
+          {children}
+        </div>
+      )}
       {action && <div className="mt-4">{action}</div>}
     </header>
   );

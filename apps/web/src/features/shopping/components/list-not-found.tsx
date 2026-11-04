@@ -11,7 +11,7 @@ export function ListNotFound() {
       <PageHeading title="This list isn't here anymore">
         Someone in your household may have deleted it.
       </PageHeading>
-      <Link to="/lists" className={cn(buttonVariants({ size: "lg" }), "mt-8 h-11 px-5")}>
+      <Link to="/lists" className={cn(buttonVariants({ size: "lg" }), "mt-8")}>
         Back to your lists
       </Link>
     </>

@@ -16,7 +16,7 @@ export function DeleteListButton({ list }: { list: ShoppingList }) {
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="ghost" className="-ml-2.5 text-destructive hover:text-destructive">
+        <Button variant="destructive-ghost" size="lg">
           <TrashIcon />
           Delete list
         </Button>

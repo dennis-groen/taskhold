@@ -21,19 +21,29 @@ export function CollapsibleGroup({
   children: ReactNode;
 }) {
   return (
-    <Collapsible render={<section aria-label={label} />} className="mt-6">
+    <Collapsible render={<section aria-label={label} />} className="mt-8">
       <div className="flex items-center justify-between gap-2">
         <CollapsibleTrigger
           render={
-            <Button variant="ghost" className="group -ml-2 h-11 px-2 text-muted-foreground" />
+            <Button
+              variant="ghost"
+              size="lg"
+              className="group -ml-2 px-2 text-[0.9375rem] text-foreground/85"
+            />
           }
         >
-          <CaretRightIcon className="transition-transform group-data-[panel-open]:rotate-90 motion-reduce:transition-none" />
-          {label} ({count})
+          <CaretRightIcon
+            weight="bold"
+            className="size-3.5 text-muted-foreground transition-transform duration-200 ease-out group-data-[panel-open]:rotate-90 motion-reduce:transition-none"
+          />
+          {label}
+          <span className="ml-0.5 rounded-full bg-foreground/7 px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
+            {count}
+          </span>
         </CollapsibleTrigger>
         {action}
       </div>
-      <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-[ending-style]:h-0 data-[starting-style]:h-0 motion-reduce:transition-none">
+      <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-250 ease-out-quint data-[ending-style]:h-0 data-[starting-style]:h-0 motion-reduce:transition-none">
         {/* Room for the card's ring, which the panel would otherwise clip while it opens */}
         <div className="px-px pt-2 pb-px">
           <Group>{children}</Group>

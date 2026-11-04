@@ -67,7 +67,7 @@ export function TodoForm({
           onChange={(event) => setName(event.target.value)}
           maxLength={100}
           autoComplete="off"
-          className="h-12 px-4 text-base md:text-base"
+          className="h-12 rounded-xl px-4 text-base md:text-base"
         />
       </div>
 
@@ -79,15 +79,10 @@ export function TodoForm({
             type="date"
             value={dueOn}
             onChange={(event) => setDueOn(event.target.value)}
-            className="h-12 min-w-0 flex-1 px-4 text-base tabular-nums md:text-base"
+            className="h-12 min-w-0 flex-1 rounded-xl px-4 text-base tabular-nums md:text-base"
           />
           {dueOn && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-12 px-4"
-              onClick={() => setDueOn("")}
-            >
+            <Button type="button" variant="ghost" size="xl" onClick={() => setDueOn("")}>
               No date
             </Button>
           )}
@@ -103,7 +98,7 @@ export function TodoForm({
           onChange={(event) => setNotes(event.target.value)}
           maxLength={1000}
           rows={3}
-          className="px-4 py-3 text-base md:text-base"
+          className="rounded-xl px-4 py-3 text-base md:text-base"
         />
       </div>
 
@@ -115,7 +110,7 @@ export function TodoForm({
         )}
       </div>
 
-      <Button type="submit" disabled={pending} className="h-12 px-5 text-base">
+      <Button type="submit" size="xl" disabled={pending}>
         {pending && <Spinner />}
         {submitLabel}
       </Button>

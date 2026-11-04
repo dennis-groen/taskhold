@@ -41,11 +41,19 @@ export function HouseholdOverviewPage({
       <Group>
         <Link
           to="/invite"
-          className="flex min-h-13 items-center gap-3 px-4 py-3 text-primary outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
+          className="group/invite flex min-h-15 items-center gap-3 px-4 py-3 text-primary-soft-foreground outline-none transition-colors hover:bg-primary-soft/35 focus-visible:bg-primary-soft/35 focus-visible:ring-2 focus-visible:ring-ring/80 focus-visible:ring-inset active:bg-primary-soft/50"
         >
-          <UserPlusIcon className="size-5 shrink-0" weight="bold" />
-          <span className="flex-1 text-base">Invite people</span>
-          <CaretRightIcon className="size-4 text-muted-foreground" />
+          <span
+            aria-hidden
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft"
+          >
+            <UserPlusIcon className="size-4.5" weight="bold" />
+          </span>
+          <span className="flex-1 text-base font-semibold">Invite people</span>
+          <CaretRightIcon
+            weight="bold"
+            className="size-4 text-muted-foreground/70 transition-transform duration-200 ease-out group-hover/invite:translate-x-0.5"
+          />
         </Link>
         <HouseholdMembers
           members={household.members}
@@ -60,10 +68,10 @@ export function HouseholdOverviewPage({
 
       <GroupHeading>Account</GroupHeading>
       <Group>
-        <div className="flex min-h-14 items-center gap-3 px-4 py-2.5">
+        <div className="flex min-h-15 items-center gap-3 px-4 py-2.5">
           <UserAvatar name={user.name} image={user.image} />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-base">{user.name}</span>
+            <span className="block truncate text-base font-semibold">{user.name}</span>
             <span className="block truncate text-sm text-muted-foreground">{user.email}</span>
           </span>
           {accountAction}
@@ -73,11 +81,11 @@ export function HouseholdOverviewPage({
       {reminders}
 
       <GroupHeading>Appearance</GroupHeading>
-      <Group className="p-4">
+      <Group className="p-1.5">
         <ThemeToggle />
       </Group>
 
-      <div className="mt-8 flex flex-wrap gap-2">
+      <div className="mt-10 flex flex-wrap gap-2 border-t border-border/70 pt-5">
         <LeaveHouseholdButton household={household} currentUserId={user.id} />
         {deleteAccount?.(household, user.id)}
       </div>

@@ -17,6 +17,7 @@ export function ChoreRow({
   chore,
   today,
   viewerId,
+  settling = false,
   onComplete,
   onUndo,
   onOpen,
@@ -24,6 +25,8 @@ export function ChoreRow({
   chore: Chore;
   today: string;
   viewerId: string;
+  /** Just ticked or unticked here, and held in place for a moment (lib/use-settling-items.ts) */
+  settling?: boolean;
   onComplete: () => void;
   onUndo: () => void;
   onOpen: () => void;
@@ -33,31 +36,30 @@ export function ChoreRow({
   const doneBy = chore.lastCompletion?.completedBy;
 
   return (
-    <li className="flex min-h-14 items-stretch">
+    <li
+      data-settling={settling ? (chore.done ? "checked" : "open") : undefined}
+      className="flex min-h-15 items-stretch overflow-hidden"
+    >
       <span className="flex items-center py-3 pr-1 pl-4">
         <Checkbox
           aria-labelledby={nameId}
           checked={chore.done}
           onCheckedChange={(checked) => (checked ? onComplete() : onUndo())}
-          className="size-6 rounded-full [&_svg]:size-4"
+          variant="tick"
         />
       </span>
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 pl-2 text-left outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
+        className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 pl-2 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/80 focus-visible:ring-inset active:bg-muted/70"
       >
         <span className="min-w-0 flex-1">
-          <span
-            id={nameId}
-            className={cn(
-              "block text-base break-words",
-              chore.done && "text-muted-foreground line-through",
-            )}
-          >
-            {chore.name}
+          <span id={nameId} className="block text-base break-words">
+            <span className="tick-label" data-done={chore.done || undefined}>
+              {chore.name}
+            </span>
           </span>
-          <span className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[0.8125rem] text-muted-foreground">
             {chore.done && chore.lastCompletion ? (
               <span>
                 Done {doneBy && `by ${doneBy.id === viewerId ? "you" : doneBy.name}`}{" "}
@@ -65,14 +67,20 @@ export function ChoreRow({
               </span>
             ) : (
               chore.dueOn && (
-                <span className={cn("tabular-nums", overdue && "font-medium text-destructive")}>
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    overdue &&
+                      "-ml-0.5 rounded-full bg-destructive/10 px-1.5 font-semibold text-destructive",
+                  )}
+                >
                   {dueLabel(chore.dueOn, today)}
                 </span>
               )
             )}
             {chore.repeat && (
               <span className="inline-flex items-center gap-1">
-                <ArrowsClockwiseIcon className="size-3.5" aria-hidden />
+                <ArrowsClockwiseIcon className="size-3.5" weight="bold" aria-hidden />
                 {repeatLabel(chore.repeat)}
               </span>
             )}

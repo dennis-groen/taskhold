@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { UserAvatar } from "@/components/user-avatar.tsx";
+import { Wordmark } from "@/components/wordmark.tsx";
 
 /** Page frame for signed-in screens: wordmark, who's signed in, and account actions on the right */
 export function AppShell({
@@ -13,9 +14,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="min-h-dvh bg-canvas">
       <header className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-5 sm:px-8">
-        <span className="text-base font-semibold tracking-tight">taskhold</span>
+        <Wordmark />
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar name={user.name} image={user.image} size="sm" />
           <span className="hidden truncate text-sm text-muted-foreground sm:inline">

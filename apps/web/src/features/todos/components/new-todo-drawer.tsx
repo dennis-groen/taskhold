@@ -23,7 +23,7 @@ export function NewTodoDrawer({ trigger }: { trigger: ReactElement }) {
       <DrawerTrigger render={trigger} />
       <DrawerContent className="mx-auto max-w-[640px]" initialFocus={nameRef}>
         <DrawerHeader className="px-5 pt-5 text-left">
-          <DrawerTitle className="text-lg font-semibold">New to-do</DrawerTitle>
+          <DrawerTitle>New to-do</DrawerTitle>
           <DrawerDescription>Only you can see this.</DrawerDescription>
         </DrawerHeader>
         <div className="overflow-y-auto px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">

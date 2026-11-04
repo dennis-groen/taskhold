@@ -1,4 +1,10 @@
-import { CheckIcon, CopyIcon, LinkIcon, ShareNetworkIcon } from "@phosphor-icons/react";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  CopyIcon,
+  LinkIcon,
+  ShareNetworkIcon,
+} from "@phosphor-icons/react";
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
@@ -90,17 +96,17 @@ export function InviteMembersPage() {
 
       <div className="mt-6 flex flex-wrap gap-2">
         {canShare ? (
-          <Button size="lg" className="h-11 px-4" onClick={() => void share()}>
+          <Button size="lg" onClick={() => void share()}>
             <ShareNetworkIcon />
             Share invite link
           </Button>
         ) : (
-          <Button size="lg" className="h-11 px-4" onClick={() => void copy("link")}>
+          <Button size="lg" onClick={() => void copy("link")}>
             {copied === "link" ? <CheckIcon /> : <LinkIcon />}
             {copied === "link" ? "Link copied" : "Copy invite link"}
           </Button>
         )}
-        <Button size="lg" variant="outline" className="h-11 px-4" onClick={() => void copy("code")}>
+        <Button size="lg" variant="outline" onClick={() => void copy("code")}>
           {copied === "code" ? <CheckIcon /> : <CopyIcon />}
           {copied === "code" ? "Code copied" : "Copy code"}
         </Button>
@@ -108,7 +114,7 @@ export function InviteMembersPage() {
           {copied ? `${copied === "link" ? "Link" : "Code"} copied` : ""}
         </span>
       </div>
-      <p ref={linkRef} className="mt-3 text-sm break-all text-muted-foreground">
+      <p ref={linkRef} className="mt-3 font-mono text-[0.8125rem] break-all text-muted-foreground">
         {link}
       </p>
       {copyBlocked && (
@@ -128,21 +134,23 @@ export function InviteMembersPage() {
         </div>
       )}
 
+      {/* Right after creating: the obvious next step, before the members list */}
+      {created && (
+        <Link
+          to="/lists"
+          className={cn(buttonVariants({ variant: "soft", size: "xl" }), "mt-8 w-full sm:w-auto")}
+        >
+          Start your first list
+          <ArrowRightIcon />
+        </Link>
+      )}
+
       <section className="mt-6">
         <GroupHeading>Already in {household.name}</GroupHeading>
         <Group>
           <HouseholdMembers members={household.members} currentUserId={user.id} />
         </Group>
       </section>
-
-      {created && (
-        <Link
-          to="/lists"
-          className={cn(buttonVariants({ variant: "link", size: "lg" }), "mt-6 h-11 px-0")}
-        >
-          Go to your shopping lists
-        </Link>
-      )}
     </>
   );
 }

@@ -59,7 +59,7 @@ export function CreateHouseholdPage() {
             maxLength={60}
             autoComplete="off"
             aria-invalid={error ? true : undefined}
-            className="h-11 px-3 text-base md:text-base"
+            className="h-12 rounded-xl px-4 text-base md:text-base"
           />
           {error ? (
             <FieldError>{error}</FieldError>
@@ -68,7 +68,7 @@ export function CreateHouseholdPage() {
           )}
         </Field>
 
-        <Button type="submit" size="lg" disabled={creating} className="mt-6 h-11 px-5">
+        <Button type="submit" size="lg" disabled={creating} className="mt-6">
           {creating && <Spinner />}
           Create household
         </Button>

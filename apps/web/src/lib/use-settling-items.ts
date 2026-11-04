@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 
-// How long after the last tap ticked items stay put before moving to the cart
+// How long after the last tap ticked rows stay put before moving to where done things go
 const SETTLE_AFTER = Temporal.Duration.from({ milliseconds: 2_500 });
 // How long settled rows take to fold away, so it's clear where they went
 const LEAVE = { duration: 300, easing: "cubic-bezier(0.4, 0, 0.2, 1)" };
 
 /**
- * Items this person just ticked off, which stay where they are (crossed out) until they stop
- * tapping for a moment, then fold away to the cart together. A wrong tick can be taken back where
+ * Rows this person just ticked off (shopping items, chores, to-dos), which stay where they are
+ * (crossed out) until they stop tapping for a moment, then fold away together: to the cart, or
+ * to Done. A wrong tick can be taken back where
  * it is, and rows don't shift under the next tap.
  *
  * Put `listRef` on the list, and `data-settling` on rows whose id is in `settling`. A part of

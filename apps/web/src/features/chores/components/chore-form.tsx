@@ -91,8 +91,13 @@ export function ChoreForm({
       nameRef?.current?.focus();
       return;
     }
+    // Checked here rather than by the browser, so the message sits with the others
+    if (repeat && !dueOn) {
+      setError("Pick when it's next due.");
+      return;
+    }
     if (repeat && !(Number.isInteger(repeat.every) && repeat.every >= 1)) {
-      setError("Repeat at least every 1 day.");
+      setError(`Repeat at least every 1 ${repeat.unit}.`);
       return;
     }
     setPending(true);
@@ -107,7 +112,7 @@ export function ChoreForm({
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-6">
+    <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Label htmlFor={ids.name}>Chore</Label>
         <Input
@@ -118,12 +123,12 @@ export function ChoreForm({
           onChange={(event) => setName(event.target.value)}
           maxLength={60}
           autoComplete="off"
-          className="h-12 px-4 text-base md:text-base"
+          className="h-12 rounded-xl px-4 text-base md:text-base"
         />
       </div>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium">Repeats</legend>
+        <legend className="mb-2 text-sm font-semibold">Repeats</legend>
         <Chips>
           {REPEAT_CHOICES.map((option) => (
             <Chip
@@ -171,15 +176,10 @@ export function ChoreForm({
             value={dueOn}
             required={repeat !== null}
             onChange={(event) => setDueOn(event.target.value)}
-            className="h-12 min-w-0 flex-1 px-4 text-base tabular-nums md:text-base"
+            className="h-12 min-w-0 flex-1 rounded-xl px-4 text-base tabular-nums md:text-base"
           />
           {!repeat && dueOn && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-12 px-4"
-              onClick={() => setDueOn("")}
-            >
+            <Button type="button" variant="ghost" size="xl" onClick={() => setDueOn("")}>
               No date
             </Button>
           )}
@@ -192,7 +192,7 @@ export function ChoreForm({
       </div>
 
       <fieldset>
-        <legend className="mb-2 text-sm font-medium">Assigned to</legend>
+        <legend className="mb-2 text-sm font-semibold">Assigned to</legend>
         <Chips>
           {members.map((member) => (
             <Chip
@@ -219,7 +219,7 @@ export function ChoreForm({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={pending} className="h-12 flex-1 px-5 text-base">
+        <Button type="submit" size="xl" disabled={pending} className="flex-1">
           {pending && <Spinner />}
           {submitLabel}
         </Button>
@@ -250,10 +250,10 @@ function Chip({
   return (
     <Button
       type="button"
-      variant={active ? "default" : "outline"}
+      variant="chip"
       aria-pressed={active}
       onClick={onClick}
-      className="h-10 rounded-full px-4 has-data-[slot=avatar]:pl-1.5"
+      className="has-data-[slot=avatar]:pl-1.5"
     >
       {children}
     </Button>

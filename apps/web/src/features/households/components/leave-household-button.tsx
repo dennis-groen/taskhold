@@ -36,7 +36,7 @@ export function LeaveHouseholdButton({
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="outline" size="lg" className="h-11 px-4">
+        <Button variant="outline" size="lg">
           <SignOutIcon />
           Leave household
         </Button>

@@ -1,12 +1,16 @@
-import { LockIcon } from "@phosphor-icons/react";
+import { CheckCircleIcon, LockIcon, NotePencilIcon } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { AddRow } from "@/components/add-row.tsx";
 import { CollapsibleGroup } from "@/components/layout/collapsible-group.tsx";
+import { EmptyState } from "@/components/layout/empty-state.tsx";
 import { Group, GroupHeading } from "@/components/layout/group.tsx";
 import { PageHeading } from "@/components/layout/page-heading.tsx";
 import { Button } from "@/components/ui/button";
 import { DUE_GROUPS, dueGroup, today as todayOnDevice } from "@/lib/dates.ts";
+import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { cn } from "@/lib/utils";
 
 import { TodoRow } from "../components/todo-row.tsx";
@@ -18,18 +22,24 @@ import type { Todo } from "../todos.api.ts";
 export function TodosPage() {
   const { todos, add, save, setDone, remove, clearDone } = useTodos();
   const [openId, setOpenId] = useState<string | null>(null);
-  const [moved, setMoved] = useState<string | null>(null);
+  const navigate = useNavigate();
   const today = todayOnDevice();
 
-  const open = todos.filter((todo) => !todo.done);
-  const done = todos.filter((todo) => todo.done);
+  const { settling, touched, listRef } = useSettlingItems();
+  // Just-ticked to-dos stay among the open ones for a moment, so a slip can be untapped in place
+  const open = todos.filter((todo) => !todo.done || settling.has(todo.id));
+  const done = todos.filter((todo) => todo.done && !settling.has(todo.id));
 
   const row = (todo: Todo) => (
     <TodoRow
       key={todo.id}
       todo={todo}
       today={today}
-      onDone={(isDone) => setDone(todo.id, isDone)}
+      settling={settling.has(todo.id)}
+      onDone={(isDone) => {
+        touched(todo.id);
+        setDone(todo.id, isDone);
+      }}
       onOpen={() => setOpenId(todo.id)}
     />
   );
@@ -38,7 +48,7 @@ export function TodosPage() {
     <>
       <PageHeading title="Personal">
         <span className="inline-flex items-center gap-1.5">
-          <LockIcon className="size-4" aria-hidden />
+          <LockIcon className="size-4" weight="bold" aria-hidden />
           Only you can see this
         </span>
       </PageHeading>
@@ -51,43 +61,37 @@ export function TodosPage() {
         />
       </Group>
 
-      <div aria-live="polite">
-        {moved && (
-          <p className="mt-3 px-1 text-sm text-muted-foreground">
-            Moved {moved} to the household's chores.
-          </p>
-        )}
-      </div>
-
       {open.length === 0 && (
-        <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+        <EmptyState icon={done.length > 0 ? CheckCircleIcon : NotePencilIcon}>
           {done.length > 0
             ? "Nothing left to do."
             : "Nothing here yet. Add something you need to do, like Renew passport."}
-        </p>
+        </EmptyState>
       )}
 
-      {DUE_GROUPS.map(({ group, label }) => {
-        const inGroup = open.filter((todo) => dueGroup(todo.dueOn, today) === group);
-        if (inGroup.length === 0) return null;
-        return (
-          <section key={group} aria-label={label}>
-            <GroupHeading className={cn(group === "overdue" && "text-destructive")}>
-              {label}
-            </GroupHeading>
-            <Group>
-              <ul className="divide-y">{inGroup.map(row)}</ul>
-            </Group>
-          </section>
-        );
-      })}
+      <div ref={listRef}>
+        {DUE_GROUPS.map(({ group, label }) => {
+          const inGroup = open.filter((todo) => dueGroup(todo.dueOn, today) === group);
+          if (inGroup.length === 0) return null;
+          return (
+            <section key={group} aria-label={label} data-settle-group>
+              <GroupHeading className={cn(group === "overdue" && "text-destructive")}>
+                {label}
+              </GroupHeading>
+              <Group>
+                <ul className="divide-y">{inGroup.map(row)}</ul>
+              </Group>
+            </section>
+          );
+        })}
+      </div>
 
       {done.length > 0 && (
         <CollapsibleGroup
           label="Done"
           count={done.length}
           action={
-            <Button variant="outline" className="h-11 px-5" onClick={clearDone}>
+            <Button variant="outline" size="lg" onClick={clearDone}>
               Clear done
             </Button>
           }
@@ -100,7 +104,11 @@ export function TodosPage() {
         todo={todos.find((todo) => todo.id === openId) ?? null}
         onSave={(changes) => save(openId ?? "", changes)}
         onDelete={() => openId && remove(openId)}
-        onMoved={setMoved}
+        onMoved={(name) =>
+          toast(`${name} is now a household chore`, {
+            action: { label: "View", onClick: () => void navigate({ to: "/chores" }) },
+          })
+        }
         onClose={() => setOpenId(null)}
       />
     </>

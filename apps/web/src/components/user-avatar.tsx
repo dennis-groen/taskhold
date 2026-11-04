@@ -7,6 +7,13 @@ function initials(name: string) {
   return (first + last).toUpperCase();
 }
 
+/** One of six calm tones (globals.css, --tone-*), the same for a name on every device */
+function toneFor(name: string) {
+  let hash = 0;
+  for (const char of name) hash = (hash * 31 + char.codePointAt(0)!) | 0;
+  return (Math.abs(hash) % 6) + 1;
+}
+
 export function UserAvatar({
   name,
   image,
@@ -17,7 +24,7 @@ export function UserAvatar({
   size?: "default" | "sm" | "lg";
 }) {
   return (
-    <Avatar size={size}>
+    <Avatar size={size} data-tone={toneFor(name)}>
       {/* Decorative: the name is always shown next to it */}
       {image && <AvatarImage src={image} alt="" referrerPolicy="no-referrer" />}
       <AvatarFallback>{initials(name)}</AvatarFallback>

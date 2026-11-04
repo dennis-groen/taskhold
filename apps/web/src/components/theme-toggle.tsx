@@ -1,30 +1,32 @@
-import { MoonIcon, SunIcon } from "@phosphor-icons/react";
+import { CircleHalfIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
-import { useTheme, type Theme } from "@/lib/theme.ts";
+import { useTheme, type ThemeChoice } from "@/lib/theme.ts";
 
-const OPTIONS: { theme: Theme; label: string; icon: typeof SunIcon }[] = [
-  { theme: "light", label: "Light", icon: SunIcon },
-  { theme: "dark", label: "Dark", icon: MoonIcon },
+const OPTIONS: { choice: ThemeChoice; label: string; icon: typeof SunIcon }[] = [
+  { choice: "light", label: "Light", icon: SunIcon },
+  { choice: "dark", label: "Dark", icon: MoonIcon },
+  { choice: "system", label: "Auto", icon: CircleHalfIcon },
 ];
 
-/** Light or dark. Shows the system's theme as selected until the person picks one. */
+/** Light, dark, or Auto: follow the device's setting, which is where everyone starts */
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { choice, setChoice } = useTheme();
 
   return (
-    <fieldset className="flex gap-2">
+    <fieldset className="flex gap-1">
       <legend className="sr-only">Theme</legend>
-      {OPTIONS.map(({ theme: option, label, icon: IconComponent }) => (
+      {OPTIONS.map(({ choice: option, label, icon: IconComponent }) => (
         <Button
           key={option}
           type="button"
-          variant={theme === option ? "default" : "outline"}
-          aria-pressed={theme === option}
-          onClick={() => setTheme(option)}
-          className="h-10 flex-1 rounded-full px-4"
+          variant="ghost"
+          size="lg"
+          aria-pressed={choice === option}
+          onClick={() => setChoice(option)}
+          className="flex-1 rounded-[0.625rem] px-2 text-muted-foreground aria-pressed:bg-primary-soft aria-pressed:text-primary-soft-foreground"
         >
-          <IconComponent weight={theme === option ? "fill" : "regular"} />
+          <IconComponent weight={choice === option ? "fill" : "regular"} />
           {label}
         </Button>
       ))}

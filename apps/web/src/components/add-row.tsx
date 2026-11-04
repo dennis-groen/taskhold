@@ -43,9 +43,14 @@ export function AddRow({
   return (
     <form
       onSubmit={(event) => void submit(event)}
-      className="flex min-h-13 items-center gap-3 pr-2 pl-4"
+      className="group/add flex min-h-14 items-center gap-3 pr-2 pl-4 transition-colors focus-within:bg-primary-soft/35 active:bg-primary-soft/35"
     >
-      <PlusIcon className="size-5 shrink-0 text-primary" weight="bold" aria-hidden />
+      <span
+        aria-hidden
+        className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-soft-foreground transition-transform duration-200 ease-out group-focus-within/add:rotate-90 motion-reduce:transition-none"
+      >
+        <PlusIcon className="size-3.5" weight="bold" />
+      </span>
       <input
         ref={nameRef}
         aria-label={label}
@@ -55,7 +60,7 @@ export function AddRow({
         maxLength={maxLength}
         autoComplete="off"
         enterKeyHint="done"
-        className="min-w-0 flex-1 bg-transparent py-3 text-base outline-none placeholder:text-primary focus:placeholder:text-muted-foreground"
+        className="min-w-0 flex-1 bg-transparent py-3 text-base font-medium outline-none placeholder:text-primary-soft-foreground focus:font-normal focus:placeholder:font-normal focus:placeholder:text-muted-foreground"
       />
       {withQuantity && (
         <input
@@ -66,10 +71,17 @@ export function AddRow({
           maxLength={20}
           autoComplete="off"
           enterKeyHint="done"
-          className="w-16 shrink-0 rounded-md bg-muted px-2 py-1.5 text-right text-sm tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-10 w-18 shrink-0 rounded-lg bg-muted px-2.5 text-right text-base tabular-nums md:text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/80 dark:bg-input/30"
         />
       )}
-      <Button type="submit" size="sm" disabled={pending} className={name.trim() ? "" : "sr-only"}>
+      <Button
+        type="submit"
+        disabled={pending}
+        // Hidden until there's something to add, but never focused while invisible
+        className={
+          name.trim() ? "animate-in fade-in zoom-in-95 duration-150" : "sr-only focus:not-sr-only"
+        }
+      >
         {pending && <Spinner />}
         Add
       </Button>

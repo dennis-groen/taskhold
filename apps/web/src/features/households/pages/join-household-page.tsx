@@ -82,11 +82,13 @@ export function JoinHouseholdPage() {
       {invite && (
         <section
           aria-live="polite"
-          className="mt-6 animate-in rounded-xl border p-4 duration-300 ease-out fade-in slide-in-from-top-1 motion-reduce:animate-none sm:p-5"
+          className="mt-6 animate-in rounded-xl bg-card p-4 shadow-card duration-300 ease-out fade-in slide-in-from-top-1 motion-reduce:animate-none sm:p-5"
         >
-          <h2 className="text-lg font-semibold tracking-tight">{invite.householdName}</h2>
+          <h2 className="font-heading text-xl font-bold tracking-[-0.02em]">
+            {invite.householdName}
+          </h2>
           <div className="mt-3 flex items-center gap-3">
-            <div className="flex -space-x-2 *:rounded-full *:ring-2 *:ring-background">
+            <div className="flex -space-x-2 *:rounded-full *:ring-2 *:ring-card">
               {invite.members.slice(0, 4).map((member, index) => (
                 <UserAvatar key={index} name={member.name} image={member.image} size="sm" />
               ))}
@@ -100,7 +102,7 @@ export function JoinHouseholdPage() {
         size="lg"
         disabled={!invite || joining}
         onClick={() => void join()}
-        className="mt-6 h-11 max-w-full px-5"
+        className="mt-6 max-w-full"
       >
         {joining && <Spinner />}
         <span className="truncate">

@@ -27,7 +27,7 @@ export function RenameListButton({ list }: { list: ShoppingList }) {
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger
         render={
-          <Button variant="ghost" className="-ml-2.5">
+          <Button variant="ghost" size="lg" className="-ml-1 text-muted-foreground">
             <PencilSimpleIcon />
             Rename list
           </Button>
@@ -35,7 +35,7 @@ export function RenameListButton({ list }: { list: ShoppingList }) {
       />
       <DrawerContent className="mx-auto max-w-[640px]">
         <DrawerHeader className="px-5 pt-5 text-left">
-          <DrawerTitle className="text-lg font-semibold">Rename list</DrawerTitle>
+          <DrawerTitle>Rename list</DrawerTitle>
           <DrawerDescription>Everyone in your household sees the new name.</DrawerDescription>
         </DrawerHeader>
         {/* Mounted only while open, so it starts from the current name each time */}
@@ -94,7 +94,7 @@ function RenameForm({ list, onDone }: { list: ShoppingList; onDone: () => void }
           maxLength={60}
           autoComplete="off"
           enterKeyHint="done"
-          className="h-12 px-4 text-base md:text-base"
+          className="h-12 rounded-xl px-4 text-base md:text-base"
         />
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -102,7 +102,7 @@ function RenameForm({ list, onDone }: { list: ShoppingList; onDone: () => void }
           </p>
         )}
       </div>
-      <Button type="submit" disabled={pending} className="h-12">
+      <Button type="submit" size="xl" disabled={pending}>
         {pending && <Spinner />}
         Save name
       </Button>

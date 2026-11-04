@@ -90,7 +90,7 @@ function SheetBody({
   return (
     <>
       <DrawerHeader className="px-5 pt-5 text-left">
-        <DrawerTitle className="text-lg font-semibold break-words">{chore.name}</DrawerTitle>
+        <DrawerTitle className="break-words">{chore.name}</DrawerTitle>
         <DrawerDescription className="sr-only">
           Change the chore, see who did it lately, or delete it.
         </DrawerDescription>
@@ -113,7 +113,7 @@ function SheetBody({
           footer={
             <ConfirmDialog
               trigger={
-                <Button variant="destructive" className="h-12 px-4">
+                <Button variant="destructive" size="xl">
                   <TrashIcon />
                   Delete
                 </Button>
@@ -128,7 +128,7 @@ function SheetBody({
         />
 
         <section className="mt-8" aria-label="History">
-          <h3 className="text-sm font-medium">Recently done</h3>
+          <h3 className="text-sm font-semibold">Recently done</h3>
           {isPending ? (
             <div className="flex justify-center py-6">
               <Spinner />
@@ -136,7 +136,7 @@ function SheetBody({
           ) : history.length === 0 ? (
             <p className="py-3 text-sm text-muted-foreground">Not done yet.</p>
           ) : (
-            <ul className="mt-2 divide-y rounded-xl ring-1 ring-foreground/10">
+            <ul className="mt-2 divide-y divide-border/80 overflow-hidden rounded-xl bg-card shadow-card">
               {history.map((completion, index) => (
                 <li key={completion.id} className="flex min-h-12 items-center gap-3 px-4 py-2">
                   <span className="min-w-0 flex-1 text-sm">
@@ -152,7 +152,7 @@ function SheetBody({
                   </span>
                   {/* Only the most recent time can be taken back */}
                   {index === 0 && (
-                    <Button variant="ghost" className="h-10 px-3" onClick={() => onUndo(chore.id)}>
+                    <Button variant="soft" size="sm" onClick={() => onUndo(chore.id)}>
                       Undo
                     </Button>
                   )}

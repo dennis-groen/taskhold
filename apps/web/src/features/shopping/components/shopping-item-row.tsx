@@ -4,7 +4,6 @@ import { useId } from "react";
 import { UserAvatar } from "@/components/user-avatar.tsx";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
 
 import type { ShoppingItem } from "../shopping.api.ts";
 
@@ -12,12 +11,15 @@ export function ShoppingItemRow({
   item,
   viewerId,
   settling = false,
+  fresh = false,
   onToggle,
   onRemove,
 }: {
   item: ShoppingItem;
   /** Just ticked or unticked here, and held in place for a moment (see useSettlingItems) */
   settling?: boolean;
+  /** Just added here: it lights up once, so you can see where sorting put it */
+  fresh?: boolean;
   viewerId: string;
   onToggle: (checked: boolean) => void;
   onRemove: () => void;
@@ -30,8 +32,9 @@ export function ShoppingItemRow({
 
   return (
     <li
+      data-fresh={fresh || undefined}
       data-settling={settling ? (item.checked ? "checked" : "open") : undefined}
-      className="flex min-h-13 items-center overflow-hidden pr-1"
+      className="group/row flex min-h-14 items-center overflow-hidden pr-1 transition-colors hover:bg-muted/40 has-[label:active]:bg-muted/70 data-fresh:animate-[row-fresh_1600ms_ease-out]"
     >
       <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 self-stretch py-3 pl-4">
         <Checkbox
@@ -39,16 +42,12 @@ export function ShoppingItemRow({
           aria-labelledby={item.quantity ? `${nameId} ${quantityId}` : nameId}
           checked={item.checked}
           onCheckedChange={(checked) => onToggle(checked)}
-          className="size-6 rounded-full [&_svg]:size-4"
+          variant="tick"
         />
-        <span
-          id={nameId}
-          className={cn(
-            "min-w-0 flex-1 text-base break-words",
-            item.checked && "text-muted-foreground line-through",
-          )}
-        >
-          {item.name}
+        <span id={nameId} className="min-w-0 flex-1 text-base break-words">
+          <span className="tick-label" data-done={item.checked || undefined}>
+            {item.name}
+          </span>
         </span>
         {other && (
           <span
@@ -62,7 +61,10 @@ export function ShoppingItemRow({
           </span>
         )}
         {item.quantity && (
-          <span id={quantityId} className="shrink-0 text-sm text-muted-foreground tabular-nums">
+          <span
+            id={quantityId}
+            className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[0.8125rem] font-medium text-muted-foreground tabular-nums"
+          >
             {item.quantity}
           </span>
         )}
@@ -71,10 +73,11 @@ export function ShoppingItemRow({
         variant="ghost"
         size="icon-lg"
         aria-label={`Remove ${item.name}`}
-        className="shrink-0 text-muted-foreground hover:text-destructive"
+        // Quieter than the item: a column of crosses shouldn't out-shout what's on the list
+        className="shrink-0 text-muted-foreground/75 hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive"
         onClick={onRemove}
       >
-        <XIcon />
+        <XIcon className="size-[1.125rem]" />
       </Button>
     </li>
   );

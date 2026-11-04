@@ -102,7 +102,7 @@ features/
     hooks/                use-todos: the to-dos plus optimistic changes
     components/           to-do form, row, sheet (with move to chores), new-to-do drawer, add button
     pages/                Personal page
-components/               shared: shadcn ui/, layout/ (household shell with nav, onboarding app shell, page heading, group), theme provider and toggle, small app-wide pieces (add row, shared-with line, confirm dialog, avatar)
+components/               shared: shadcn ui/ (extended with taskhold variants, see apps/web/DESIGN.md), layout/ (household shell with nav, onboarding app shell, page heading, group, empty state), theme provider and toggle, small app-wide pieces (add row, shared-with line, confirm dialog, avatar, wordmark, page skeleton)
 lib/                      shared: RPC client and errorMessage(), dates (due groups and labels), theme context and useTheme(), utils
 ```
 

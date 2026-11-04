@@ -2,7 +2,7 @@ import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 
 import { choresQuery } from "@/features/chores/chores.queries.ts";
 import { ChoresPage } from "@/features/chores/pages/chores-page.tsx";
-import { otherFirstNames } from "@/lib/shared-with.ts";
+import { otherHousemates } from "@/lib/shared-with.ts";
 
 const householdRoute = getRouteApi("/_household");
 
@@ -18,7 +18,7 @@ function ChoresRoute() {
     <ChoresPage
       viewer={user}
       members={household.members}
-      otherMembers={otherFirstNames(household.members, user.id)}
+      otherMembers={otherHousemates(household.members, user.id)}
     />
   );
 }

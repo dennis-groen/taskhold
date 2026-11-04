@@ -72,9 +72,12 @@ function ReminderSettings({
       <GroupHeading>Chore reminders</GroupHeading>
       <Group>
         <div className="flex min-h-14 items-start gap-3 px-4 py-3">
-          <BellRingingIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+          <BellRingingIcon
+            className="mt-0.5 size-5 shrink-0 text-primary-soft-foreground"
+            weight="duotone"
+          />
           <div className="min-w-0 flex-1">
-            <label htmlFor={switchId} className="block text-base">
+            <label htmlFor={switchId} className="block text-base font-semibold">
               Remind me on this device
             </label>
             <p className="mt-0.5 text-sm text-pretty text-muted-foreground">
@@ -107,7 +110,7 @@ function ReminderSettings({
           <>
             <div className="flex min-h-14 items-center gap-3 px-4 py-2.5">
               <label htmlFor={timeId} className="min-w-0 flex-1">
-                <span className="block text-base">Time</span>
+                <span className="block text-base font-semibold">Time</span>
                 <span className="block text-sm text-muted-foreground">
                   Every day, {settings.timeZone.replaceAll("_", " ")} time
                 </span>

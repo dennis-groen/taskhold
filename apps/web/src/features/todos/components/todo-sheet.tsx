@@ -87,7 +87,7 @@ function SheetBody({
   return (
     <>
       <DrawerHeader className="px-5 pt-5 text-left">
-        <DrawerTitle className="text-lg font-semibold break-words">{todo.name}</DrawerTitle>
+        <DrawerTitle className="break-words">{todo.name}</DrawerTitle>
         <DrawerDescription>Only you can see this.</DrawerDescription>
       </DrawerHeader>
 
@@ -101,12 +101,17 @@ function SheetBody({
           }}
           footer={
             <div className="flex flex-col gap-2">
+              <p className="text-sm text-pretty text-muted-foreground">
+                Moving makes it a one-off chore that everyone in your household can see.
+                {todo.notes && " Its notes aren't shared: they're deleted with the to-do."}
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="outline"
+                  size="xl"
                   disabled={moving}
-                  className="h-12 flex-1 px-4"
+                  className="flex-1"
                   onClick={() => void move()}
                 >
                   {moving ? <Spinner /> : <HouseIcon />}
@@ -115,7 +120,7 @@ function SheetBody({
                 <Button
                   type="button"
                   variant="destructive"
-                  className="h-12 px-4"
+                  size="xl"
                   onClick={() => {
                     onDelete();
                     onClose();
@@ -125,10 +130,6 @@ function SheetBody({
                   Delete
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Moving makes it a one-off chore that everyone in your household can see.
-                {todo.notes && " Its notes aren't shared: they're deleted with the to-do."}
-              </p>
               {moveError && (
                 <p role="alert" className="text-sm text-destructive">
                   {moveError}

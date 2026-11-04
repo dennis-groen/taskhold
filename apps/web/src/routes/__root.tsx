@@ -36,6 +36,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     return { viewer };
   },
   component: RootLayout,
+  // Before anything is known about the person there's no page shape to show yet
+  pendingComponent: () => <div className="min-h-dvh bg-canvas" />,
   errorComponent: ({ error }) => (
     <RootError unreachable={error instanceof ViewerUnavailableError} />
   ),

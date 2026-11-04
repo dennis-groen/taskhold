@@ -33,13 +33,13 @@ export function GoogleSignInButton({
       <Button
         type="button"
         variant="outline"
-        size="lg"
+        size="xl"
         disabled={pending}
         onClick={() => void signIn()}
-        className={cn("h-12 w-full gap-3 text-base", className)}
+        className={cn("w-full gap-3 font-semibold", className)}
       >
         {pending ? <Spinner /> : <GoogleLogo />}
-        Login with Google
+        Sign in with Google
       </Button>
       {error && (
         <p role="alert" className="mt-2 text-sm text-destructive">

@@ -1,4 +1,4 @@
-import { PlusIcon } from "@phosphor-icons/react";
+import { CheckIcon, PlusIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useRef, useState, type FormEvent, type RefObject } from "react";
@@ -13,7 +13,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 
 import { useAddItem } from "../hooks/use-shopping-list.ts";
 import type { ShoppingListSummary } from "../shopping.api.ts";
@@ -33,14 +33,9 @@ export function QuickAdd({ viewer }: { viewer: { id: string; name: string } }) {
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger
-        render={
-          <Button
-            aria-label="Add to a shopping list"
-            className="size-14 rounded-full shadow-lg shadow-primary/25"
-          />
-        }
+        render={<Button aria-label="Add to a shopping list" variant="fab" size="fab" />}
       >
-        <PlusIcon className="size-7" weight="bold" />
+        <PlusIcon weight="bold" />
       </DrawerTrigger>
       <DrawerContent className="mx-auto max-w-[640px]" initialFocus={nameRef}>
         <DrawerHeader className="sr-only">
@@ -81,7 +76,12 @@ function QuickAddForm({
   const [added, setAdded] = useState<{ count: number; text: string } | null>(null);
   const add = useAddItem(viewer);
 
-  if (!lists) return <div className="h-40" />;
+  if (!lists)
+    return (
+      <div className="flex h-40 items-center justify-center text-muted-foreground">
+        <Spinner />
+      </div>
+    );
 
   if (lists.length === 0) {
     return (
@@ -122,7 +122,7 @@ function QuickAddForm({
           maxLength={100}
           autoComplete="off"
           enterKeyHint="done"
-          className="h-12 min-w-0 flex-1 px-4 text-base md:text-base"
+          className="h-12 min-w-0 flex-1 rounded-xl px-4 text-base md:text-base"
         />
         <Input
           aria-label="Quantity"
@@ -132,16 +132,20 @@ function QuickAddForm({
           maxLength={20}
           autoComplete="off"
           enterKeyHint="done"
-          className="h-12 w-20 shrink-0 px-3 text-base tabular-nums md:text-base"
+          className="h-12 w-20 shrink-0 rounded-xl px-3 text-base tabular-nums md:text-base"
         />
-        <Button type="submit" disabled={!name.trim()} className="h-12 shrink-0 px-5">
+        <Button type="submit" size="xl" disabled={!name.trim()}>
           Add
         </Button>
       </div>
 
       <div className="h-6 pt-1.5 text-sm" aria-live="polite">
         {added && (
-          <span key={added.count} className="text-primary animate-in fade-in">
+          <span
+            key={added.count}
+            className="inline-flex items-center gap-1 font-medium text-primary-soft-foreground animate-in fade-in slide-in-from-bottom-1 duration-200"
+          >
+            <CheckIcon className="size-4" weight="bold" aria-hidden />
             {added.text}
           </span>
         )}
@@ -157,15 +161,15 @@ function QuickAddForm({
                 <Button
                   key={list.id}
                   type="button"
-                  variant={active ? "default" : "outline"}
+                  variant="chip"
                   aria-pressed={active}
                   onClick={() => {
                     setPicked(list.id);
                     nameRef.current?.focus();
                   }}
-                  className={cn("h-11 rounded-full px-4")}
+                  className="h-11 max-w-full"
                 >
-                  {list.name}
+                  <span className="truncate">{list.name}</span>
                 </Button>
               );
             })}

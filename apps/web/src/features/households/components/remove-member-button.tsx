@@ -22,7 +22,7 @@ export function RemoveMemberButton({
           variant="ghost"
           size="sm"
           aria-label={`Remove ${member.name}`}
-          className="-mr-2 text-muted-foreground hover:text-destructive"
+          className="-mr-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
         >
           Remove
         </Button>

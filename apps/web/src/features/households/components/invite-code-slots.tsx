@@ -33,7 +33,7 @@ export function InviteCodeSlots({
       index={index}
       aria-invalid={invalid || undefined}
       className={cn(
-        "size-10 text-lg font-semibold sm:size-12 sm:text-xl",
+        "size-[2.125rem] text-lg font-semibold min-[360px]:size-9 min-[400px]:size-10 sm:size-12 sm:text-xl",
         reveal &&
           "animate-in duration-500 ease-out fade-in fill-mode-both slide-in-from-bottom-2 motion-reduce:animate-none",
       )}

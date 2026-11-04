@@ -39,7 +39,7 @@ export function NewChoreDrawer({
       <DrawerTrigger render={trigger} />
       <DrawerContent className="mx-auto max-w-[640px]" initialFocus={nameRef}>
         <DrawerHeader className="px-5 pt-5 text-left">
-          <DrawerTitle className="text-lg font-semibold">New chore</DrawerTitle>
+          <DrawerTitle>New chore</DrawerTitle>
           <DrawerDescription className="sr-only">
             Name the chore, choose how often it repeats, when it's due and who it's for.
           </DrawerDescription>

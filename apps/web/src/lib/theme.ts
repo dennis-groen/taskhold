@@ -1,11 +1,14 @@
 import { createContext, use } from "react";
 
 export type Theme = "light" | "dark";
+/** What the person picked: a theme, or "system" to follow the device */
+export type ThemeChoice = Theme | "system";
 
 export type ThemeContextValue = {
   /** The theme on screen: the person's choice, or their system's when they haven't chosen */
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  choice: ThemeChoice;
+  setChoice: (choice: ThemeChoice) => void;
 };
 
 export const ThemeContext = createContext<ThemeContextValue | null>(null);

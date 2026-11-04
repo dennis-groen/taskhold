@@ -80,6 +80,7 @@ export function useShoppingList(listId: string, viewer: Person) {
     list,
     /** Someone deleted the list while it was open */
     gone: isListGone(refetchError),
+    /** Returns the new item's id */
     add: (name: string, quantity: string | null) => add(listId, name, quantity),
     toggle: (itemId: string, checked: boolean) => toggle.mutate({ listId, itemId, checked }),
     remove: (itemId: string) => {
@@ -121,8 +122,11 @@ export function useAddItem(viewer: Person) {
       ...items,
     ],
   });
-  return (listId: string, name: string, quantity: string | null) =>
-    add.mutate({ listId, id: crypto.randomUUID(), name, quantity });
+  return (listId: string, name: string, quantity: string | null) => {
+    const id = crypto.randomUUID();
+    add.mutate({ listId, id, name, quantity });
+    return id;
+  };
 }
 
 function useListChange<Vars extends { listId: string }>({
