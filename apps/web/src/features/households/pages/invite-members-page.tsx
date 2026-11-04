@@ -17,7 +17,9 @@ import { cn } from "@/lib/utils";
 
 import { HouseholdMembers } from "../components/household-members.tsx";
 import { InviteCodeSlots } from "../components/invite-code-slots.tsx";
+import { NeedsConnection } from "../components/needs-connection.tsx";
 import { NewInviteCodeButton } from "../components/new-invite-code-button.tsx";
+import { isSavedHousehold, type Household } from "../households.api.ts";
 import { formatInviteCode, inviteLink } from "../invite-code.ts";
 
 const householdRoute = getRouteApi("/_household");
@@ -29,6 +31,14 @@ const canShare =
 
 export function InviteMembersPage() {
   const household = householdRoute.useLoaderData();
+  // The invite code is never kept on the device
+  if (isSavedHousehold(household)) {
+    return <NeedsConnection title="Invite people" householdName={household.name} />;
+  }
+  return <Invite household={household} />;
+}
+
+function Invite({ household }: { household: Household }) {
   const { user } = householdRoute.useRouteContext();
   const { created } = routeApi.useSearch();
   const [copied, setCopied] = useState<"link" | "code" | null>(null);

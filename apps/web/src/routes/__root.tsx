@@ -1,10 +1,17 @@
-import type { QueryClient } from "@tanstack/react-query";
-import { Outlet, createRootRouteWithContext, redirect } from "@tanstack/react-router";
+import { onlineManager, type QueryClient } from "@tanstack/react-query";
+import { Outlet, createRootRouteWithContext, redirect, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { RootError } from "@/components/root-error.tsx";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdatePrompt } from "@/components/update-prompt.tsx";
-import { ViewerUnavailableError, fetchViewer } from "@/features/auth/auth.api.ts";
+import { ViewerUnavailableError, fetchViewer, type Viewer } from "@/features/auth/auth.api.ts";
+import {
+  keepForOffline,
+  keptForOffline,
+  openOfflineCache,
+  openSavedCopy,
+} from "@/lib/offline-cache.ts";
 
 import "@/styles/globals.css";
 
@@ -17,8 +24,8 @@ function isSetupPath(path: string) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  beforeLoad: async ({ location }) => {
-    const viewer = await fetchViewer();
+  beforeLoad: async ({ context, location }) => {
+    const { viewer, offline } = await whoIsSignedIn(context.queryClient);
     const path = location.pathname;
 
     if (!viewer.user) {
@@ -33,7 +40,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       throw redirect({ to: "/lists" });
     }
 
-    return { viewer };
+    return { viewer, offline };
   },
   component: RootLayout,
   // Before anything is known about the person there's no page shape to show yet
@@ -43,7 +50,64 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   ),
 });
 
+// How often to ask again while open from the device and the browser says it's online: the server
+// may have been down rather than the connection
+const RECHECK = Temporal.Duration.from({ seconds: 30 });
+
+/**
+ * Asks the API who is signed in, and brings back their lists and waiting changes from the device.
+ * When the API can't be reached, the app opens from the copy on the device instead (`offline`),
+ * as the person who was signed in when it was saved, if they were in a household. Without such a
+ * copy the error stands, and the app says it can't reach taskhold.
+ */
+async function whoIsSignedIn(
+  queryClient: QueryClient,
+): Promise<{ viewer: Viewer; offline: boolean }> {
+  let viewer: Viewer;
+  try {
+    viewer = await fetchViewer();
+  } catch (error) {
+    if (!(error instanceof ViewerUnavailableError)) throw error;
+    await openSavedCopy(queryClient);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- kept below, from fetchViewer
+    const kept = keptForOffline(queryClient, "viewer") as Viewer | undefined;
+    if (!kept?.user || !kept.household) throw error;
+    return { viewer: kept, offline: true };
+  }
+  // Someone else, or nobody, drops what was saved for the last person
+  await openOfflineCache(queryClient, viewer.user?.id ?? null);
+  if (viewer.user) keepForOffline(queryClient, "viewer", viewer);
+  return { viewer, offline: false };
+}
+
+/**
+ * While the app is open from the copy on the device, asks again who is signed in once the
+ * connection is back, or the app is opened again. Then pages load from the API again, and the
+ * copy is dropped if the person was signed out in the meantime.
+ */
+function useRecheckWhenOnline() {
+  const { offline } = Route.useRouteContext();
+  const router = useRouter();
+  useEffect(() => {
+    if (!offline) return undefined;
+    const recheck = () => {
+      if (onlineManager.isOnline() && document.visibilityState === "visible") {
+        void router.invalidate();
+      }
+    };
+    const unsubscribe = onlineManager.subscribe(recheck);
+    document.addEventListener("visibilitychange", recheck);
+    const timer = setInterval(recheck, RECHECK.total("milliseconds"));
+    return () => {
+      unsubscribe();
+      document.removeEventListener("visibilitychange", recheck);
+      clearInterval(timer);
+    };
+  }, [offline, router]);
+}
+
 function RootLayout() {
+  useRecheckWhenOnline();
   return (
     <>
       <Outlet />

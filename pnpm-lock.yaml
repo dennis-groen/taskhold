@@ -200,6 +200,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15))
+      '@tanstack/query-persist-client-core':
+        specifier: 5.105.2
+        version: 5.105.2
       '@tanstack/react-query':
         specifier: ^5.105.2
         version: 5.105.2(@types/react@19.3.0)(react@19.3.1)
@@ -1948,6 +1951,9 @@ packages:
 
   '@tanstack/query-core@5.105.2':
     resolution: {integrity: sha512-cyZGOtI1ZZ79mm905PJ42ng43Mwbc9CeqB83XuJmj9ADj/C+dzUXcgMQucRQ8yZs7atHykMzqavAXXhjxAw50g==}
+
+  '@tanstack/query-persist-client-core@5.105.2':
+    resolution: {integrity: sha512-qQa9wzw/2J1gWH5aMLJDpMH9iS98tTHzPc45L9NjrwF6KbkC24gC7YfFO66AOE5C5iGKaersjFfr/yMPERhwiQ==}
 
   '@tanstack/react-query@5.105.2':
     resolution: {integrity: sha512-K7MMGdVIgsQ41o6TI0fXD75aRCDNBLEKP80FvhvuwFkgiC36+rd8/JI5BYufLpfbZ3/sFTcYnotWxJqDxV/9dQ==}
@@ -6002,6 +6008,10 @@ snapshots:
   '@tanstack/history@1.162.5': {}
 
   '@tanstack/query-core@5.105.2': {}
+
+  '@tanstack/query-persist-client-core@5.105.2':
+    dependencies:
+      '@tanstack/query-core': 5.105.2
 
   '@tanstack/react-query@5.105.2(@types/react@19.3.0)(react@19.3.1)':
     dependencies:

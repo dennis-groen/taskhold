@@ -11,12 +11,19 @@ import { useCallback } from "react";
 import { HouseholdShell } from "@/components/layout/household-shell.tsx";
 import { choreKeys } from "@/features/chores/chores.queries.ts";
 import { AddChoreButton } from "@/features/chores/components/add-chore-button.tsx";
-import { fetchCurrentHousehold } from "@/features/households/households.api.ts";
+import { ViewerUnavailableError } from "@/features/auth/auth.api.ts";
+import {
+  fetchCurrentHousehold,
+  householdSummary,
+  type Household,
+  type SavedHousehold,
+} from "@/features/households/households.api.ts";
 import { QuickAdd } from "@/features/shopping/components/quick-add.tsx";
 import { shoppingKeys } from "@/features/shopping/shopping.queries.ts";
 import { AddTodoButton } from "@/features/todos/components/add-todo-button.tsx";
 import { todoKeys } from "@/features/todos/todos.queries.ts";
 import { useLiveUpdates, type LiveMessage } from "@/lib/live-updates.ts";
+import { keepForOffline, keptForOffline } from "@/lib/offline-cache.ts";
 
 // Pages for people who belong to a household; loads that household once for all of them
 export const Route = createFileRoute("/_household")({
@@ -24,9 +31,24 @@ export const Route = createFileRoute("/_household")({
     const { user, household } = context.viewer;
     if (!user) throw redirect({ to: "/" });
     if (!household) throw redirect({ to: "/onboarding" });
-    return { user };
+    return { user, householdId: household.id };
   },
-  loader: () => fetchCurrentHousehold(),
+  loader: async ({ context }): Promise<Household | SavedHousehold> => {
+    const { queryClient, offline, householdId } = context;
+    if (offline) {
+      // Opened without a connection: the member names kept on the device are enough for lists,
+      // chores and to-dos
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- kept below, from householdSummary
+      const kept = keptForOffline(queryClient, "household") as
+        | Omit<SavedHousehold, "offline">
+        | undefined;
+      if (kept?.id !== householdId) throw new ViewerUnavailableError();
+      return { ...kept, offline: true };
+    }
+    const household = await fetchCurrentHousehold();
+    keepForOffline(queryClient, "household", householdSummary(household));
+    return household;
+  },
   component: HouseholdLayout,
 });
 

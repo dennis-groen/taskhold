@@ -18,9 +18,10 @@ export class ViewerUnavailableError extends Error {
 const RETRY_DELAYS_MS = [500, 1_000, 2_000];
 
 /**
- * Throws ViewerUnavailableError when the API can't be reached, so the app shows that instead of
- * sending a signed-in person to the sign-in page. Protected pages stay closed either way.
- * Network failures and server errors are retried a few times first.
+ * Throws ViewerUnavailableError when the API can't be reached, so the app shows that (or opens
+ * from the copy on the device) instead of sending a signed-in person to the sign-in page.
+ * Network failures and server errors are retried a few times first, unless the browser says it's
+ * offline: then the app opens from the device straight away, and asks again once it's back.
  */
 export async function fetchViewer(): Promise<Viewer> {
   for (let attempt = 0; ; attempt++) {
@@ -28,7 +29,7 @@ export async function fetchViewer(): Promise<Viewer> {
       return await parseResponse(api.viewer.$get());
     } catch (error) {
       const delay = RETRY_DELAYS_MS[attempt];
-      if (delay === undefined || !isTransient(error)) {
+      if (delay === undefined || !isTransient(error) || !navigator.onLine) {
         throw new ViewerUnavailableError({ cause: error });
       }
       await new Promise((resolve) => setTimeout(resolve, delay));

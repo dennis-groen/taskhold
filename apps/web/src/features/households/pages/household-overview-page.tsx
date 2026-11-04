@@ -9,8 +9,9 @@ import { UserAvatar } from "@/components/user-avatar.tsx";
 
 import { HouseholdMembers } from "../components/household-members.tsx";
 import { LeaveHouseholdButton } from "../components/leave-household-button.tsx";
+import { NeedsConnection } from "../components/needs-connection.tsx";
 import { RemoveMemberButton } from "../components/remove-member-button.tsx";
-import type { Household } from "../households.api.ts";
+import { isSavedHousehold, type Household } from "../households.api.ts";
 
 const householdRoute = getRouteApi("/_household");
 
@@ -18,16 +19,29 @@ const householdRoute = getRouteApi("/_household");
  * `accountAction` is the sign-out button and `deleteAccount` the delete-account button, which
  * belong to the auth feature; `reminders` is the reminders feature's settings
  */
-export function HouseholdOverviewPage({
-  accountAction,
-  deleteAccount,
-  reminders,
-}: {
+export function HouseholdOverviewPage(props: {
   accountAction?: ReactNode;
   deleteAccount?: (household: Household, currentUserId: string) => ReactNode;
   reminders?: ReactNode;
 }) {
   const household = householdRoute.useLoaderData();
+  if (isSavedHousehold(household)) {
+    return <NeedsConnection title="Household" householdName={household.name} />;
+  }
+  return <Overview household={household} {...props} />;
+}
+
+function Overview({
+  household,
+  accountAction,
+  deleteAccount,
+  reminders,
+}: {
+  household: Household;
+  accountAction?: ReactNode;
+  deleteAccount?: (household: Household, currentUserId: string) => ReactNode;
+  reminders?: ReactNode;
+}) {
   const { user } = householdRoute.useRouteContext();
   const isOwner = household.members.some(
     (member) => member.id === user.id && member.role === "owner",

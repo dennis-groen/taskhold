@@ -13,6 +13,35 @@ export async function fetchCurrentHousehold(): Promise<Household> {
   return (await parseResponse(households.current.$get())).household;
 }
 
+/**
+ * The household as kept on the device, so shopping, chores and to-dos can open without a
+ * connection: its name and who is in it. Never the invite code. Pages that need more (the
+ * household and invite pages) say they need a connection instead.
+ */
+export type SavedHousehold = {
+  id: string;
+  name: string;
+  members: { id: string; name: string; image: null }[];
+  offline: true;
+};
+
+/** What's kept on the device of a household loaded from the API */
+export function householdSummary(household: Household): Omit<SavedHousehold, "offline"> {
+  return {
+    id: household.id,
+    name: household.name,
+    // Pictures wouldn't load offline anyway; faces show initials instead
+    members: household.members.map(({ id, name }) => ({ id, name, image: null })),
+  };
+}
+
+/** True for a household from the device, opened without a connection */
+export function isSavedHousehold(
+  household: Household | SavedHousehold,
+): household is SavedHousehold {
+  return "offline" in household;
+}
+
 export async function createHousehold(name: string): Promise<Household> {
   return (await parseResponse(households.$post({ json: { name } }))).household;
 }
