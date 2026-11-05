@@ -103,6 +103,41 @@ describe("shopping changes kept on the device", () => {
     expect(after.isMutating()).toBe(0);
   });
 
+  it("shows an edit made offline straight away and sends it after a restart", async () => {
+    onlineManager.setOnline(false);
+    const before = appClient();
+    before.setQueryData(listQuery("list").queryKey, list);
+
+    change(before, "edit", { listId: "list", itemId: "milk", changes: { quantity: "2" } });
+    await vi.waitFor(() =>
+      expect(before.getQueryData(listQuery("list").queryKey)?.items[0]?.quantity).toBe("2"),
+    );
+
+    const after = saveAndRestart(before);
+    expect(after.getQueryData(listQuery("list").queryKey)?.items[0]).toMatchObject({
+      name: "Milk",
+      quantity: "2",
+    });
+
+    api.updateItem.mockResolvedValue({});
+    onlineManager.setOnline(true);
+    await after.resumePausedMutations();
+
+    // Only the field that changed, so a housemate's rename at the same time isn't undone
+    expect(api.updateItem).toHaveBeenCalledExactlyOnceWith("list", "milk", { quantity: "2" });
+  });
+
+  it("puts an item back as it was when the API turns the edit down", async () => {
+    const queryClient = appClient();
+    queryClient.setQueryData(listQuery("list").queryKey, list);
+    api.updateItem.mockRejectedValue(new Error("This item isn't on the list anymore."));
+
+    change(queryClient, "edit", { listId: "list", itemId: "milk", changes: { name: "Oat milk" } });
+    await vi.waitFor(() => expect(api.updateItem).toHaveBeenCalled());
+    await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0));
+    expect(queryClient.getQueryData(listQuery("list").queryKey)?.items[0]?.name).toBe("Milk");
+  });
+
   it("resends a tick whose request was on its way, but not a removal", async () => {
     const before = appClient();
     before.setQueryData(listQuery("list").queryKey, list);

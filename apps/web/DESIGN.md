@@ -33,7 +33,7 @@ Browser surfaces are themed too: `::selection`, `caret-color`, `scrollbar-color`
 
 ## Components
 
-- `Button` variants: `default`, `soft`, `outline`, `secondary`, `ghost`, `destructive`, `link`, plus **`chip`** (rounded toggle, 44px tall; selected with `aria-pressed`, which adds a faint primary edge), **`fab`** (the round + button) and **`destructive-ghost`** (red text that opens a confirmation: Delete list, Delete account). Sizes: `sm` 32px (with an invisible hit area to 44px), `default` 40px, `lg` 44px, `xl` 48px (a sheet's main action), `icon*`, `fab` 56px. Use the size scale rather than `h-*` overrides.
+- `Button` variants: `default`, `soft`, `outline`, `secondary`, `ghost`, `destructive`, `link`, plus **`chip`** (rounded toggle, 44px tall; selected with `aria-pressed`, which adds a faint primary edge), **`fab`** (the round + button) and **`destructive-ghost`** (quiet red text for taking something away: Delete list and Delete account open a confirmation, Remove from list offers Undo). Sizes: `sm` 32px (with an invisible hit area to 44px), `default` 40px, `lg` 44px, `xl` 48px (a sheet's main action), `icon*` (`icon-xl` 48px sits beside a sheet's fields, e.g. the − and + by a quantity), `fab` 56px. Use the size scale rather than `h-*` overrides.
 - `Checkbox variant="tick"`: the 24px round circle on every list row, its edge at least 3:1 against the card, with a 48px hit area. Its check mark pops in (`check-pop`).
 - Focus: rings are `ring-ring/80` (3:1 or better in both themes). Tappable rows that run edge to edge use an inset ring (`focus-visible:ring-2 ring-inset`) plus their tint, never the tint alone.
 - `ConnectionStatus` (`components/ConnectionStatus.tsx`): a dark pill at the top while offline, counting changes that are waiting to send.

@@ -7,7 +7,8 @@ import { cn } from "cn";
  * - `soft`: a tinted primary for secondary actions that still belong to the accent
  * - `chip`: a rounded toggle for filters and pickers; set aria-pressed to select it
  * - `fab`: the round + button in the nav
- * - `destructive-ghost`: a red text button that opens a confirmation (delete list, delete account)
+ * - `destructive-ghost`: quiet red text for taking something away; a confirmation or an Undo carries
+ *   the weight (delete list, delete account, remove an item)
  * Sizes step up to `xl` (48px), the height of a sheet's main action.
  */
 const buttonVariants = cva(
@@ -46,6 +47,8 @@ const buttonVariants = cva(
         "icon-sm":
           "relative size-8 after:absolute after:-inset-1.5 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-11 [&_svg:not([class*='size-'])]:size-5",
+        // Sits beside a sheet's 48px fields, e.g. the − and + by a quantity
+        "icon-xl": "size-12 rounded-xl [&_svg:not([class*='size-'])]:size-5",
         fab: "size-14 [&_svg:not([class*='size-'])]:size-7",
       },
     },

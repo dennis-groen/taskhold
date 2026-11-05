@@ -82,6 +82,14 @@ export function shoppingMutations(queryClient: QueryClient) {
         ),
     }),
 
+    // Sends only the fields that changed, so a housemate's edit to the other one stays
+    edit: listChange("edit", {
+      idempotent: true,
+      mutationFn: ({ listId, itemId, changes }: EditItem) => updateItem(listId, itemId, changes),
+      apply: (items, { itemId, changes }) =>
+        items.map((item) => (item.id === itemId ? { ...item, ...changes } : item)),
+    }),
+
     // The id comes from the app, so the API ignores a second copy
     add: listChange("add", {
       idempotent: true,
@@ -131,6 +139,8 @@ export function shoppingMutations(queryClient: QueryClient) {
 }
 
 export type ToggleItem = { listId: string; itemId: string; checked: boolean; by: Person };
+export type ItemChanges = { name?: string; quantity?: string | null };
+export type EditItem = { listId: string; itemId: string; changes: ItemChanges };
 export type NewItem = {
   listId: string;
   id: string;
@@ -143,6 +153,7 @@ export type NewItem = {
 export function registerShoppingMutations(queryClient: QueryClient): void {
   const changes = shoppingMutations(queryClient);
   resumable(queryClient, changes.toggle);
+  resumable(queryClient, changes.edit);
   resumable(queryClient, changes.add);
   resumable(queryClient, changes.remove);
   resumable(queryClient, changes.clearChecked);
