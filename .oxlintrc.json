@@ -12,7 +12,18 @@
     "es2024": true
   },
   "ignorePatterns": ["**/routeTree.gen.ts"],
+  "rules": {
+    // Named exports keep one name per thing across every import
+    "import/no-default-export": "error"
+  },
   "overrides": [
+    {
+      // Tool configs must export a default
+      "files": ["**/*.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
     {
       "files": ["apps/api/**"],
       "env": {
@@ -20,7 +31,7 @@
       }
     },
 
-    // API layering: routes -> service -> dal. Only DAL files query the database.
+    // API layering: routes -> service -> repo. Only repo files query the database.
     {
       "files": ["apps/api/src/features/**/*.routes.ts", "apps/api/src/features/**/*.middleware.ts"],
       "rules": {
@@ -29,12 +40,12 @@
           {
             "patterns": [
               {
-                "regex": "(\\.dal|\\.schema|/db/client)(\\.ts)?$",
-                "message": "The HTTP layer calls services. Only DAL files touch the database."
+                "regex": "(\\.repo|\\.table|/db/db)(\\.ts)?$",
+                "message": "The HTTP layer calls services. Only repo files touch the database."
               },
               {
                 "group": ["drizzle-orm", "drizzle-orm/*"],
-                "message": "The HTTP layer calls services. Only DAL files touch the database."
+                "message": "The HTTP layer calls services. Only repo files touch the database."
               }
             ]
           }
@@ -50,21 +61,21 @@
             "patterns": [
               {
                 "group": ["drizzle-orm", "drizzle-orm/*"],
-                "message": "Services hold business rules. Build queries in the feature's DAL."
+                "message": "Services hold business rules. Build queries in the feature's repo."
               },
               {
-                "regex": "\\.schema(\\.ts)?$",
+                "regex": "\\.table(\\.ts)?$",
                 "allowTypeImports": true,
-                "message": "Services hold business rules. Build queries in the feature's DAL."
+                "message": "Services hold business rules. Build queries in the feature's repo."
               },
               {
-                "regex": "/db/client(\\.ts)?$",
+                "regex": "/db/db(\\.ts)?$",
                 "importNames": ["db", "pool"],
-                "message": "Services query through the DAL. Use transaction() to group DAL calls."
+                "message": "Services query through the repo. Use transaction() to group repo calls."
               },
               {
-                "regex": "^\\.\\./[^/]+/[^/]+\\.dal(\\.ts)?$",
-                "message": "Call the other feature's service, never its DAL."
+                "regex": "^\\.\\./[^/]+/[^/]+\\.repo(\\.ts)?$",
+                "message": "Call the other feature's service, never its repo."
               }
             ]
           }
@@ -72,7 +83,7 @@
       }
     },
     {
-      "files": ["apps/api/src/features/**/*.dal.ts"],
+      "files": ["apps/api/src/features/**/*.repo.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -80,7 +91,7 @@
             "patterns": [
               {
                 "regex": "\\.(service|routes|middleware)(\\.ts)?$",
-                "message": "The DAL is the bottom layer. It can't call services or routes."
+                "message": "The repo is the bottom layer. It can't call services or routes."
               }
             ]
           }
@@ -88,7 +99,7 @@
       }
     },
     {
-      "files": ["apps/api/src/lib/**", "apps/api/src/config/**"],
+      "files": ["apps/api/src/lib/**", "apps/api/src/env.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -161,7 +172,7 @@
       }
     },
     {
-      // Files one folder down, e.g. features/households/pages/join-household-page.tsx
+      // Files one folder down, e.g. features/households/components/JoinHouseholdPage.tsx
       "files": ["apps/web/src/features/*/*/*.ts", "apps/web/src/features/*/*/*.tsx"],
       "rules": {
         "no-restricted-imports": [
@@ -186,7 +197,7 @@
       }
     },
     {
-      // Keep features flat: one level of folders (components/, pages/, hooks/) inside a feature
+      // Keep features flat: at most one folder (components/) inside a feature
       "files": ["apps/web/src/features/*/*/*/**"],
       "rules": {
         "no-restricted-imports": [
@@ -195,7 +206,7 @@
             "patterns": [
               {
                 "regex": ".*",
-                "message": "Keep feature folders one level deep (components/, pages/, hooks/), or split the feature."
+                "message": "Keep features flat: files at the root, components in components/. Or split the feature."
               }
             ]
           }

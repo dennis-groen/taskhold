@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 
-import { env } from "./config/env.ts";
-import { pool } from "./db/client.ts";
+import { env } from "./env.ts";
+import { pool } from "./db/db.ts";
 import { stopFeed } from "./lib/live-changes.ts";
 import { logger } from "./lib/logger.ts";
 import { describeError } from "./lib/wide-event.ts";

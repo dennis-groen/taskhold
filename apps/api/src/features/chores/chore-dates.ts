@@ -1,6 +1,6 @@
 // Pure date rules for chores. Due dates are Temporal.PlainDates: calendar days with no time or
 // time zone, so adding days or weeks never trips over a daylight saving change.
-import type { RepeatUnit } from "./chores.schema.ts";
+import type { RepeatUnit } from "./chores.table.ts";
 
 /** The date `every` days or weeks after `date` */
 export function addInterval(

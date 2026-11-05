@@ -1,65 +1,102 @@
-import { sql } from "drizzle-orm";
-import { check, index, integer, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
+// The feature's contract: request input and the shapes returned to clients, as zod schemas
+// and their inferred types. Response shapes are inferred from the Drizzle table columns.
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-orm/zod";
+import { z } from "zod";
 
-import { instant, now, plainDate } from "../../db/columns.ts";
+import { instantSchema, plainDateInputSchema, plainDateSchema } from "../../db/zod.ts";
+import { user } from "../auth/auth.table.ts";
+import { chore, choreCompletion } from "./chores.table.ts";
 
-import { user } from "../auth/auth.schema.ts";
-import { household } from "../households/households.schema.ts";
+const choreColumns = createSelectSchema(chore, {
+  dueOn: (schema) => schema.pipe(plainDateSchema),
+  createdAt: (schema) => schema.pipe(instantSchema),
+});
 
-export const repeatUnit = pgEnum("chore_repeat_unit", ["day", "week"]);
-export type RepeatUnit = (typeof repeatUnit.enumValues)[number];
+const completionColumns = createSelectSchema(choreCompletion, {
+  completedOn: (schema) => schema.pipe(plainDateSchema),
+  previousDueOn: (schema) => schema.pipe(plainDateSchema),
+  createdAt: (schema) => schema.pipe(instantSchema),
+});
 
-// Due dates are plain dates, with no time or timezone: "today" is whatever day it is for the
-// person looking, so the client says which date it is when it marks a chore done
-export const chore = pgTable(
-  "chore",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    householdId: text("household_id")
-      .notNull()
-      .references(() => household.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    // Both null for a one-off chore, both set for one that repeats every N days or weeks
-    repeatEvery: integer("repeat_every"),
-    repeatUnit: repeatUnit("repeat_unit"),
-    // When it's next due. A one-off chore may have none; a repeating one always has one.
-    dueOn: plainDate("due_on"),
-    // Who it's assigned to; anyone can still do it. Only meaningful while they're a member.
-    assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }),
-    createdAt: instant("created_at").default(now).notNull(),
-    updatedAt: instant("updated_at")
-      .default(now)
-      .$onUpdate(() => Temporal.Now.instant())
-      .notNull(),
-  },
-  (table) => [
-    index("chore_householdId_idx").on(table.householdId),
-    check(
-      "chore_repeat_check",
-      sql`(${table.repeatEvery} is null and ${table.repeatUnit} is null) or (${table.repeatEvery} > 0 and ${table.repeatUnit} is not null and ${table.dueOn} is not null)`,
-    ),
-  ],
-);
+const userColumns = createSelectSchema(user);
+const userSummarySchema = userColumns.pick({ id: true, name: true });
+const assigneeSchema = userColumns.pick({ id: true, name: true, image: true });
 
-// Every time a chore was done. The latest one can be undone, which puts the due date back.
-export const choreCompletion = pgTable(
-  "chore_completion",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    choreId: text("chore_id")
-      .notNull()
-      .references(() => chore.id, { onDelete: "cascade" }),
-    // People can leave or delete their account; what they did stays in the history
-    completedById: text("completed_by_id").references(() => user.id, { onDelete: "set null" }),
-    // The date where the person was when they did it, which the next due date counts from
-    completedOn: plainDate("completed_on").notNull(),
-    // The chore's due date before this completion moved it, so undoing can restore it
-    previousDueOn: plainDate("previous_due_on"),
-    createdAt: instant("created_at").default(now).notNull(),
-  },
-  (table) => [index("chore_completion_choreId_createdAt_idx").on(table.choreId, table.createdAt)],
-);
+export const repeatSchema = z
+  .object({
+    every: choreColumns.shape.repeatEvery
+      .unwrap()
+      .min(1, "Repeat at least every 1 day.")
+      .max(365, "Repeat at most every 365 days or weeks."),
+    unit: choreColumns.shape.repeatUnit.unwrap(),
+  })
+  .nullable();
+
+export const choreRecordSchema = choreColumns
+  .pick({ id: true, name: true, repeatEvery: true, repeatUnit: true, dueOn: true, createdAt: true })
+  .extend({ assignee: assigneeSchema.nullable() });
+
+export const completionRecordSchema = completionColumns
+  .pick({ id: true, choreId: true, completedOn: true, previousDueOn: true, createdAt: true })
+  .extend({ completedBy: userSummarySchema.nullable() });
+
+export const choreCompletionSchema = completionRecordSchema.pick({
+  id: true,
+  completedOn: true,
+  createdAt: true,
+  completedBy: true,
+});
+
+export const choreSchema = choreRecordSchema
+  .pick({ id: true, name: true, dueOn: true, assignee: true })
+  .extend({
+    repeat: repeatSchema,
+    lastCompletion: choreCompletionSchema.nullable(),
+    done: z.boolean(),
+  });
+
+export const choreDetailSchema = choreSchema.extend({ history: z.array(choreCompletionSchema) });
+
+export type Repeat = NonNullable<z.infer<typeof repeatSchema>>;
+export type ChoreRecord = z.infer<typeof choreRecordSchema>;
+export type CompletionRecord = z.infer<typeof completionRecordSchema>;
+export type ChoreCompletion = z.infer<typeof choreCompletionSchema>;
+export type Chore = z.infer<typeof choreSchema>;
+export type ChoreDetail = z.infer<typeof choreDetailSchema>;
+
+const choreName = (schema: z.ZodString) =>
+  schema.trim().min(1, "Give the chore a name.").max(60, "Keep the name under 60 characters.");
+
+const choreFields = {
+  name: choreName,
+  dueOn: () => plainDateInputSchema,
+  assigneeId: (schema: z.ZodString) => schema.min(1).max(64),
+};
+
+export const choreParam = z.object({
+  choreId: z.string().min(1).max(64),
+});
+
+export const createChoreBody = createInsertSchema(chore, choreFields)
+  .pick({ name: true, dueOn: true, assigneeId: true })
+  // Inserts make nullable columns optional; this API requires callers to send explicit values.
+  .required()
+  .extend({ repeat: repeatSchema });
+
+export const updateChoreBody = z
+  .object(
+    createUpdateSchema(chore, choreFields).pick({ name: true, dueOn: true, assigneeId: true })
+      .shape,
+  )
+  .extend({ repeat: repeatSchema.optional() })
+  .refine((body) => Object.values(body).some((value) => value !== undefined), {
+    message: "Nothing to change.",
+  });
+
+export const completeChoreBody = z.object({
+  /** What day it is where the person is */
+  today: plainDateInputSchema,
+});
+
+export type CreateChoreInput = z.output<typeof createChoreBody>;
+export type UpdateChoreInput = z.output<typeof updateChoreBody>;

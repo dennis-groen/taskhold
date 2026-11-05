@@ -1,0 +1,16 @@
+{
+  // `pnpm build`: emits src to dist, without the tests
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "rewriteRelativeImportExtensions": true,
+
+    /* Referenced by apps/web, which reads the RPC client types from the emitted .d.ts */
+    "composite": true,
+    "declarationMap": true
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

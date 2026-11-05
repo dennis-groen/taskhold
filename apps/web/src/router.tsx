@@ -2,7 +2,7 @@ import { QueryClient, onlineManager } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 
 // Import the generated route tree
-import { PageSkeleton } from "./components/page-skeleton.tsx";
+import { PageSkeleton } from "./components/PageSkeleton.tsx";
 import { registerChoreMutations } from "./features/chores/chores.mutations.ts";
 import { registerShoppingMutations } from "./features/shopping/shopping.mutations.ts";
 import { registerTodoMutations } from "./features/todos/todos.mutations.ts";

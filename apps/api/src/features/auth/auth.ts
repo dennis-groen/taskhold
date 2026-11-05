@@ -1,8 +1,8 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { betterAuth } from "better-auth";
 
-import { env } from "../../config/env.ts";
-import { db } from "../../db/client.ts";
+import { env } from "../../env.ts";
+import { db } from "../../db/db.ts";
 import * as schema from "../../db/schema.ts";
 import { logger } from "../../lib/logger.ts";
 import { appendToEvent, describeError, keepEvent } from "../../lib/wide-event.ts";

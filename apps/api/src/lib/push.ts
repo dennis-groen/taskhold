@@ -2,7 +2,7 @@
 // Payloads are encrypted for the receiving browser, so push services can't read them.
 import webPush from "web-push";
 
-import { env } from "../config/env.ts";
+import { env } from "../env.ts";
 import { logger } from "./logger.ts";
 import { describeError } from "./wide-event.ts";
 

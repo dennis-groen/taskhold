@@ -1,41 +1,57 @@
-import { index, pgTable, text } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
-import { instant, now, plainDate, plainTime } from "../../db/columns.ts";
+// Push services of the browsers that support Web Push. Only these get requests from the server,
+// so a made-up endpoint can't point it at another host.
+const PUSH_HOSTS = ["fcm.googleapis.com", "android.googleapis.com"];
+const PUSH_HOST_SUFFIXES = [".push.services.mozilla.com", ".notify.windows.com", ".push.apple.com"];
 
-import { user } from "../auth/auth.schema.ts";
+function isPushService(endpoint: string): boolean {
+  const url = URL.parse(endpoint);
+  if (url?.protocol !== "https:" || url.port !== "") return false;
+  return (
+    PUSH_HOSTS.includes(url.hostname) ||
+    PUSH_HOST_SUFFIXES.some((suffix) => url.hostname.endsWith(suffix))
+  );
+}
 
-// A browser or phone that gets chore reminders: the Web Push subscription it handed the app.
-// The endpoint is unique per browser, so signing in as someone else there moves it to them.
-export const pushSubscription = pgTable(
-  "push_subscription",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    endpoint: text("endpoint").notNull().unique(),
-    // The browser's public key and secret, which encrypt what we send so only it can read it
-    p256dh: text("p256dh").notNull(),
-    auth: text("auth").notNull(),
-    createdAt: instant("created_at").default(now).notNull(),
-  },
-  (table) => [index("push_subscription_userId_idx").on(table.userId)],
-);
+function isTimeZone(value: string): boolean {
+  try {
+    Temporal.Now.zonedDateTimeISO(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-// When a person wants their daily summary. Made the first time they turn reminders on.
-export const reminderSetting = pgTable("reminder_setting", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  // Local time of day in `timeZone`, the zone of the device they last turned reminders on from
-  remindAt: plainTime("remind_at").notNull(),
-  timeZone: text("time_zone").notNull(),
-  // The local date of the last summary, so each day gets at most one
-  lastSentOn: plainDate("last_sent_on"),
-  updatedAt: instant("updated_at")
-    .default(now)
-    .$onUpdate(() => Temporal.Now.instant())
-    .notNull(),
+const endpoint = z
+  .string()
+  .max(1024)
+  .refine(isPushService, "This isn't a push service we can send to.");
+
+// base64url, as PushSubscription.toJSON() gives them
+const key = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .regex(/^[\w-]+=*$/, "Not a valid key.");
+
+export const subscribeBody = z.object({
+  subscription: z.object({
+    endpoint,
+    keys: z.object({ p256dh: key(200), auth: key(64) }),
+  }),
+  // The device's IANA time zone, e.g. "Europe/Amsterdam"
+  timeZone: z.string().max(64).refine(isTimeZone, "Unknown time zone."),
 });
+
+export const unsubscribeBody = z.object({ endpoint: z.string().max(1024) });
+
+export const settingsBody = z.object({
+  // A time of day, "HH:MM"
+  remindAt: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time like 08:00.")
+    .transform((value) => Temporal.PlainTime.from(value)),
+});
+
+export type SubscribeInput = z.infer<typeof subscribeBody>;

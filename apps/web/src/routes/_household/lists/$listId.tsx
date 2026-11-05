@@ -1,7 +1,7 @@
 import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
 
-import { ListNotFound } from "@/features/shopping/components/list-not-found.tsx";
-import { ShoppingListPage } from "@/features/shopping/pages/shopping-list-page.tsx";
+import { ListNotFound } from "@/features/shopping/components/ListNotFound.tsx";
+import { ShoppingListPage } from "@/features/shopping/components/ShoppingListPage.tsx";
 import { isListGone, listQuery } from "@/features/shopping/shopping.queries.ts";
 import { otherHousemates } from "@/lib/shared-with.ts";
 

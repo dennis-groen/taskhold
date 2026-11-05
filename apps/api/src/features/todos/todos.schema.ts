@@ -1,30 +1,60 @@
-import { index, pgTable, text } from "drizzle-orm/pg-core";
+// The feature's contract: request input and the shapes returned to clients, as zod schemas
+// and their inferred types. Response shapes are inferred from the Drizzle table columns.
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-orm/zod";
+import { z } from "zod";
 
-import { instant, now, plainDate } from "../../db/columns.ts";
-import { user } from "../auth/auth.schema.ts";
+import { instantSchema, plainDateInputSchema, plainDateSchema } from "../../db/zod.ts";
+import { todo } from "./todos.table.ts";
 
-// Private to-dos belong to a person, not a household: only they can see them, and they keep them
-// when they leave or switch households
-export const todo = pgTable(
-  "todo",
-  {
-    // Clients may pick the id, so a to-do added optimistically keeps it once saved
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    notes: text("notes"),
-    dueOn: plainDate("due_on"),
-    // Null while it still needs doing
-    doneAt: instant("done_at"),
-    createdAt: instant("created_at").default(now).notNull(),
-    updatedAt: instant("updated_at")
-      .default(now)
-      .$onUpdate(() => Temporal.Now.instant())
-      .notNull(),
-  },
-  (table) => [index("todo_userId_idx").on(table.userId)],
-);
+const todoName = (schema: z.ZodString) =>
+  schema.trim().min(1, "Write what you need to do.").max(100, "Keep it under 100 characters.");
+
+const notes = (schema: z.ZodString) =>
+  schema
+    .trim()
+    .max(1000, "Keep notes under 1000 characters.")
+    .transform((value) => value || null);
+
+const todoFields = {
+  id: (schema: z.ZodString) => schema.pipe(z.uuid()),
+  name: todoName,
+  notes,
+  dueOn: () => plainDateInputSchema,
+};
+
+export const todoParam = z.object({
+  todoId: z.string().min(1).max(64),
+});
+
+export const createTodoBody = createInsertSchema(todo, todoFields)
+  .pick({
+    // Optional client-chosen id, so an optimistically added to-do keeps its identity
+    id: true,
+    name: true,
+    notes: true,
+    dueOn: true,
+  })
+  // Drizzle makes nullable/defaulted insert fields optional at runtime; mirror that in API types.
+  .partial({ id: true, notes: true, dueOn: true });
+
+export const updateTodoBody = z
+  .object(createUpdateSchema(todo, todoFields).pick({ name: true, notes: true, dueOn: true }).shape)
+  .extend({ done: z.boolean().optional() })
+  .refine((body) => Object.values(body).some((value) => value !== undefined), {
+    message: "Nothing to change.",
+  });
+
+export type CreateTodoInput = z.output<typeof createTodoBody>;
+export type UpdateTodoInput = z.output<typeof updateTodoBody>;
+
+const todoColumns = createSelectSchema(todo, {
+  dueOn: (schema) => schema.pipe(plainDateSchema),
+  doneAt: (schema) => schema.pipe(instantSchema),
+  createdAt: (schema) => schema.pipe(instantSchema),
+});
+
+export const todoSchema = todoColumns
+  .pick({ id: true, name: true, notes: true, dueOn: true, doneAt: true, createdAt: true })
+  .extend({ done: z.boolean() });
+
+export type Todo = z.infer<typeof todoSchema>;

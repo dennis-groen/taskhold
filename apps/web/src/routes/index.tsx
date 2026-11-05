@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { SignInPage } from "@/features/auth/pages/sign-in-page.tsx";
+import { SignInPage } from "@/features/auth/SignInPage.tsx";
 import { safeRedirect } from "@/features/auth/redirect.ts";
 
 export const Route = createFileRoute("/")({

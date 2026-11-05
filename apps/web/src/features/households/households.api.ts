@@ -1,4 +1,4 @@
-import { api, errorMessage, parseResponse, type InferResponseType } from "@/lib/api-client.ts";
+import { api, errorMessage, parseResponse, type InferResponseType } from "@/lib/api.ts";
 
 const households = api.households;
 

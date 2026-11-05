@@ -3,19 +3,24 @@
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
-import * as shoppingDal from "./shopping.dal.ts";
+import * as shoppingRepo from "./shopping.repo.ts";
 import { itemIdTaken, itemNotFound, listNotFound } from "./shopping.errors.ts";
-import type { ShoppingItem, ShoppingList, ShoppingListSummary } from "./shopping.types.ts";
-import type { AddItemInput, UpdateItemInput } from "./shopping.validation.ts";
+import type {
+  AddItemInput,
+  ShoppingItem,
+  ShoppingList,
+  ShoppingListSummary,
+  UpdateItemInput,
+} from "./shopping.schema.ts";
 
 export async function getLists(userId: string): Promise<ShoppingListSummary[]> {
   const household = await householdsService.getMembershipOf(userId);
-  return shoppingDal.findListsByHousehold(household.id);
+  return shoppingRepo.findListsByHousehold(household.id);
 }
 
 export async function createList(userId: string, name: string): Promise<ShoppingList> {
   const household = await householdsService.getMembershipOf(userId);
-  const { id } = await shoppingDal.insertList({ householdId: household.id, name });
+  const { id } = await shoppingRepo.insertList({ householdId: household.id, name });
   annotate("shopping", { list_id: id });
   await changed(household.id);
   return { id, name, items: [] };
@@ -23,7 +28,7 @@ export async function createList(userId: string, name: string): Promise<Shopping
 
 export async function getList(userId: string, listId: string): Promise<ShoppingList> {
   const { list } = await findListOf(userId, listId);
-  const items = await shoppingDal.findItems(list.id);
+  const items = await shoppingRepo.findItems(list.id);
   annotate("shopping", { item_count: items.length });
   return { id: list.id, name: list.name, items: items.map(toItem) };
 }
@@ -31,7 +36,7 @@ export async function getList(userId: string, listId: string): Promise<ShoppingL
 export async function renameList(userId: string, listId: string, name: string): Promise<void> {
   annotate("shopping", { list_id: listId });
   const household = await householdsService.getMembershipOf(userId);
-  const renamed = await shoppingDal.renameList({ householdId: household.id, listId }, name);
+  const renamed = await shoppingRepo.renameList({ householdId: household.id, listId }, name);
   if (!renamed) throw listNotFound();
   await changed(household.id);
 }
@@ -39,7 +44,7 @@ export async function renameList(userId: string, listId: string, name: string): 
 export async function deleteList(userId: string, listId: string): Promise<void> {
   annotate("shopping", { list_id: listId });
   const household = await householdsService.getMembershipOf(userId);
-  const deleted = await shoppingDal.deleteList({ householdId: household.id, listId });
+  const deleted = await shoppingRepo.deleteList({ householdId: household.id, listId });
   if (!deleted) throw listNotFound();
   await changed(household.id);
 }
@@ -52,7 +57,7 @@ export async function addItem(
   const { list, householdId } = await findListOf(userId, listId);
   const id = input.id ?? crypto.randomUUID();
   annotate("shopping", { item_id: id });
-  const inserted = await shoppingDal.insertItem({
+  const inserted = await shoppingRepo.insertItem({
     id,
     listId: list.id,
     name: input.name,
@@ -61,7 +66,7 @@ export async function addItem(
   });
 
   // Not inserted: either a retry of an add that already went through, or someone else's id
-  const item = await shoppingDal.findItem({ listId: list.id, itemId: id });
+  const item = await shoppingRepo.findItem({ listId: list.id, itemId: id });
   if (!item) throw inserted ? itemNotFound() : itemIdTaken();
   if (inserted) await changed(householdId);
   return toItem(item);
@@ -76,7 +81,7 @@ export async function updateItem(
   const itemRef = { listId: list.id, itemId: ref.itemId };
   annotate("shopping", { item_id: ref.itemId, checked: changes.checked });
 
-  const updated = await shoppingDal.updateItem(itemRef, {
+  const updated = await shoppingRepo.updateItem(itemRef, {
     name: changes.name,
     quantity: changes.quantity,
     // Checking records who and when; unchecking clears both
@@ -88,7 +93,7 @@ export async function updateItem(
   if (!updated) throw itemNotFound();
   await changed(householdId);
 
-  const item = await shoppingDal.findItem(itemRef);
+  const item = await shoppingRepo.findItem(itemRef);
   if (!item) throw itemNotFound();
   return toItem(item);
 }
@@ -100,14 +105,14 @@ export async function deleteItem(
 ): Promise<void> {
   const { list, householdId } = await findListOf(userId, ref.listId);
   annotate("shopping", { item_id: ref.itemId });
-  await shoppingDal.deleteItem({ listId: list.id, itemId: ref.itemId });
+  await shoppingRepo.deleteItem({ listId: list.id, itemId: ref.itemId });
   await changed(householdId);
 }
 
 /** Removes everything that's been checked off. Returns how many items went. */
 export async function clearCheckedItems(userId: string, listId: string): Promise<number> {
   const { list, householdId } = await findListOf(userId, listId);
-  const removed = await shoppingDal.deleteCheckedItems(list.id);
+  const removed = await shoppingRepo.deleteCheckedItems(list.id);
   annotate("shopping", { removed_count: removed });
   if (removed > 0) await changed(householdId);
   return removed;
@@ -116,7 +121,7 @@ export async function clearCheckedItems(userId: string, listId: string): Promise
 async function findListOf(userId: string, listId: string) {
   annotate("shopping", { list_id: listId });
   const household = await householdsService.getMembershipOf(userId);
-  const list = await shoppingDal.findList({ householdId: household.id, listId });
+  const list = await shoppingRepo.findList({ householdId: household.id, listId });
   if (!list) throw listNotFound();
   return { list, householdId: household.id };
 }
@@ -126,6 +131,6 @@ function changed(householdId: string) {
   return announce({ householdId, topic: "shopping" });
 }
 
-function toItem(record: shoppingDal.ItemRecord): ShoppingItem {
+function toItem(record: shoppingRepo.ItemRecord): ShoppingItem {
   return { ...record, checked: record.checkedAt !== null };
 }

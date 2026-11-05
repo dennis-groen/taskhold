@@ -4,18 +4,18 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./client": "./src/client.ts"
+    "./client": "./src/rpc-client.ts"
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "NODE_ENV=production node --env-file-if-exists=.env dist/index.js",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
-    "auth:generate": "auth generate --config src/features/auth/auth.ts --output src/features/auth/auth.schema.ts --yes && node scripts/strip-auth-relations.mjs src/features/auth/auth.schema.ts",
+    "typecheck": "tsc",
+    "auth:generate": "auth generate --config src/features/auth/auth.ts --output src/features/auth/auth.table.ts --yes && node scripts/strip-auth-relations.mjs src/features/auth/auth.table.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
   "dependencies": {

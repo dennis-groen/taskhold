@@ -6,8 +6,8 @@
 import { sql } from "drizzle-orm";
 import { Client } from "pg";
 
-import { env } from "../config/env.ts";
-import { db, type Executor } from "../db/client.ts";
+import { env } from "../env.ts";
+import { db, type Executor } from "../db/db.ts";
 import { logger } from "./logger.ts";
 import { describeError } from "./wide-event.ts";
 

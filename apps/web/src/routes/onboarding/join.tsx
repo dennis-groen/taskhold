@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { lookUpInvite, type InviteLookup } from "@/features/households/households.api.ts";
 import { INVITE_CODE_LENGTH, extractInviteCode } from "@/features/households/invite-code.ts";
-import { JoinHouseholdPage } from "@/features/households/pages/join-household-page.tsx";
+import { JoinHouseholdPage } from "@/features/households/components/JoinHouseholdPage.tsx";
 
 export const Route = createFileRoute("/onboarding/join")({
   validateSearch: (search): { code?: string } => ({

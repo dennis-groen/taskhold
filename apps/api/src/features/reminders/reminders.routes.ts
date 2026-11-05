@@ -2,7 +2,7 @@
 import { validate } from "../../lib/validation.ts";
 import { protectedRouter } from "../auth/auth.middleware.ts";
 import * as remindersService from "./reminders.service.ts";
-import { settingsBody, subscribeBody, unsubscribeBody } from "./reminders.validation.ts";
+import { settingsBody, subscribeBody, unsubscribeBody } from "./reminders.schema.ts";
 
 export const reminderRoutes = protectedRouter()
   .get("/", async (c) => {

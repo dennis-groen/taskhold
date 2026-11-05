@@ -8,110 +8,117 @@ Both apps are organized by feature (vertical slices). A feature folder holds eve
 index.ts                  starts the HTTP server, shuts down cleanly on SIGTERM/SIGINT
 server.ts                 the API plus, in production (WEB_ROOT), the web app's build on one origin
 app.ts                    composes the API: middleware, error handler, one router per feature
-client.ts                 typed RPC client for the web app (@taskhold/api/client)
-config/env.ts             environment, validated with zod at startup
-db/client.ts              Postgres pool (with timeouts), Drizzle instance, transaction()
+rpc-client.ts             typed RPC client for the web app (@taskhold/api/client)
+env.ts                    environment, validated with zod at startup
+db/db.ts                  Postgres pool (with timeouts), Drizzle instance, transaction()
 db/migrate.ts             applies migrations at container start
-db/schema.ts              every feature's tables, for migrations and relational queries
-lib/                      feature-agnostic helpers: AppError, error handler, validate(), logger, wide events
+db/schema.ts              re-exports every feature's *.table.ts, for migrations and relational queries
+lib/                      feature-agnostic infrastructure: AppError, error handler, validate(), logger, wide events
 features/
-  auth/                   Better Auth instance, its tables, requireAuth and protectedRouter()
+  auth/                   Better Auth instance (auth.ts), its generated tables, requireAuth and protectedRouter()
   households/
     households.routes.ts      HTTP: routes, input validation, status codes
     households.service.ts     business rules: who may create, join, see what
-    households.dal.ts         data access: the only file that queries household tables
-    households.schema.ts      Drizzle tables and relations
-    households.validation.ts  zod schemas for request input
+    households.repo.ts        data access: the only file that queries household tables
+    households.table.ts       Drizzle tables
+    households.schema.ts      the contract: zod schemas for request input and the shapes returned to clients
     households.errors.ts      the feature's AppErrors
-    households.types.ts       shapes returned to clients
+    households.test.ts        integration tests for the feature's routes
     invite-code.ts            pure domain logic: generate and normalize codes
   shopping/               shopping lists and items, scoped to the user's household
   chores/                 chores and their completions; chore-dates.ts holds the due-date rules
   todos/                  private to-dos, scoped to the user rather than a household; can move one to chores
+  reminders/              push subscriptions and reminder settings; reminders.scheduler.ts sends due reminders
+  live/                   server-sent change notifications
   viewer/                 GET /api/viewer, composed from the auth and households services
 ```
 
 ### Layers
 
-Requests flow `routes → service → dal → database`, never backwards.
+Requests flow `routes → service → repo → database`, never backwards.
 
 | Layer          | Does                                                                                     | Doesn't                                     |
 | -------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------- |
 | `*.routes.ts`  | Validates input with `validate()`, reads the user, picks status codes                    | Touch the database or decide business rules |
-| `*.service.ts` | Enforces business rules, groups DAL calls with `transaction()`, throws `AppError`        | Build queries or know about HTTP            |
-| `*.dal.ts`     | Runs Drizzle queries, returns plain records, takes an optional executor for transactions | Call services or decide what's allowed      |
+| `*.service.ts` | Enforces business rules, groups repo calls with `transaction()`, throws `AppError`       | Build queries or know about HTTP            |
+| `*.repo.ts`    | Runs Drizzle queries, returns plain records, takes an optional executor for transactions | Call services or decide what's allowed      |
 
 - Services throw `AppError(kind, code, message)`. `lib/error-handler.ts` maps the `kind` to a status code and responds with `{ error: { code, message } }`.
 - Every request is logged as one wide event (`lib/request-logger.ts`). Services add what they know about the request with `annotate(group, fields)` from `lib/wide-event.ts`, using ids and counts, never names, codes or other user content. Don't log separate lines during a request: add to its event instead.
-- A feature may call another feature's service, never its DAL. `viewer` uses `auth` and `households` this way, `shopping` asks `householdsService.getMembershipOf()` which household a user is in, and `todos` calls `choresService.createChore()` to move a to-do to chores.
+- A feature may call another feature's service, never its repo. `viewer` uses `auth` and `households` this way, `shopping` asks `householdsService.getMembershipOf()` which household a user is in, and `todos` calls `choresService.createChore()` to move a to-do to chores.
 - Data that belongs to a household is always queried with the household id in the `WHERE` clause, so an id from another household reads as missing (404) and never leaks.
-- Schema files may import other features' tables, because foreign keys cross features.
+- Table files may import other features' tables, because foreign keys cross features.
 - Each feature mounts under its own path in `app.ts`. A feature that needs a signed-in user builds its router with `protectedRouter()`, so every route in it returns 401 without a session and 403 for a state-changing request from another origin (`lib/same-origin.ts`).
-- When a rule depends on other rows (the last member leaving deletes the household, the owner leaving hands over ownership), the service locks the parent row first (`householdsDal.lockHousehold`) and re-reads under the lock. Concurrent requests then run one after another instead of acting on stale reads.
-- DB-specific error handling stays in the DAL: it turns a constraint conflict into a plain result (`null` or `false`) that the service can act on, using `onConflictDoNothing`, or a savepoint plus `db/errors.ts` where an insert can't skip conflicts.
+- When a rule depends on other rows (the last member leaving deletes the household, the owner leaving hands over ownership), the service locks the parent row first (`householdsRepo.lockHousehold`) and re-reads under the lock. Concurrent requests then run one after another instead of acting on stale reads.
+- DB-specific error handling stays in the repo: it turns a constraint conflict into a plain result (`null` or `false`) that the service can act on, using `onConflictDoNothing`, or a savepoint plus `db/pg-errors.ts` where an insert can't skip conflicts.
 
 ### Tests
 
-API integration tests live in `apps/api/test/`, one file per feature. `test/helpers.ts` provides:
+Tests sit next to the code they cover: `features/<name>/<name>.test.ts`, `lib/connection.test.ts`, `server.test.ts`. `pnpm test <name>` runs one feature's tests in both apps. API tests are integration tests against a real database; the shared setup lives in `apps/api/test/`: `global-setup.ts` prepares the test database, and `harness.ts` provides:
 
 - `signUp()`: a user with a real session;
 - `householdWith()`: a household with the given users in it;
 - `json()` and `errorCode()`: they assert the status and return the typed body or the error code.
 
-Each test makes its own users and households, so tests don't depend on each other or on order. Web unit tests sit next to the code they test (`*.test.ts`).
+Each test makes its own users and households, so tests don't depend on each other or on order. Web unit tests sit next to the code they test too.
 
 ### Adding an API feature
 
-1. Create `features/<name>/` with the files from the list above that it needs.
-2. Export its tables from `db/schema.ts`, then run `pnpm db:generate` and `pnpm db:migrate`.
+1. Create `features/<name>/` with the files from the list above that it needs, starting from the contract (`<name>.schema.ts`).
+2. Re-export its `<name>.table.ts` from `db/schema.ts`, then run `pnpm db:generate` and `pnpm db:migrate`.
 3. Mount its router in `app.ts` with `.route("/<name>", <name>Routes)`. The web app's RPC client picks it up from the types.
 4. In the service, `annotate("<name>", { ... })` the ids and counts someone debugging a request would want.
-5. Add `test/<name>.test.ts`, including a test that another household (or another person, for private data) gets a 404 for every route.
+5. Add `features/<name>/<name>.test.ts`, including a test that another household (or another person, for private data) gets a 404 for every route.
 
 ## Web (`apps/web/src`)
 
 ```
-routes/                   TanStack file routes: URL, guards, loaders, search params, layout
+routes/                   TanStack file routes: URL, guards, loaders, search params, layout (thin)
 features/
-  auth/
+  auth/                   small, so flat
     auth.api.ts           RPC calls: fetchViewer
     redirect.ts           sanitizes the post-sign-in redirect
-    components/           Google sign-in and sign-out buttons
-    pages/                sign-in page
+    SignInPage.tsx, GoogleSignInButton.tsx, SignOutButton.tsx, DeleteAccountButton.tsx
   households/
     households.api.ts     RPC calls and their response types
-    invite-code.ts        format and parse invite codes
-    components/           household-members, invite-code-slots, leave/remove/new-code buttons
-    pages/                setup, create, join, invite, overview
+    invite-code.ts        format and parse invite codes (mirrors the API's)
+    components/           HouseholdMembers, InviteCodeSlots, leave/remove/new-code buttons, and the
+                          setup, create, join, invite and overview pages
   shopping/
     shopping.api.ts       RPC calls and their response types
     shopping.queries.ts   React Query keys and queryOptions (loaders and components share them)
-    hooks/                use-shopping-list: the list plus optimistic changes
-    components/           quick add (the round + button), new-list form, item row, delete-list button
-    pages/                all lists, a single list
+    shopping.mutations.ts mutation defaults, registered in router.tsx so offline changes can resume
+    shopping.hooks.ts     useShoppingList: the list plus optimistic changes
+    components/           QuickAdd (the round + button), NewListForm, ShoppingItemRow, list buttons, and
+                          the all-lists and single-list pages
   chores/
     chores.api.ts         RPC calls and their response types
     chores.queries.ts     React Query keys and queryOptions
+    chores.mutations.ts   mutation defaults
+    chores.hooks.ts       useChores: the chores plus optimistic marking done
     chore-dates.ts        repeat rule (mirrors the API's) and repeat labels; general date helpers are in lib/dates.ts
-    hooks/                use-chores: the chores plus optimistic marking done
-    components/           chore form, row, sheet, new-chore drawer, add button
-    pages/                chores page
+    components/           ChoreForm, ChoreRow, ChoreSheet, NewChoreDrawer, AddChoreButton, ChoresPage
   todos/
-    todos.api.ts          RPC calls and their response types
-    todos.queries.ts      React Query keys and queryOptions
-    hooks/                use-todos: the to-dos plus optimistic changes
-    components/           to-do form, row, sheet (with move to chores), new-to-do drawer, add button
-    pages/                Personal page
-components/               shared: shadcn ui/ (extended with taskhold variants, see apps/web/DESIGN.md), layout/ (household shell with nav, onboarding app shell, page heading, group, empty state), theme provider and toggle, small app-wide pieces (add row, shared-with line, confirm dialog, avatar, wordmark, page skeleton)
-lib/                      shared: RPC client and errorMessage(), dates (due groups and labels), theme context and useTheme(), utils
+    todos.api.ts, todos.queries.ts, todos.mutations.ts
+    todos.hooks.ts        useTodos: the to-dos plus optimistic changes
+    components/           TodoForm, TodoRow, TodoSheet (with move to chores), NewTodoDrawer, AddTodoButton,
+                          TodosPage (the Personal page)
+  reminders/              small, so flat: reminders.api.ts, reminders.queries.ts, reminders.hooks.ts,
+                          ChoreReminders.tsx
+components/               shared: shadcn ui/ (extended with taskhold variants, see apps/web/DESIGN.md), layout/
+                          (HouseholdShell with nav, AppShell for onboarding, PageHeading, Group, EmptyState),
+                          ThemeProvider and ThemeToggle, small app-wide pieces (AddRow, SharedWithLine,
+                          ConfirmDialog, UserAvatar, Wordmark, PageSkeleton)
+lib/                      shared: RPC client and errorMessage() (api.ts), dates (due groups and labels),
+                          theme context and useTheme(), offline cache, feedback toasts
 ```
 
 - Server data that changes while a page is open (shopping lists, chores, to-dos) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
-- Optimistic changes follow `hooks/use-shopping-list.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
+- Optimistic changes follow `shopping.hooks.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
 - Feedback after a change goes through `lib/feedback.ts`: `offerUndo` shows a toast with Undo (a ticked chore, a removed item or to-do, a cleared cart), and `changeFailed` shows a toast when a background change didn't save. Errors in forms and dialogs stay next to the form. Deletes and the undos that restore them share a mutation `scope`, so the restore can't reach the API before the delete.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
 - Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button, or the chores feature's add button on the chores page, into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
-- Inside a feature, imports are relative and folders are one level deep (`components/`, `pages/`, `hooks/`).
+- Inside a feature, imports are relative. A feature stays flat until it has about 10 files; then its components and pages move to `components/`, and nothing else nests.
 - Shared code (`components/`, `lib/`) never imports a feature or a route.
 
 ## Dates and times
@@ -122,9 +129,9 @@ Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/Ja
   - `instant()` reads a `timestamp` column as a `Temporal.Instant`, in UTC;
   - `plainDate()` reads a `date` column as a `Temporal.PlainDate`.
 
-  Schemas use them instead of `timestamp()` and `date()`, with `.default(now)` instead of `.defaultNow()`. Both produce the same SQL as before. Timestamps are stored in UTC, and `now()` defaults assume the database's time zone is UTC, as it is in `compose.yaml`.
+  Table files use them instead of `timestamp()` and `date()`, with `.default(now)` instead of `.defaultNow()`. Both produce the same SQL as before. Timestamps are stored in UTC, and `now()` defaults assume the database's time zone is UTC, as it is in `compose.yaml`.
 
-- **Better Auth's tables** (`auth.schema.ts`, generated) keep `Date`, because Better Auth reads and writes those columns itself.
+- **Better Auth's tables** (`auth.table.ts`, generated) keep `Date`, because Better Auth reads and writes those columns itself.
 - **Responses:** Temporal values become ISO strings in JSON: instants like `2026-11-01T13:42:14.4528Z`, dates like `2026-11-01`. The web app's RPC types see them as strings.
 - **Web:** `main.tsx` imports `temporal-polyfill/global` first, which installs `Temporal` only in browsers without one (Safari, and older Chrome and Firefox). Don't use `Temporal` at module top level in a file that might load before it.
 - **Comparing timestamps:** use `Temporal.Instant.compare`, not string comparison. ISO strings vary in precision (`…:00Z` vs `…:00.5Z`).
@@ -134,7 +141,8 @@ Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/Ja
 
 `.oxlintrc.json` turns these rules into `no-restricted-imports` errors, so `pnpm check` fails when a file reaches across a boundary:
 
-- API routes and middleware can't import a DAL, a schema, the database client or `drizzle-orm`.
-- API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's DAL.
-- API DAL files can't import services or routes. `lib/` and `config/` can't import features.
+- API routes and middleware can't import a repo, a table, the database client or `drizzle-orm`.
+- API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's repo.
+- API repo files can't import services or routes. `lib/` and `env.ts` can't import features.
 - Web shared code can't import features or routes. Features can't import routes or other features, and can't nest folders more than one level deep.
+- Default exports are errors everywhere except tool configs (`*.config.ts`).

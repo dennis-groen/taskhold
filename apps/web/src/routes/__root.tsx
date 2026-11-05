@@ -2,9 +2,9 @@ import { onlineManager, type QueryClient } from "@tanstack/react-query";
 import { Outlet, createRootRouteWithContext, redirect, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import { RootError } from "@/components/root-error.tsx";
+import { RootError } from "@/components/RootError.tsx";
 import { Toaster } from "@/components/ui/sonner";
-import { UpdatePrompt } from "@/components/update-prompt.tsx";
+import { UpdatePrompt } from "@/components/UpdatePrompt.tsx";
 import { ViewerUnavailableError, fetchViewer, type Viewer } from "@/features/auth/auth.api.ts";
 import {
   keepForOffline,

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { DeleteAccountButton } from "@/features/auth/components/delete-account-button.tsx";
-import { HouseholdSetupPage } from "@/features/households/pages/household-setup-page.tsx";
+import { DeleteAccountButton } from "@/features/auth/DeleteAccountButton.tsx";
+import { HouseholdSetupPage } from "@/features/households/components/HouseholdSetupPage.tsx";
 
 export const Route = createFileRoute("/onboarding/")({
   component: OnboardingIndex,

@@ -1,4 +1,4 @@
-import { api, parseResponse, type InferResponseType } from "@/lib/api-client.ts";
+import { api, parseResponse, type InferResponseType } from "@/lib/api.ts";
 
 const chores = api.chores;
 

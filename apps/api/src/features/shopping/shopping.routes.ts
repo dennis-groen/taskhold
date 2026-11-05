@@ -2,13 +2,7 @@
 import { validate } from "../../lib/validation.ts";
 import { protectedRouter } from "../auth/auth.middleware.ts";
 import * as shoppingService from "./shopping.service.ts";
-import {
-  addItemBody,
-  itemParam,
-  listBody,
-  listParam,
-  updateItemBody,
-} from "./shopping.validation.ts";
+import { addItemBody, itemParam, listBody, listParam, updateItemBody } from "./shopping.schema.ts";
 
 export const shoppingRoutes = protectedRouter()
   .get("/lists", async (c) => {

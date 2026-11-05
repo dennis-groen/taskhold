@@ -8,9 +8,9 @@ import {
 } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-import { HouseholdShell } from "@/components/layout/household-shell.tsx";
+import { HouseholdShell } from "@/components/layout/HouseholdShell.tsx";
 import { choreKeys } from "@/features/chores/chores.queries.ts";
-import { AddChoreButton } from "@/features/chores/components/add-chore-button.tsx";
+import { AddChoreButton } from "@/features/chores/components/AddChoreButton.tsx";
 import { ViewerUnavailableError } from "@/features/auth/auth.api.ts";
 import {
   fetchCurrentHousehold,
@@ -18,9 +18,9 @@ import {
   type Household,
   type SavedHousehold,
 } from "@/features/households/households.api.ts";
-import { QuickAdd } from "@/features/shopping/components/quick-add.tsx";
+import { QuickAdd } from "@/features/shopping/components/QuickAdd.tsx";
 import { shoppingKeys } from "@/features/shopping/shopping.queries.ts";
-import { AddTodoButton } from "@/features/todos/components/add-todo-button.tsx";
+import { AddTodoButton } from "@/features/todos/components/AddTodoButton.tsx";
 import { todoKeys } from "@/features/todos/todos.queries.ts";
 import { useLiveUpdates, type LiveMessage } from "@/lib/live-updates.ts";
 import { keepForOffline, keptForOffline } from "@/lib/offline-cache.ts";

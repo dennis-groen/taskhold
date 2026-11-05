@@ -1,6 +1,6 @@
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 
-import { ShoppingListsPage } from "@/features/shopping/pages/shopping-lists-page.tsx";
+import { ShoppingListsPage } from "@/features/shopping/components/ShoppingListsPage.tsx";
 import { listsQuery } from "@/features/shopping/shopping.queries.ts";
 import { otherHousemates } from "@/lib/shared-with.ts";
 
