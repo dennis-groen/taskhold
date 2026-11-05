@@ -288,6 +288,15 @@ pnpm db:migrate
 - **Web** (`apps/web/src/**/*.test.ts`): unit tests for the date helpers and shopping-list sorting. The date helpers run twice, on native Temporal and on `temporal-polyfill`, because browsers without Temporal use the polyfill.
 - Vitest is installed once, at the workspace root.
 
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`, in two jobs side by side:
+
+- **Format, lint, typecheck, build:** `pnpm check`, then `pnpm build`, then `pnpm db:generate` must produce no new files in `apps/api/drizzle`, so a `*.table.ts` change can't reach production without its migration.
+- **Tests:** `pnpm test` against a Postgres 18 service container, with `TEST_DATABASE_URL` pointing at `taskhold_test`.
+
+Coolify deploys `main` whether or not CI passed, so merge only green pull requests. Actions are pinned to commit SHAs, with the tag in a comment; update both together.
+
 ## Scripts
 
 | Command               | What it does                                     |
