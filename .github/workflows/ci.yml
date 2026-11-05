@@ -1,6 +1,6 @@
-# Runs the same checks as `pnpm check` and `pnpm test` on every pull request and on main.
-# Coolify deploys main as soon as it changes, and the container migrates on start, so this is
-# the last stop before production. Actions are pinned to commit SHAs (tag in the comment).
+# Runs the same checks as `pnpm check` and `pnpm test` on every pull request and on main, then
+# deploys main to production through Coolify once both pass. Coolify's own auto-deploy is off,
+# so a red build never ships. Actions are pinned to commit SHAs (tag in the comment).
 name: CI
 
 on:
@@ -79,3 +79,79 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+
+  deploy:
+    name: Deploy to production
+    needs: [check, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # One deploy at a time; a newer one waits instead of cancelling a deploy halfway
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      # Repository secrets: the app's deploy webhook URL from Coolify (Webhooks tab), and an API
+      # token with the Deploy and Read permissions. See README, "Deploying".
+      COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+    steps:
+      # Coolify builds the head of main, not this exact commit. If main moved on while CI ran,
+      # deploying now would ship commits whose CI hasn't passed; their own run deploys them instead.
+      - name: Check this commit is still the head of main
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main moved on to $head; that commit's run will deploy it."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy and wait for Coolify
+        if: steps.head.outputs.current == 'true'
+        run: |
+          if [ -z "$COOLIFY_WEBHOOK" ] || [ -z "$COOLIFY_TOKEN" ]; then
+            echo "::error::Set the COOLIFY_WEBHOOK and COOLIFY_TOKEN repository secrets."
+            exit 1
+          fi
+          # The token travels in a header, so never over plain HTTP
+          if [[ "$COOLIFY_WEBHOOK" != https://* ]]; then
+            echo "::error::COOLIFY_WEBHOOK must be an https:// URL."
+            exit 1
+          fi
+          auth="Authorization: Bearer $COOLIFY_TOKEN"
+
+          if ! response=$(curl --silent --show-error --fail-with-body --max-time 30 \
+            --request POST --header "$auth" "$COOLIFY_WEBHOOK"); then
+            echo "::error::Coolify rejected the deploy request: $response"
+            exit 1
+          fi
+          deployment=$(jq -r '.deployments[0].deployment_uuid // empty' <<< "$response" 2>/dev/null || true)
+          if [ -z "$deployment" ]; then
+            echo "::error::Coolify didn't queue a deployment: $response"
+            exit 1
+          fi
+          echo "Coolify deployment $deployment queued"
+
+          # Fails the job when the build fails or the container never becomes healthy (for
+          # example a migration that errors on start), so main shows red in GitHub too.
+          api="${COOLIFY_WEBHOOK%%/api/v1/*}/api/v1"
+          for _ in $(seq 1 100); do
+            sleep 15
+            status=$(curl --silent --show-error --fail --max-time 30 --header "$auth" \
+              "$api/deployments/$deployment" | jq -r .status) || status="unknown"
+            echo "Status: $status"
+            case "$status" in
+              finished) exit 0 ;;
+              failed | cancelled*)
+                echo "::error::Coolify deployment $deployment ended as $status. Its logs are in Coolify."
+                exit 1
+                ;;
+            esac
+          done
+          echo "::error::Coolify deployment $deployment didn't finish within 25 minutes."
+          exit 1
