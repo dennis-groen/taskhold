@@ -1,0 +1,213 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "b0cf72fd-5339-40a6-b7e1-1915988ad52e",
+  "prevIds": [
+    "4f88ead9-283a-4135-adf3-661556d2ac4d"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "shopping_purchase"
+      ],
+      "writes": [
+        "s|tbl|public.shopping_purchase",
+        "n|tbl|public.shopping_purchase",
+        "e|tbl|public.shopping_purchase",
+        "n|rel|public.shopping_purchase",
+        "n|type|public.shopping_purchase",
+        "n|rel|public.shopping_purchase_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "shopping_purchase",
+        "shopping_purchase_household_bought_idx"
+      ],
+      "writes": [
+        "s|idx|public.shopping_purchase_household_bought_idx",
+        "n|idx|public.shopping_purchase_household_bought_idx",
+        "e|idx|public.shopping_purchase_household_bought_idx",
+        "n|rel|public.shopping_purchase_household_bought_idx"
+      ],
+      "reads": [
+        "n|tbl|public.shopping_purchase",
+        "n|sch|public",
+        "n|col|public.shopping_purchase.household_id",
+        "n|col|public.shopping_purchase.bought_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "shopping_purchase"
+      ],
+      "writes": [
+        "s|fk|public.shopping_purchase.shopping_purchase_household_id_household_id_fkey",
+        "n|fk|public.shopping_purchase.shopping_purchase_household_id_household_id_fkey",
+        "e|fk|public.shopping_purchase.shopping_purchase_household_id_household_id_fkey",
+        "n|con|public.shopping_purchase.shopping_purchase_household_id_household_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.shopping_purchase",
+        "n|sch|public",
+        "n|tbl|public.household",
+        "n|sch|public",
+        "n|col|public.shopping_purchase.household_id",
+        "n|col|public.household.id",
+        "e|uniqueness|public.household.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "shopping_purchase",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "household_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "bought_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "shopping_purchase_household_bought_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "household_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "bought_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "shopping_purchase_household_id_household_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "household_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "household",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "shopping_purchase_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

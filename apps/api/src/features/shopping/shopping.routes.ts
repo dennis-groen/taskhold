@@ -5,6 +5,11 @@ import * as shoppingService from "./shopping.service.ts";
 import { addItemBody, itemParam, listBody, listParam, updateItemBody } from "./shopping.schema.ts";
 
 export const shoppingRoutes = protectedRouter()
+  // What the household has bought, for "buy again" suggestions
+  .get("/history", async (c) => {
+    const items = await shoppingService.getPurchaseHistory(c.get("user").id);
+    return c.json({ items }, 200);
+  })
   .get("/lists", async (c) => {
     const lists = await shoppingService.getLists(c.get("user").id);
     return c.json({ lists }, 200);

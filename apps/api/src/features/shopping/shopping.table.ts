@@ -45,3 +45,24 @@ export const shoppingItem = pgTable(
   },
   (table) => [index("shopping_item_listId_idx").on(table.listId)],
 );
+
+/**
+ * What the household has bought, for "buy again" suggestions. A row is written when an item is
+ * ticked off and removed when it's unticked, and it outlives the item: "Done shopping" deletes
+ * the items, not their history. No link to the person who bought it; only the household's names.
+ */
+export const shoppingPurchase = pgTable(
+  "shopping_purchase",
+  {
+    // The ticked item's id, so ticking twice, or putting a cleared item back, records it once
+    id: text("id").primaryKey(),
+    householdId: text("household_id")
+      .notNull()
+      .references(() => household.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    boughtAt: instant("bought_at").default(now).notNull(),
+  },
+  (table) => [
+    index("shopping_purchase_household_bought_idx").on(table.householdId, table.boughtAt),
+  ],
+);

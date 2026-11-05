@@ -109,6 +109,10 @@ Signed-in pages that need a household share one frame (`components/layout/Househ
 - Items can carry a client-generated id, so a retried add doesn't create a duplicate.
 - Tables: `shopping_list` and `shopping_item` in `apps/api/src/features/shopping/shopping.table.ts`. Deleting a household deletes its lists; when someone leaves, the items they added stay.
 - "Rename list" at the bottom of a list opens a sheet to change its name (`PATCH /api/shopping/lists/:listId`). Other members see the new name straight away through live updates.
+- **Buy again.** Ticking an item off records it as bought, for the whole household (`shopping_purchase`); unticking takes that back, and renaming a ticked item renames its record. The record outlives the item, so "Done shopping" doesn't erase it. `GET /api/shopping/history` returns the last year, one entry per name (ignoring case, spelled as last bought) with how many days it was bought on and when first and last.
+  - The app ranks it (`features/shopping/buy-again.ts`), so it works offline and follows what's typed. With nothing typed it offers regulars (bought on two days or more) that are due: something bought every 4 days and last bought 5 days ago comes first, and something bought a few days into a two-week rhythm isn't offered. While typing it offers anything bought whose name has a word starting with what's typed, accents and case aside. What's already waiting on the list is left out.
+  - The chips show in the quick-add sheet under the field, and on a list under "Add item" while someone is adding, so the list stays calm while shopping. A tap adds the name with whatever is in the quantity field, keeps the keyboard up, and the chip leaves the row.
+  - Records hold only the household and the name, never who bought it. They go with the household; anything older than a year is no longer offered.
 
 ## Chores
 

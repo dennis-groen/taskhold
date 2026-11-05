@@ -10,6 +10,7 @@ import { PageHeading } from "@/components/layout/PageHeading.tsx";
 import { Button } from "@/components/ui/button";
 
 import { AddRow } from "@/components/AddRow.tsx";
+import { BuyAgain } from "./BuyAgain.tsx";
 import { DeleteListButton } from "./DeleteListButton.tsx";
 import { EditItemSheet } from "./EditItemSheet.tsx";
 import { ListNotFound } from "./ListNotFound.tsx";
@@ -18,7 +19,7 @@ import { SharedWithLine } from "@/components/SharedWithLine.tsx";
 import type { Housemate } from "@/lib/shared-with.ts";
 import { ShoppingItemRow } from "./ShoppingItemRow.tsx";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
-import { useShoppingList } from "../shopping.hooks.ts";
+import { useBuyAgain, useShoppingList } from "../shopping.hooks.ts";
 import type { ItemChanges } from "../shopping.mutations.ts";
 import { CATEGORY_ICONS } from "../category-icons.ts";
 import { categorize } from "../categories.ts";
@@ -83,7 +84,16 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: Housemate[] }
       </PageHeading>
 
       <Group className="mt-6">
-        <AddRow label="Add item" withQuantity maxLength={100} onAdd={addItem} />
+        <AddRow
+          label="Add item"
+          withQuantity
+          maxLength={100}
+          onAdd={addItem}
+          // Shown only while adding, so the list stays calm while shopping
+          renderBelow={({ typed, active, add: addNamed }) =>
+            active && <ListBuyAgain listId={listId} typed={typed} onPick={addNamed} />
+          }
+        />
         {/* Says where the item went: sorting can put it below the fold, and the field keeps focus */}
         <p aria-live="polite" className="empty:hidden">
           {fresh && (
@@ -162,6 +172,19 @@ export function ShoppingListPage({ otherMembers }: { otherMembers: Housemate[] }
       </div>
     </>
   );
+}
+
+function ListBuyAgain({
+  listId,
+  typed,
+  onPick,
+}: {
+  listId: string;
+  typed: string;
+  onPick: (name: string) => void;
+}) {
+  const names = useBuyAgain(listId, typed);
+  return <BuyAgain names={names} onPick={onPick} gutter="card" className="pt-1 pb-3" />;
 }
 
 function CategoryHeading({ category }: { category: keyof typeof CATEGORY_ICONS }) {

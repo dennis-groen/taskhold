@@ -15,9 +15,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 
-import { useAddItem } from "../shopping.hooks.ts";
+import { useAddItem, useBuyAgain } from "../shopping.hooks.ts";
 import type { ShoppingListSummary } from "../shopping.api.ts";
 import { listsQuery } from "../shopping.queries.ts";
+import { BuyAgain } from "./BuyAgain.tsx";
 import { NewListForm } from "./NewListForm.tsx";
 
 /**
@@ -41,7 +42,8 @@ export function QuickAdd({ viewer }: { viewer: { id: string; name: string } }) {
         <DrawerHeader className="sr-only">
           <DrawerTitle>Add to a shopping list</DrawerTitle>
           <DrawerDescription>
-            Type an item and press Enter. The sheet stays open for the next one.
+            Type an item and press Enter, or pick one you bought before. The sheet stays open for
+            the next one.
           </DrawerDescription>
         </DrawerHeader>
         {/* Mounted only while open, so it starts fresh each time */}
@@ -74,7 +76,18 @@ function QuickAddForm({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [added, setAdded] = useState<{ count: number; text: string } | null>(null);
+  // Chips tapped in this sheet, per list, so one leaves the row at once, even before that list
+  // has loaded and can say it's on there
+  const [tapped, setTapped] = useState<string[]>([]);
   const add = useAddItem(viewer);
+
+  const destination =
+    lists?.find((list) => list.id === picked) ??
+    lists?.find((list) => list.id === openListId) ??
+    lists?.[0];
+  const suggestions = useBuyAgain(destination?.id, name).filter(
+    (suggestion) => !tapped.includes(`${destination?.id}:${suggestion}`),
+  );
 
   if (!lists)
     return (
@@ -94,20 +107,29 @@ function QuickAddForm({
     );
   }
 
-  const destination =
-    lists.find((list) => list.id === picked) ??
-    lists.find((list) => list.id === openListId) ??
-    lists[0];
+  /** Adds to the chosen list with what's in the quantity field, then clears both fields */
+  function addToList(itemName: string) {
+    if (!destination) return;
+    add(destination.id, itemName, quantity.trim() || null);
+    setName("");
+    setQuantity("");
+    setAdded((last) => ({
+      count: (last?.count ?? 0) + 1,
+      text: `Added ${itemName} to ${destination.name}`,
+    }));
+    nameRef.current?.focus();
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed || !destination) return;
-    add(destination.id, trimmed, quantity.trim() || null);
-    setName("");
-    setQuantity("");
-    setAdded((last) => ({ count: (last?.count ?? 0) + 1, text: `Added to ${destination.name}` }));
-    nameRef.current?.focus();
+    if (trimmed) addToList(trimmed);
+  }
+
+  function pick(itemName: string) {
+    if (!destination) return;
+    setTapped((names) => [...names, `${destination.id}:${itemName}`]);
+    addToList(itemName);
   }
 
   return (
@@ -151,9 +173,13 @@ function QuickAddForm({
         )}
       </div>
 
+      <BuyAgain names={suggestions} onPick={pick} gutter="sheet" className="mt-2 mb-5" />
+
       {lists.length > 1 && (
         <fieldset className="mt-1">
-          <legend className="sr-only">List</legend>
+          <legend className="pb-2 text-[0.8125rem] leading-4 font-semibold text-muted-foreground">
+            Add to
+          </legend>
           <div className="flex flex-wrap gap-2">
             {lists.map((list) => {
               const active = list.id === destination?.id;

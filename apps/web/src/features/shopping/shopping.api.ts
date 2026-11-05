@@ -5,6 +5,12 @@ const lists = api.shopping.lists;
 export type ShoppingListSummary = InferResponseType<typeof lists.$get, 200>["lists"][number];
 export type ShoppingList = InferResponseType<(typeof lists)[":listId"]["$get"], 200>["list"];
 export type ShoppingItem = ShoppingList["items"][number];
+export type BoughtItem = InferResponseType<typeof api.shopping.history.$get, 200>["items"][number];
+
+/** What the household bought in the last year, one entry per name, for "buy again" */
+export async function fetchHistory(): Promise<BoughtItem[]> {
+  return (await parseResponse(api.shopping.history.$get())).items;
+}
 
 export async function fetchLists(): Promise<ShoppingListSummary[]> {
   return (await parseResponse(lists.$get())).lists;

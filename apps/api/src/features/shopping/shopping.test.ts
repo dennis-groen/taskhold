@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
+import { db } from "../../db/db.ts";
+import { shoppingPurchase } from "./shopping.table.ts";
 import { errorCode, householdWith, json, signUp, type TestUser } from "../../../test/harness.ts";
 
 async function listOf(person: TestUser, name = "Groceries") {
@@ -173,5 +176,148 @@ describe("shopping lists", () => {
       200,
     );
     expect(after.items.map((item) => item.name)).toEqual(["Pears"]);
+  });
+});
+
+/** A fresh list for the person, with shorthand for adding, ticking, renaming and clearing */
+async function shop(person: TestUser) {
+  const list = await listOf(person);
+  const items = person.api.shopping.lists[":listId"].items;
+  return {
+    add: async (name: string, id: string = randomUUID()) =>
+      (await json(await items.$post({ param: { listId: list.id }, json: { id, name } }), 201)).item,
+    patch: (itemId: string, change: { name?: string; checked?: boolean }) =>
+      items[":itemId"].$patch({ param: { listId: list.id, itemId }, json: change }),
+    clear: () =>
+      person.api.shopping.lists[":listId"]["clear-checked"].$post({ param: { listId: list.id } }),
+  };
+}
+
+async function historyOf(person: TestUser) {
+  return (await json(await person.api.shopping.history.$get(), 200)).items;
+}
+
+describe("buy again history", () => {
+  it("records what's ticked off, and outlives the cart", async () => {
+    const owner = await signUp();
+    const member = await signUp();
+    await householdWith(owner, member);
+    const list = await shop(owner);
+
+    const milk = await list.add("Milk");
+    await list.add("Bread");
+    expect(await historyOf(owner)).toEqual([]);
+
+    await json(await list.patch(milk.id, { checked: true }), 200);
+    await json(await list.clear(), 200);
+
+    const history = await historyOf(member);
+    expect(history).toEqual([
+      {
+        name: "Milk",
+        trips: 1,
+        firstBoughtAt: expect.any(String),
+        lastBoughtAt: expect.any(String),
+      },
+    ]);
+  });
+
+  it("takes a purchase back when the item is unticked, and follows a rename", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const list = await shop(owner);
+    const item = await list.add("Mlik");
+
+    await json(await list.patch(item.id, { checked: true }), 200);
+    await json(await list.patch(item.id, { name: "Milk" }), 200);
+    expect((await historyOf(owner)).map(({ name }) => name)).toEqual(["Milk"]);
+
+    await json(await list.patch(item.id, { checked: false }), 200);
+    expect(await historyOf(owner)).toEqual([]);
+  });
+
+  it("counts one name once per day, whatever its case, spelled as last bought", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const list = await shop(owner);
+    for (const name of ["milk", "Milk", "Eggs"]) {
+      const item = await list.add(name);
+      await json(await list.patch(item.id, { checked: true }), 200);
+    }
+    // Ticking again, or putting a cleared item back and ticking it, records nothing new
+    const again = await list.add("Eggs");
+    await json(await list.patch(again.id, { checked: true }), 200);
+    await json(await list.clear(), 200);
+    await list.add("Eggs", again.id);
+    await json(await list.patch(again.id, { checked: true }), 200);
+
+    const history = await historyOf(owner);
+    expect(history.map(({ name, trips }) => ({ name, trips }))).toEqual([
+      { name: "Eggs", trips: 1 },
+      { name: "Milk", trips: 1 },
+    ]);
+    const rows = await db
+      .select({ id: shoppingPurchase.id })
+      .from(shoppingPurchase)
+      .where(eq(shoppingPurchase.name, "Eggs"));
+    expect(rows).toHaveLength(2);
+  });
+
+  it("counts trips on different days and leaves out anything over a year old", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const list = await shop(owner);
+    const now = Temporal.Now.instant();
+    const boughtOn = async (name: string, daysAgo: number) => {
+      const item = await list.add(name);
+      await json(await list.patch(item.id, { checked: true }), 200);
+      await db
+        .update(shoppingPurchase)
+        .set({ boughtAt: now.subtract({ hours: 24 * daysAgo }) })
+        .where(eq(shoppingPurchase.id, item.id));
+    };
+    await boughtOn("Coffee", 1);
+    await boughtOn("Coffee", 8);
+    await boughtOn("Coffee", 15);
+    await boughtOn("Tea", 2);
+    await boughtOn("Tinsel", 400);
+
+    const history = await historyOf(owner);
+    expect(history.map(({ name, trips }) => ({ name, trips }))).toEqual([
+      { name: "Coffee", trips: 3 },
+      { name: "Tea", trips: 1 },
+    ]);
+    const coffee = history[0];
+    const daysBetween = Temporal.Instant.from(coffee?.firstBoughtAt ?? "").until(
+      Temporal.Instant.from(coffee?.lastBoughtAt ?? ""),
+    );
+    expect(Math.round(daysBetween.total("hours") / 24)).toBe(14);
+  });
+
+  it("stays inside the household", async () => {
+    const owner = await signUp();
+    const outsider = await signUp();
+    await householdWith(owner);
+    await householdWith(outsider);
+    const list = await shop(owner);
+    const item = await list.add("Milk");
+    await json(await list.patch(item.id, { checked: true }), 200);
+
+    expect(await historyOf(outsider)).toEqual([]);
+    expect(await historyOf(owner)).toHaveLength(1);
+
+    // Another household reusing the item's id can't take over or erase its purchase
+    const theirs = await shop(outsider);
+    await json(await list.clear(), 200);
+    const copy = await theirs.add("Caviar", item.id);
+    await json(await theirs.patch(copy.id, { checked: true }), 200);
+    await json(await theirs.patch(copy.id, { checked: false }), 200);
+    expect((await historyOf(owner)).map(({ name }) => name)).toEqual(["Milk"]);
+    expect(await historyOf(outsider)).toEqual([]);
+  });
+
+  it("needs a household", async () => {
+    const loner = await signUp();
+    expect(await errorCode(await loner.api.shopping.history.$get(), 404)).toBe("NOT_IN_HOUSEHOLD");
   });
 });

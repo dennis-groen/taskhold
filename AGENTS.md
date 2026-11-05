@@ -31,7 +31,7 @@ Folder names match in both apps and follow the URL.
 
 - auth: Google sign-in through Better Auth, sign-out, account deletion
 - households: create, join with an invite code, members, leave
-- shopping: shared lists and items with categories, quick add, editing items, offline ticks
+- shopping: shared lists and items with categories, quick add, editing items, offline ticks, "buy again" suggestions
 - chores: shared chores with repeat rules, marking done, history
 - todos: private to-dos, can be moved to chores
 - reminders: push reminders for chores (API scheduler and device settings)

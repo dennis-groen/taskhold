@@ -45,6 +45,7 @@ Browser surfaces are themed too: `::selection`, `caret-color`, `scrollbar-color`
 - `PageSkeleton`: the router's pending component.
 - Nav (`components/layout/HouseholdShell.tsx`): a frosted bottom bar on phones and a rail on wide screens. The current tab's icon sits in a `primary-soft` pill.
 - Shopping categories each have a Phosphor duotone icon (`features/shopping/category-icons.ts`).
+- `BuyAgain` (`features/shopping/components/BuyAgain.tsx`): past buys as a sideways-scrolling row of `chip` buttons, each with its aisle's icon, under a small "Buy again" label. The row fades out at its edges. A tap adds without taking focus from the field above. In the quick-add sheet the list picker below it is labelled "Add to" in the same style, so the two rows of chips stay distinct. On a list it sits inside the Add item row and shares its tint while adding.
 
 ## Icons
 

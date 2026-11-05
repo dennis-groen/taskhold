@@ -1,12 +1,14 @@
 import { PlusIcon } from "@phosphor-icons/react";
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "cn";
 import { Spinner } from "@/components/ui/spinner";
 
 /**
  * The first row of a list: type and press Enter, and the field is ready for the next one.
  * With `withQuantity`, a short second field takes "2" or "500 g".
+ * With `renderBelow`, something under the row that can add by name, e.g. suggestions while typing.
  */
 export function AddRow({
   label,
@@ -14,6 +16,7 @@ export function AddRow({
   pending = false,
   maxLength,
   onAdd,
+  renderBelow,
 }: {
   /** Placeholder and accessible name, e.g. "Add item" */
   label: string;
@@ -22,10 +25,23 @@ export function AddRow({
   maxLength: number;
   /** Return false to keep what was typed, e.g. when saving failed */
   onAdd: (name: string, quantity: string | null) => void | boolean | Promise<boolean>;
+  /**
+   * Rendered under the row. `active` while the row has focus or something typed; `add` adds a
+   * name with the quantity typed, the same as typing it and pressing Enter.
+   */
+  renderBelow?: (field: BelowField) => ReactNode;
 }) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [focused, setFocused] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+
+  async function add(itemName: string) {
+    if ((await onAdd(itemName, quantity.trim() || null)) === false) return;
+    setName("");
+    setQuantity("");
+    nameRef.current?.focus();
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,16 +50,17 @@ export function AddRow({
       nameRef.current?.focus();
       return;
     }
-    if ((await onAdd(trimmed, quantity.trim() || null)) === false) return;
-    setName("");
-    setQuantity("");
-    nameRef.current?.focus();
+    await add(trimmed);
   }
 
-  return (
+  const form = (
     <form
       onSubmit={(event) => void submit(event)}
-      className="group/add flex min-h-14 items-center gap-3 pr-2 pl-4 transition-colors focus-within:bg-primary-soft/35 active:bg-primary-soft/35"
+      className={cn(
+        "group/add flex min-h-14 items-center gap-3 pr-2 pl-4",
+        // With something below, the whole block lights up instead, so it reads as one row
+        !renderBelow && ADDING_TINT,
+      )}
     >
       <span
         aria-hidden
@@ -87,4 +104,33 @@ export function AddRow({
       </Button>
     </form>
   );
+  if (!renderBelow) return form;
+
+  return (
+    <div
+      className={ADDING_TINT}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
+      {form}
+      <Below
+        render={renderBelow}
+        typed={name}
+        active={focused || name.trim() !== ""}
+        add={(itemName) => void add(itemName)}
+      />
+    </div>
+  );
+}
+
+/** The soft tint while someone is adding */
+const ADDING_TINT = "transition-colors focus-within:bg-primary-soft/35 active:bg-primary-soft/35";
+
+type BelowField = { typed: string; active: boolean; add: (name: string) => void };
+
+/** Calls `renderBelow` as its own component, so `add` is only ever run from an event */
+function Below({ render, ...field }: BelowField & { render: (field: BelowField) => ReactNode }) {
+  return render(field);
 }

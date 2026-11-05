@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { instantSchema } from "../../db/zod.ts";
 import { user } from "../auth/auth.table.ts";
-import { shoppingItem, shoppingList } from "./shopping.table.ts";
+import { shoppingItem, shoppingList, shoppingPurchase } from "./shopping.table.ts";
 
 const listName = (schema: z.ZodString) =>
   schema.trim().min(1, "Give the list a name.").max(60, "Keep the name under 60 characters.");
@@ -81,7 +81,18 @@ export const shoppingListSchema = listColumns
   .pick({ id: true, name: true })
   .extend({ items: z.array(shoppingItemSchema) });
 
+const purchaseColumns = createSelectSchema(shoppingPurchase);
+
+/** One name the household has bought, for "buy again": how often, and when first and last */
+export const boughtItemSchema = purchaseColumns.pick({ name: true }).extend({
+  /** Days it was bought on; two on one day count once */
+  trips: z.number(),
+  firstBoughtAt: instantSchema,
+  lastBoughtAt: instantSchema,
+});
+
 export type ShoppingListSummary = z.infer<typeof shoppingListSummarySchema>;
 export type ShoppingItemRecord = z.infer<typeof shoppingItemRecordSchema>;
 export type ShoppingItem = z.infer<typeof shoppingItemSchema>;
 export type ShoppingList = z.infer<typeof shoppingListSchema>;
+export type BoughtItem = z.infer<typeof boughtItemSchema>;

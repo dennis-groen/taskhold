@@ -1,9 +1,11 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { offerUndo } from "@/lib/feedback.ts";
 
 import type { ShoppingItem } from "./shopping.api.ts";
 import { shoppingMutations, type ItemChanges } from "./shopping.mutations.ts";
-import { isListGone, listQuery } from "./shopping.queries.ts";
+import { suggestBuyAgain } from "./buy-again.ts";
+import { historyQuery, isListGone, listQuery } from "./shopping.queries.ts";
 
 type Person = { id: string; name: string };
 
@@ -62,6 +64,19 @@ export function useAddItem(viewer: Person) {
     add.mutate({ listId, id, name, quantity, by: person(viewer) });
     return id;
   };
+}
+
+/**
+ * "Buy again" names for a list: the household's regulars, or past buys matching what's typed,
+ * leaving out what's already waiting on that list. Nothing until the history has loaded.
+ */
+export function useBuyAgain(listId: string | undefined, typed: string): string[] {
+  const { data: history = [] } = useQuery(historyQuery());
+  const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
+  // "Due" is judged once per screen, so chips don't reshuffle while someone is picking
+  const [now] = useState(() => Temporal.Now.instant());
+  const onList = list?.items.filter((item) => !item.checked).map((item) => item.name) ?? [];
+  return suggestBuyAgain(history, { now, typed, onList });
 }
 
 /** Only what the list shows about a person, since a change is saved on the device with its variables */

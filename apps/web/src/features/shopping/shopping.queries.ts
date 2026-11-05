@@ -3,14 +3,25 @@ import { queryOptions } from "@tanstack/react-query";
 import { errorCode } from "@/lib/api.ts";
 import { isLive } from "@/lib/live-updates.ts";
 
-import { fetchList, fetchLists } from "./shopping.api.ts";
+import { fetchHistory, fetchList, fetchLists } from "./shopping.api.ts";
 
 // Everything under ["shopping"] is refetched after a change, so counts on the dashboard stay right
 export const shoppingKeys = {
   all: ["shopping"] as const,
   lists: () => [...shoppingKeys.all, "lists"] as const,
   list: (listId: string) => [...shoppingKeys.all, "list", listId] as const,
+  history: () => [...shoppingKeys.all, "history"] as const,
 };
+
+/**
+ * What the household has bought, for "buy again". Under "shopping", so it's saved for offline use
+ * and refetched when anyone ticks something off.
+ */
+export const historyQuery = () =>
+  queryOptions({
+    queryKey: shoppingKeys.history(),
+    queryFn: fetchHistory,
+  });
 
 export const listsQuery = () =>
   queryOptions({
