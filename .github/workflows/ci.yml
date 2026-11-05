@@ -1,0 +1,81 @@
+# Runs the same checks as `pnpm check` and `pnpm test` on every pull request and on main.
+# Coolify deploys main as soon as it changes, and the container migrates on start, so this is
+# the last stop before production. Actions are pinned to commit SHAs (tag in the comment).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to a pull request cancels its previous run; runs on main always finish
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, lint, typecheck, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Reads the pnpm version from packageManager in package.json
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+      # A *.table.ts change without its migration would reach production unmigrated.
+      # drizzle-kit generate doesn't connect; it only needs DATABASE_URL to be set.
+      - name: Migrations match the tables
+        env:
+          DATABASE_URL: postgres://unused@localhost/unused
+        run: |
+          pnpm db:generate
+          if [ -n "$(git status --porcelain apps/api/drizzle)" ]; then
+            echo "::error::A *.table.ts changed without a migration. Run pnpm db:generate and commit apps/api/drizzle."
+            git status --porcelain apps/api/drizzle
+            exit 1
+          fi
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: taskhold
+          POSTGRES_PASSWORD: taskhold
+          POSTGRES_DB: taskhold
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U taskhold -d taskhold"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The API tests create, migrate and empty this database themselves
+      TEST_DATABASE_URL: postgres://taskhold:taskhold@localhost:5432/taskhold_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
