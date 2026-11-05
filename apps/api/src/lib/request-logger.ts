@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { matchedRoutes } from "hono/route";
 
-import { env } from "../config/env.ts";
+import { env } from "../env.ts";
 import { forwardedChain, socketAddress } from "./connection.ts";
 import { logger } from "./logger.ts";
 import { recordError, startEvent, type WideEvent } from "./wide-event.ts";

@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
-import { errorCode } from "@/lib/api-client.ts";
+import { errorCode } from "@/lib/api.ts";
 import { isLive } from "@/lib/live-updates.ts";
 
 import { fetchChore, fetchChores } from "./chores.api.ts";

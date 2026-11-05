@@ -1,7 +1,7 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context } from "hono";
 
-import { env } from "../config/env.ts";
+import { env } from "../env.ts";
 
 /** IP address of the peer on the other end of the socket: the client, or the nearest proxy */
 export function socketAddress(c: Context): string | undefined {

@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Client, Pool } from "pg";
 import type { TestProject } from "vitest/node";
 
-export default async function setup(project: TestProject) {
+export async function setup(project: TestProject) {
   const url = new URL(String(project.config.env.DATABASE_URL));
   const database = url.pathname.slice(1);
   // Every table gets emptied below, so never run against a database that isn't meant for tests

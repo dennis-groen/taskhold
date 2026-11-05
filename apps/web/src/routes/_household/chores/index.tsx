@@ -1,7 +1,7 @@
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 
 import { choresQuery } from "@/features/chores/chores.queries.ts";
-import { ChoresPage } from "@/features/chores/pages/chores-page.tsx";
+import { ChoresPage } from "@/features/chores/components/ChoresPage.tsx";
 import { otherHousemates } from "@/lib/shared-with.ts";
 
 const householdRoute = getRouteApi("/_household");

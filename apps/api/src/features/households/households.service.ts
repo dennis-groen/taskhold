@@ -1,12 +1,12 @@
 // Business rules for households: who can create, join, manage and see what.
-// Talks to the DAL only, throws AppErrors, and knows nothing about HTTP.
+// Talks to the repo only, throws AppErrors, and knows nothing about HTTP.
 //
 // Every change to who is in a household runs in a transaction that locks the household row,
 // so concurrent joins, leaves and removals in one household happen one at a time.
-import { transaction, type Transaction } from "../../db/client.ts";
+import { transaction, type Transaction } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
-import * as householdsDal from "./households.dal.ts";
+import * as householdsRepo from "./households.repo.ts";
 import {
   alreadyInHousehold,
   cannotRemoveSelf,
@@ -16,8 +16,12 @@ import {
   ownerOnly,
   tooManyInviteAttempts,
 } from "./households.errors.ts";
-import type { Household, InvitePreview, Membership } from "./households.types.ts";
-import type { CreateHouseholdInput } from "./households.validation.ts";
+import type {
+  CreateHouseholdInput,
+  Household,
+  InvitePreview,
+  Membership,
+} from "./households.schema.ts";
 import { generateInviteCode, normalizeInviteCode } from "./invite-code.ts";
 
 const MAX_INVITE_CODE_ATTEMPTS = 5;
@@ -30,7 +34,7 @@ const INVITE_GUESS_WINDOW = Temporal.Duration.from({ minutes: 15 });
 
 /** The household a user belongs to, or null when they haven't created or joined one */
 export async function findMembership(userId: string): Promise<Membership | null> {
-  const membership = await householdsDal.findMembershipByUserId(userId);
+  const membership = await householdsRepo.findMembershipByUserId(userId);
   if (!membership) return null;
   annotate("household", { id: membership.householdId, role: membership.role });
   return { id: membership.householdId, name: membership.householdName, role: membership.role };
@@ -45,11 +49,11 @@ export async function getMembershipOf(userId: string): Promise<Membership> {
 
 /** Whether someone is in this household right now, e.g. before assigning them something */
 export function isMemberOf(householdId: string, userId: string): Promise<boolean> {
-  return householdsDal.isMember({ householdId, userId });
+  return householdsRepo.isMember({ householdId, userId });
 }
 
 export async function getHouseholdOf(userId: string): Promise<Household> {
-  const membership = await householdsDal.findMembershipByUserId(userId);
+  const membership = await householdsRepo.findMembershipByUserId(userId);
   if (!membership) throw notInHousehold();
   annotate("household", { id: membership.householdId, role: membership.role });
   return getHousehold(membership.householdId);
@@ -62,7 +66,7 @@ export async function createHousehold(
 ): Promise<Household> {
   const householdId = await transaction(async (tx) => {
     const created = await insertWithFreshInviteCode(name, tx);
-    const added = await householdsDal.insertMember(
+    const added = await householdsRepo.insertMember(
       { householdId: created.id, userId, role: "owner" },
       tx,
     );
@@ -88,10 +92,10 @@ export async function acceptInvite(userId: string, rawCode: string): Promise<Hou
   const household = await findByInviteCode(userId, rawCode);
   await transaction(async (tx) => {
     // The household may have been deleted, or its code replaced, since we looked it up
-    const locked = await householdsDal.lockHousehold(household.id, tx);
+    const locked = await householdsRepo.lockHousehold(household.id, tx);
     if (!locked || locked.inviteCode !== household.inviteCode) throw inviteNotFound();
 
-    const added = await householdsDal.insertMember(
+    const added = await householdsRepo.insertMember(
       { householdId: household.id, userId, role: "member" },
       tx,
     );
@@ -115,23 +119,26 @@ export async function leaveHousehold(userId: string): Promise<{ householdDeleted
  * transaction, and does nothing when they aren't in one
  */
 export async function leaveAnyHousehold(userId: string, tx: Transaction): Promise<void> {
-  if (await householdsDal.findMembershipByUserId(userId, tx)) await leave(userId, tx);
+  if (await householdsRepo.findMembershipByUserId(userId, tx)) await leave(userId, tx);
 }
 
 async function leave(userId: string, tx: Transaction): Promise<{ householdDeleted: boolean }> {
   const membership = await lockMembershipOf(userId, tx);
   const { householdId } = membership;
-  await householdsDal.deleteMember({ householdId, userId }, tx);
+  await householdsRepo.deleteMember({ householdId, userId }, tx);
   await membershipChanged({ householdId, userId }, tx);
 
-  const successor = await householdsDal.findEarliestMember(householdId, tx);
+  const successor = await householdsRepo.findEarliestMember(householdId, tx);
   if (!successor) {
-    await householdsDal.deleteHousehold(householdId, tx);
+    await householdsRepo.deleteHousehold(householdId, tx);
     annotate("household", { deleted: true });
     return { householdDeleted: true };
   }
   if (membership.role === "owner") {
-    await householdsDal.setMemberRole({ householdId, userId: successor.userId, role: "owner" }, tx);
+    await householdsRepo.setMemberRole(
+      { householdId, userId: successor.userId, role: "owner" },
+      tx,
+    );
     annotate("household", { new_owner_id: successor.userId });
   }
   return { householdDeleted: false };
@@ -146,7 +153,7 @@ export async function removeMember(ownerId: string, memberId: string): Promise<H
 
   const householdId = await transaction(async (tx) => {
     const owner = await lockMembershipOf(ownerId, tx, { ownerOnly: true });
-    const removed = await householdsDal.deleteMember(
+    const removed = await householdsRepo.deleteMember(
       { householdId: owner.householdId, userId: memberId },
       tx,
     );
@@ -175,11 +182,11 @@ export async function regenerateInviteCode(ownerId: string): Promise<Household> 
  * read again after locking because another request may have changed it while we waited.
  */
 async function lockMembershipOf(userId: string, tx: Transaction, options = { ownerOnly: false }) {
-  const before = await householdsDal.findMembershipByUserId(userId, tx);
+  const before = await householdsRepo.findMembershipByUserId(userId, tx);
   if (!before) throw notInHousehold();
 
-  await householdsDal.lockHousehold(before.householdId, tx);
-  const membership = await householdsDal.findMembershipByUserId(userId, tx);
+  await householdsRepo.lockHousehold(before.householdId, tx);
+  const membership = await householdsRepo.findMembershipByUserId(userId, tx);
   if (!membership || membership.householdId !== before.householdId) throw notInHousehold();
   annotate("household", { id: membership.householdId, role: membership.role });
   if (options.ownerOnly && membership.role !== "owner") throw ownerOnly();
@@ -187,7 +194,7 @@ async function lockMembershipOf(userId: string, tx: Transaction, options = { own
 }
 
 async function getHousehold(householdId: string): Promise<Household> {
-  const household = await householdsDal.findHouseholdById(householdId);
+  const household = await householdsRepo.findHouseholdById(householdId);
   // Callers only pass ids they just read or wrote, so a miss means the data changed underneath us
   if (!household) throw new Error(`Household ${householdId} not found`);
 
@@ -202,15 +209,15 @@ async function getHousehold(householdId: string): Promise<Household> {
 /** Looks up the household behind a code, counting misses against the user's guess budget */
 async function findByInviteCode(userId: string, rawCode: string) {
   const windowStart = Temporal.Now.instant().subtract(INVITE_GUESS_WINDOW);
-  const failures = await householdsDal.countFailedInviteAttempts(userId, windowStart);
+  const failures = await householdsRepo.countFailedInviteAttempts(userId, windowStart);
   annotate("invite", { recent_failed_attempts: failures });
   if (failures >= INVITE_GUESS_LIMIT) throw tooManyInviteAttempts();
 
   const code = normalizeInviteCode(rawCode);
-  const household = code ? await householdsDal.findHouseholdByInviteCode(code) : null;
+  const household = code ? await householdsRepo.findHouseholdByInviteCode(code) : null;
   annotate("invite", { matched: household !== null });
   if (!household) {
-    await householdsDal.recordFailedInviteAttempt(userId, windowStart);
+    await householdsRepo.recordFailedInviteAttempt(userId, windowStart);
     throw inviteNotFound();
   }
   annotate("invite", { household_id: household.id });
@@ -219,14 +226,14 @@ async function findByInviteCode(userId: string, rawCode: string) {
 
 async function replaceInviteCode(householdId: string, tx: Transaction) {
   for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
-    if (await householdsDal.updateInviteCode(householdId, generateInviteCode(), tx)) return;
+    if (await householdsRepo.updateInviteCode(householdId, generateInviteCode(), tx)) return;
   }
   throw new Error("Could not generate a unique invite code");
 }
 
 async function insertWithFreshInviteCode(name: string, tx: Transaction) {
   for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
-    const created = await householdsDal.insertHousehold(
+    const created = await householdsRepo.insertHousehold(
       { name, inviteCode: generateInviteCode() },
       tx,
     );

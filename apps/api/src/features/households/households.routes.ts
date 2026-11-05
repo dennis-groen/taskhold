@@ -2,7 +2,7 @@
 import { validate } from "../../lib/validation.ts";
 import { protectedRouter } from "../auth/auth.middleware.ts";
 import * as householdsService from "./households.service.ts";
-import { createHouseholdBody, inviteCodeParam, memberParam } from "./households.validation.ts";
+import { createHouseholdBody, inviteCodeParam, memberParam } from "./households.schema.ts";
 
 export const householdRoutes = protectedRouter()
   .get("/current", async (c) => {

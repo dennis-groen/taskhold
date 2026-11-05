@@ -1,6 +1,6 @@
 // This browser's Web Push subscription, which chore reminders use. Shared, so signing out can
 // remove it: whoever signs in next on this device shouldn't get someone else's reminders.
-import { api, parseResponse } from "./api-client.ts";
+import { api, parseResponse } from "./api.ts";
 
 /** The service worker that receives pushes, or null when this browser can't get them */
 export async function pushRegistration(): Promise<ServiceWorkerRegistration | null> {

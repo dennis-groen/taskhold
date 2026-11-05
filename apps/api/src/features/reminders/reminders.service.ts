@@ -1,21 +1,21 @@
 // Chore reminders: one push notification a day, at the time each person picks in their own time
 // zone, listing their chores that are due or overdue. Their chores are the ones assigned to them
 // or to nobody. Each device subscribes on its own; the time is per person.
-import { transaction } from "../../db/client.ts";
+import { transaction } from "../../db/db.ts";
 import { pushConfigured, sendPush, type PushMessage, type SendPush } from "../../lib/push.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
-import { env } from "../../config/env.ts";
-import * as remindersDal from "./reminders.dal.ts";
+import { env } from "../../env.ts";
+import * as remindersRepo from "./reminders.repo.ts";
 import { noReminderDevices, remindersOff, remindersUnavailable } from "./reminders.errors.ts";
-import type { SubscribeInput } from "./reminders.validation.ts";
+import type { SubscribeInput } from "./reminders.schema.ts";
 
 const DEFAULT_REMIND_AT = Temporal.PlainTime.from("08:00");
 // A summary names this many chores, then says how many more there are
 const NAMES_SHOWN = 4;
 
 export async function getStatus(userId: string) {
-  const setting = await remindersDal.findSetting(userId);
+  const setting = await remindersRepo.findSetting(userId);
   return {
     available: pushConfigured,
     // The key browsers need to subscribe; public by design
@@ -32,8 +32,8 @@ export async function subscribe(userId: string, input: SubscribeInput): Promise<
   if (!pushConfigured) throw remindersUnavailable();
   const { endpoint, keys } = input.subscription;
   await transaction(async (tx) => {
-    await remindersDal.upsertSubscription({ userId, endpoint, ...keys }, tx);
-    await remindersDal.upsertSetting(
+    await remindersRepo.upsertSubscription({ userId, endpoint, ...keys }, tx);
+    await remindersRepo.upsertSetting(
       { userId, remindAt: DEFAULT_REMIND_AT, timeZone: input.timeZone },
       tx,
     );
@@ -43,18 +43,18 @@ export async function subscribe(userId: string, input: SubscribeInput): Promise<
 
 /** Turns reminders off for this device. Unsubscribing one that's already gone succeeds. */
 export async function unsubscribe(userId: string, endpoint: string): Promise<void> {
-  const removed = await remindersDal.deleteSubscription({ userId, endpoint });
+  const removed = await remindersRepo.deleteSubscription({ userId, endpoint });
   annotate("reminders", { unsubscribed: removed });
 }
 
 export async function updateRemindAt(userId: string, remindAt: Temporal.PlainTime): Promise<void> {
-  if (!(await remindersDal.updateRemindAt(userId, remindAt))) throw remindersOff();
+  if (!(await remindersRepo.updateRemindAt(userId, remindAt))) throw remindersOff();
 }
 
 /** Sends a notification to each of the person's devices, so they can see reminders work */
 export async function sendTest(userId: string, send: SendPush = sendPush): Promise<number> {
   if (!pushConfigured) throw remindersUnavailable();
-  const devices = await remindersDal.findSubscriptions(userId);
+  const devices = await remindersRepo.findSubscriptions(userId);
   if (devices.length === 0) throw noReminderDevices();
   const sent = await deliver(
     devices,
@@ -81,18 +81,18 @@ export async function sendDueReminders(
 ): Promise<{ people: number; notifications: number }> {
   let people = 0;
   let notifications = 0;
-  for (const setting of await remindersDal.findSettingsWithDevices()) {
+  for (const setting of await remindersRepo.findSettingsWithDevices()) {
     const local = now.toZonedDateTimeISO(setting.timeZone);
     const today = local.toPlainDate();
     if (Temporal.PlainTime.compare(local.toPlainTime(), setting.remindAt) < 0) continue;
     if (setting.lastSentOn && Temporal.PlainDate.compare(setting.lastSentOn, today) >= 0) continue;
     // Claimed before sending, so two instances (or a slow run overlapping the next) don't both send
-    if (!(await remindersDal.claimDay(setting.userId, today))) continue;
+    if (!(await remindersRepo.claimDay(setting.userId, today))) continue;
 
     const due = await choresService.findDueChores(setting.userId, today);
     const message = summary(due);
     if (!message) continue;
-    const devices = await remindersDal.findSubscriptions(setting.userId);
+    const devices = await remindersRepo.findSubscriptions(setting.userId);
     people += 1;
     notifications += await deliver(devices, message, send);
   }
@@ -101,7 +101,7 @@ export async function sendDueReminders(
 
 /** Sends to each device and forgets the ones that no longer exist. Returns how many got it. */
 async function deliver(
-  devices: remindersDal.SubscriptionRecord[],
+  devices: remindersRepo.SubscriptionRecord[],
   message: PushMessage,
   send: SendPush,
 ): Promise<number> {
@@ -109,7 +109,7 @@ async function deliver(
   for (const device of devices) {
     const result = await send(device, message);
     if (result === "sent") sent += 1;
-    if (result === "gone") await remindersDal.deleteSubscriptionByEndpoint(device.endpoint);
+    if (result === "gone") await remindersRepo.deleteSubscriptionByEndpoint(device.endpoint);
   }
   return sent;
 }

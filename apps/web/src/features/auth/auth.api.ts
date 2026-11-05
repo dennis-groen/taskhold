@@ -1,6 +1,6 @@
 import { DetailedError } from "@taskhold/api/client";
 
-import { api, parseResponse, type InferResponseType } from "@/lib/api-client.ts";
+import { api, parseResponse, type InferResponseType } from "@/lib/api.ts";
 
 /** Who is signed in (if anyone) and which household they belong to */
 export type Viewer = InferResponseType<typeof api.viewer.$get, 200>;

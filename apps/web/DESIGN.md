@@ -36,14 +36,14 @@ Browser surfaces are themed too: `::selection`, `caret-color`, `scrollbar-color`
 - `Button` variants: `default`, `soft`, `outline`, `secondary`, `ghost`, `destructive`, `link`, plus **`chip`** (rounded toggle, 44px tall; selected with `aria-pressed`, which adds a faint primary edge), **`fab`** (the round + button) and **`destructive-ghost`** (red text that opens a confirmation: Delete list, Delete account). Sizes: `sm` 32px (with an invisible hit area to 44px), `default` 40px, `lg` 44px, `xl` 48px (a sheet's main action), `icon*`, `fab` 56px. Use the size scale rather than `h-*` overrides.
 - `Checkbox variant="tick"`: the 24px round circle on every list row, its edge at least 3:1 against the card, with a 48px hit area. Its check mark pops in (`check-pop`).
 - Focus: rings are `ring-ring/80` (3:1 or better in both themes). Tappable rows that run edge to edge use an inset ring (`focus-visible:ring-2 ring-inset`) plus their tint, never the tint alone.
-- `ConnectionStatus` (`components/connection-status.tsx`): a dark pill at the top while offline, counting changes that are waiting to send.
+- `ConnectionStatus` (`components/ConnectionStatus.tsx`): a dark pill at the top while offline, counting changes that are waiting to send.
 - `SharedWithLine`: the housemates' faces (same tones as the initials on rows) and "Shared with Sam", under the title of shared pages.
 - `tick-label` utility: put it on the inline text of a row, with `data-done` when done, and the strike-through draws across the words.
-- `Group` / `GroupHeading` (`components/layout/group.tsx`): a card of rows and the heading above it.
-- `EmptyState` (`components/layout/empty-state.tsx`): a duotone icon in a soft circle above the existing copy.
+- `Group` / `GroupHeading` (`components/layout/Group.tsx`): a card of rows and the heading above it.
+- `EmptyState` (`components/layout/EmptyState.tsx`): a duotone icon in a soft circle above the existing copy.
 - `Wordmark` (`components/wordmark.tsx`): the house-and-tick mark plus "taskhold".
 - `PageSkeleton`: the router's pending component.
-- Nav (`components/layout/household-shell.tsx`): a frosted bottom bar on phones and a rail on wide screens. The current tab's icon sits in a `primary-soft` pill.
+- Nav (`components/layout/HouseholdShell.tsx`): a frosted bottom bar on phones and a rail on wide screens. The current tab's icon sits in a `primary-soft` pill.
 - Shopping categories each have a Phosphor duotone icon (`features/shopping/category-icons.ts`).
 
 ## Icons
@@ -64,6 +64,6 @@ Phosphor only. `regular` by default, `bold` for small glyphs (carets, plus, repe
 - Inputs are at least 16px on phones (`text-base md:text-sm`), so iOS doesn't zoom in on focus.
 - Controls get `touch-action: manipulation`; buttons, checkboxes, switches and nav links can't be text-selected by a long press. Content text stays selectable.
 - `overscroll-behavior: none` on the page; sheets keep their own bounce.
-- Appearance is Light, Dark or Auto (follow the device, the default). The status bar color (`theme-color`) follows what's on screen (`components/theme-provider.tsx`).
+- Appearance is Light, Dark or Auto (follow the device, the default). The status bar color (`theme-color`) follows what's on screen (`components/ThemeProvider.tsx`).
 - The viewport uses `interactive-widget=resizes-content`, so the on-screen keyboard shrinks the layout instead of covering a sheet's main button.
 - A tab stays lit on pages that belong to it (`alsoOn` in the nav, e.g. Invite under Household).

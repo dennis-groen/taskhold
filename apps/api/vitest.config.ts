@@ -7,9 +7,9 @@ const databaseUrl =
 
 export default defineConfig({
   test: {
-    include: ["test/**/*.test.ts"],
+    include: ["src/**/*.test.ts"],
     globalSetup: ["test/global-setup.ts"],
-    // Set before any app module loads, so config/env.ts validates these instead of .env
+    // Set before any app module loads, so env.ts validates these instead of .env
     env: {
       NODE_ENV: "test",
       DATABASE_URL: databaseUrl,

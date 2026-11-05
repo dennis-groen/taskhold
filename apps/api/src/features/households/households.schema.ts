@@ -1,59 +1,84 @@
-import { index, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
+// The feature's contract: request input and the shapes returned to clients, as zod schemas
+// and their inferred types. Response shapes are inferred from the Drizzle table columns.
+import { createInsertSchema, createSelectSchema } from "drizzle-orm/zod";
+import { z } from "zod";
 
-import { instant, now } from "../../db/columns.ts";
+import { instantSchema } from "../../db/zod.ts";
+import { user } from "../auth/auth.table.ts";
+import { household, householdMember } from "./households.table.ts";
 
-// Schema files may reference other features' tables: foreign keys cross slices by nature
-import { user } from "../auth/auth.schema.ts";
+export const createHouseholdBody = createInsertSchema(household, {
+  name: (schema) =>
+    schema
+      .trim()
+      .min(1, "Give your household a name.")
+      .max(60, "Keep the name under 60 characters."),
+}).pick({ name: true });
 
-export const householdRole = pgEnum("household_role", ["owner", "member"]);
-export type HouseholdRole = (typeof householdRole.enumValues)[number];
-
-export const household = pgTable("household", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  inviteCode: text("invite_code").notNull().unique(),
-  createdAt: instant("created_at").default(now).notNull(),
-  updatedAt: instant("updated_at")
-    .default(now)
-    .$onUpdate(() => Temporal.Now.instant())
-    .notNull(),
+export const inviteCodeParam = z.object({
+  code: z.string().min(1).max(64),
 });
 
-export const householdMember = pgTable(
-  "household_member",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    householdId: text("household_id")
-      .notNull()
-      .references(() => household.id, { onDelete: "cascade" }),
-    // Unique: a user belongs to at most one household
-    userId: text("user_id")
-      .notNull()
-      .unique()
-      .references(() => user.id, { onDelete: "cascade" }),
-    role: householdRole("role").notNull(),
-    joinedAt: instant("joined_at").default(now).notNull(),
-  },
-  (table) => [index("household_member_householdId_idx").on(table.householdId)],
-);
+export const memberParam = z.object({
+  userId: z.string().min(1).max(64),
+});
 
-// One row per invite code that didn't match a household, so guessing codes can be capped per account
-export const inviteCodeAttempt = pgTable(
-  "invite_code_attempt",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    attemptedAt: instant("attempted_at").default(now).notNull(),
-  },
-  (table) => [
-    index("invite_code_attempt_userId_attemptedAt_idx").on(table.userId, table.attemptedAt),
-  ],
-);
+export type CreateHouseholdInput = z.output<typeof createHouseholdBody>;
+
+const householdColumns = createSelectSchema(household, {
+  createdAt: (schema) => schema.pipe(instantSchema),
+  updatedAt: (schema) => schema.pipe(instantSchema),
+});
+const memberColumns = createSelectSchema(householdMember, {
+  joinedAt: (schema) => schema.pipe(instantSchema),
+});
+const userColumns = createSelectSchema(user);
+const userDisplaySchema = userColumns.pick({ name: true, image: true });
+
+export const householdMemberSchema = memberColumns.pick({ role: true, joinedAt: true }).extend({
+  id: userColumns.shape.id,
+  name: userColumns.shape.name,
+  image: userColumns.shape.image,
+});
+
+export const householdSchema = householdColumns
+  .pick({ id: true, name: true, inviteCode: true })
+  .extend({ members: z.array(householdMemberSchema) });
+
+export const membershipSchema = z.object({
+  id: householdColumns.shape.id,
+  name: householdColumns.shape.name,
+  role: memberColumns.shape.role,
+});
+
+/** What someone holding an invite code may see before joining: no emails, no code */
+export const invitePreviewSchema = z.object({
+  householdName: householdColumns.shape.name,
+  members: z.array(userDisplaySchema),
+});
+
+export const membershipRecordSchema = z.object({
+  householdId: householdColumns.shape.id,
+  householdName: householdColumns.shape.name,
+  role: memberColumns.shape.role,
+});
+
+export const memberRecordSchema = z.object({
+  userId: userColumns.shape.id,
+  name: userColumns.shape.name,
+  image: userColumns.shape.image,
+  role: memberColumns.shape.role,
+  joinedAt: memberColumns.shape.joinedAt,
+});
+
+export const householdRecordSchema = householdColumns
+  .pick({ id: true, name: true, inviteCode: true })
+  .extend({ members: z.array(memberRecordSchema) });
+
+export type HouseholdMember = z.infer<typeof householdMemberSchema>;
+export type Household = z.infer<typeof householdSchema>;
+export type Membership = z.infer<typeof membershipSchema>;
+export type InvitePreview = z.infer<typeof invitePreviewSchema>;
+export type MembershipRecord = z.infer<typeof membershipRecordSchema>;
+export type MemberRecord = z.infer<typeof memberRecordSchema>;
+export type HouseholdRecord = z.infer<typeof householdRecordSchema>;

@@ -322,7 +322,7 @@
   }
 }
 
-/* Which of the --tone-* pairs a person's initials use (components/user-avatar.tsx) */
+/* Which of the --tone-* pairs a person's initials use (components/UserAvatar.tsx) */
 [data-tone="1"] {
   --tone-bg: var(--tone-1);
   --tone-fg: var(--tone-1-fg);

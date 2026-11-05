@@ -4,7 +4,7 @@
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 import { logger } from "../lib/logger.ts";
-import { db, pool } from "./client.ts";
+import { db, pool } from "./db.ts";
 
 // apps/api/drizzle, from both src/db and dist/db
 const migrationsFolder = new URL("../../drizzle", import.meta.url).pathname;

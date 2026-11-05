@@ -2,7 +2,7 @@
 import { validate } from "../../lib/validation.ts";
 import { protectedRouter } from "../auth/auth.middleware.ts";
 import * as todosService from "./todos.service.ts";
-import { createTodoBody, todoParam, updateTodoBody } from "./todos.validation.ts";
+import { createTodoBody, todoParam, updateTodoBody } from "./todos.schema.ts";
 
 export const todoRoutes = protectedRouter()
   .get("/", async (c) => {

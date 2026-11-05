@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { errorMessage } from "./api-client.ts";
+import { errorMessage } from "./api.ts";
 
 // Long enough to read the message and reach the button
 const UNDO_MS = 6_000;

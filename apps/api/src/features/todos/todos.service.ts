@@ -1,20 +1,19 @@
 // Business rules for private to-dos. A to-do belongs to one person and only they can see or change
 // it; someone else's to-do looks the same as one that doesn't exist. To-dos don't depend on a
 // household, except for moving one to the household's chores.
-import { transaction } from "../../db/client.ts";
+import { transaction } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
-import type { ChoreDetail } from "../chores/chores.types.ts";
-import * as todosDal from "./todos.dal.ts";
+import type { ChoreDetail } from "../chores/chores.schema.ts";
+import * as todosRepo from "./todos.repo.ts";
 import { todoIdTaken, todoNotFound } from "./todos.errors.ts";
-import type { Todo } from "./todos.types.ts";
-import type { CreateTodoInput, UpdateTodoInput } from "./todos.validation.ts";
+import type { CreateTodoInput, Todo, UpdateTodoInput } from "./todos.schema.ts";
 
 // Names and notes are private, so the wide event only ever gets ids and counts
 
 export async function getTodos(userId: string): Promise<Todo[]> {
-  const records = await todosDal.findTodos(userId);
+  const records = await todosRepo.findTodos(userId);
   annotate("todos", { count: records.length });
   return records.map(toTodo);
 }
@@ -22,7 +21,7 @@ export async function getTodos(userId: string): Promise<Todo[]> {
 export async function createTodo(userId: string, input: CreateTodoInput): Promise<Todo> {
   const id = input.id ?? crypto.randomUUID();
   annotate("todos", { todo_id: id });
-  const inserted = await todosDal.insertTodo({
+  const inserted = await todosRepo.insertTodo({
     id,
     userId,
     name: input.name,
@@ -31,7 +30,7 @@ export async function createTodo(userId: string, input: CreateTodoInput): Promis
   });
 
   // Not inserted: either a retry of an add that already went through, or someone else's id
-  const record = await todosDal.findTodo({ userId, todoId: id });
+  const record = await todosRepo.findTodo({ userId, todoId: id });
   if (!record) throw inserted ? todoNotFound() : todoIdTaken();
   if (inserted) await changed(userId);
   return toTodo(record);
@@ -44,7 +43,7 @@ export async function updateTodo(
 ): Promise<Todo> {
   annotate("todos", { todo_id: todoId });
   const ref = { userId, todoId };
-  const updated = await todosDal.updateTodo(ref, {
+  const updated = await todosRepo.updateTodo(ref, {
     name: changes.name,
     notes: changes.notes,
     dueOn: changes.dueOn,
@@ -55,7 +54,7 @@ export async function updateTodo(
   if (!updated) throw todoNotFound();
   await changed(userId);
 
-  const record = await todosDal.findTodo(ref);
+  const record = await todosRepo.findTodo(ref);
   if (!record) throw todoNotFound();
   return toTodo(record);
 }
@@ -63,13 +62,13 @@ export async function updateTodo(
 /** Deleting a to-do that's already gone succeeds, so a retried delete doesn't fail */
 export async function deleteTodo(userId: string, todoId: string): Promise<void> {
   annotate("todos", { todo_id: todoId });
-  await todosDal.deleteTodo({ userId, todoId });
+  await todosRepo.deleteTodo({ userId, todoId });
   await changed(userId);
 }
 
 /** Removes every done to-do. Returns how many went. */
 export async function clearDoneTodos(userId: string): Promise<number> {
-  const removed = await todosDal.deleteDoneTodos(userId);
+  const removed = await todosRepo.deleteDoneTodos(userId);
   annotate("todos", { removed_count: removed });
   if (removed > 0) await changed(userId);
   return removed;
@@ -83,7 +82,7 @@ export async function moveToChores(userId: string, todoId: string): Promise<Chor
   annotate("todos", { todo_id: todoId });
   return transaction(async (tx) => {
     // Deleting first locks the row, so moving the same to-do twice at once makes one chore
-    const removed = await todosDal.deleteTodo({ userId, todoId }, tx);
+    const removed = await todosRepo.deleteTodo({ userId, todoId }, tx);
     if (!removed) throw todoNotFound();
     // Sent when the transaction commits; createChore announces the new chore itself
     await announce({ userId, topic: "todos" }, tx);
@@ -102,6 +101,6 @@ function changed(userId: string) {
   return announce({ userId, topic: "todos" });
 }
 
-function toTodo(record: todosDal.TodoRecord): Todo {
+function toTodo(record: todosRepo.TodoRecord): Todo {
   return { ...record, done: record.doneAt !== null };
 }

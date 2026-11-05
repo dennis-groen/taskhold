@@ -2,7 +2,7 @@ import { hostname } from "node:os";
 
 import { pino, stdTimeFunctions, type DestinationStream } from "pino";
 
-import { env } from "../config/env.ts";
+import { env } from "../env.ts";
 import { currentEvent } from "./wide-event.ts";
 
 // Pretty printing is for people at a terminal. It runs in this thread, not pino's worker-thread

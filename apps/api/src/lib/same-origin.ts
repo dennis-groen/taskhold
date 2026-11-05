@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 
-import { env } from "../config/env.ts";
+import { env } from "../env.ts";
 import { AppError } from "./errors.ts";
 
 const appOrigin = new URL(env.BETTER_AUTH_URL).origin;

@@ -7,7 +7,7 @@ import {
   completeChoreBody,
   createChoreBody,
   updateChoreBody,
-} from "./chores.validation.ts";
+} from "./chores.schema.ts";
 
 export const choreRoutes = protectedRouter()
   .get("/", async (c) => {

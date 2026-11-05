@@ -24,7 +24,7 @@ export default defineConfig({
     // the installed app opens without a connection. API responses are never cached: they're private
     // and change all the time.
     VitePWA({
-      // components/update-prompt.tsx asks before switching an open app to a new version
+      // components/UpdatePrompt.tsx asks before switching an open app to a new version
       registerType: "prompt",
       injectRegister: false,
       // The manifest is public/manifest.webmanifest, linked from index.html
