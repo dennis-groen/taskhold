@@ -188,6 +188,11 @@ docker build -t taskhold .
 **Coolify** (live at https://taskhold.lunexa.dev, project `taskhold` on `coolify.example.com`):
 
 - **Application:** built from `main` of the GitHub repository with the Dockerfile build pack, on port 3000. The health check calls `GET /api/health`. Coolify's scan suggests `compose.yaml`, but that file is only the local dev database.
+- **Deploys wait for CI.** Auto Deploy is off in Coolify (application > Advanced). Instead, the `deploy` job in `.github/workflows/ci.yml` runs after the checks and tests pass on a push to `main`:
+  - It skips the deploy if `main` has moved on since the push, because Coolify builds the head of `main` and that newer commit hasn't passed CI yet. The newer commit's own run deploys it.
+  - It calls the app's deploy webhook, then waits for Coolify to report the deployment `finished`, and fails if it ends as `failed` or `cancelled`, or takes over 25 minutes. A failed deploy shows as a red `main` in GitHub, and Coolify's logs say why.
+  - It needs two repository secrets (GitHub > Settings > Secrets and variables > Actions): `COOLIFY_WEBHOOK`, the Deploy webhook URL from the application's Webhooks tab, and `COOLIFY_TOKEN`, a Coolify API token (Keys & Tokens > API Tokens) with the Deploy and Read permissions. API access must be enabled under Settings > Advanced.
+  - Deploying by hand from Coolify still works, for a rollback or when GitHub is down. It skips CI.
 - **Database:** a Coolify database, PostgreSQL 18, not publicly reachable. `DATABASE_URL` is its internal URL, ending in `/taskhold`.
 - **Domains:** `https://taskhold.lunexa.dev`, with `www` redirecting to it. Remove the extra hosts Coolify generates, such as `sslip.io`. On any host other than the one in `BETTER_AUTH_URL`, saving gets a 403 and sign-in doesn't work.
 - **Variables:** set them as runtime-only ("Not available during build"); the build doesn't need any.
@@ -295,7 +300,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every
 - **Format, lint, typecheck, build:** `pnpm check`, then `pnpm build`, then `pnpm db:generate` must produce no new files in `apps/api/drizzle`, so a `*.table.ts` change can't reach production without its migration.
 - **Tests:** `pnpm test` against a Postgres 18 service container, with `TEST_DATABASE_URL` pointing at `taskhold_test`.
 
-Coolify deploys `main` whether or not CI passed, so merge only green pull requests. Actions are pinned to commit SHAs, with the tag in a comment; update both together.
+On a push to `main`, a third job deploys once both pass (see "Deploying"), so a red build never reaches production. Actions are pinned to commit SHAs, with the tag in a comment; update both together.
 
 ## Scripts
 
