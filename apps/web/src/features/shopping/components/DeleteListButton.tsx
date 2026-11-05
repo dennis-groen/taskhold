@@ -1,8 +1,8 @@
-import { TrashIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
+import { TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 
 import { deleteList, type ShoppingList } from "../shopping.api.ts";

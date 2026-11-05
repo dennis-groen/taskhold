@@ -1,14 +1,14 @@
+import { Link, getRouteApi } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+
+import { BackLink } from "@/components/BackLink.tsx";
 import {
   ArrowRightIcon,
   CheckIcon,
   CopyIcon,
   LinkIcon,
   ShareNetworkIcon,
-} from "@phosphor-icons/react";
-import { Link, getRouteApi } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-
-import { BackLink } from "@/components/BackLink.tsx";
+} from "@/components/icons.ts";
 import { Group, GroupHeading } from "@/components/layout/Group.tsx";
 import { PageHeading } from "@/components/layout/PageHeading.tsx";
 import { Button, buttonVariants } from "@/components/ui/button";

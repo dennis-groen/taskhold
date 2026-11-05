@@ -1,5 +1,4 @@
-import { CloudSlashIcon } from "@phosphor-icons/react";
-
+import { CloudSlashIcon } from "@/components/icons.ts";
 import { PageHeading } from "@/components/layout/PageHeading.tsx";
 
 /**

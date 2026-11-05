@@ -1,7 +1,7 @@
-import { BellRingingIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
+import { BellRingingIcon } from "@/components/icons.ts";
 import { Group, GroupHeading } from "@/components/layout/Group.tsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

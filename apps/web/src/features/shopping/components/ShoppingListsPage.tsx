@@ -1,7 +1,7 @@
-import { CaretRightIcon, ListChecksIcon } from "@phosphor-icons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 
+import { CaretRightIcon, ListChecksIcon } from "@/components/icons.ts";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Group } from "@/components/layout/Group.tsx";
 import { PageHeading } from "@/components/layout/PageHeading.tsx";

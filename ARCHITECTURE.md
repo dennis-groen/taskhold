@@ -145,4 +145,5 @@ Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/Ja
 - API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's repo.
 - API repo files can't import services or routes. `lib/` and `env.ts` can't import features.
 - Web shared code can't import features or routes. Features can't import routes or other features, and can't nest folders more than one level deep.
+- Web code imports icons from `components/icons.ts`, never from `@phosphor-icons/react`, so the icon library can be swapped in one file. Only `icons.ts` and the shadcn files in `components/ui/` import the library.
 - Default exports are errors everywhere except tool configs (`*.config.ts`).

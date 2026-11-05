@@ -1,6 +1,6 @@
-import { MinusIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useId, useRef, useState, type FormEvent, type RefObject } from "react";
 
+import { MinusIcon, PlusIcon, TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,

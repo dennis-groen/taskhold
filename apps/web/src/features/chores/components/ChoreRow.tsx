@@ -1,6 +1,6 @@
-import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useId } from "react";
 
+import { ArrowsClockwiseIcon } from "@/components/icons.ts";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Checkbox } from "@/components/ui/checkbox";
 import { daysBetween, dueLabel, pastDateLabel } from "@/lib/dates.ts";

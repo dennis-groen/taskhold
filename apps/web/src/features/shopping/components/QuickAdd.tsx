@@ -1,8 +1,8 @@
-import { CheckIcon, PlusIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useRef, useState, type FormEvent, type RefObject } from "react";
 
+import { CheckIcon, PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,

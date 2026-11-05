@@ -1,7 +1,7 @@
-import { CaretRightIcon, UserPlusIcon } from "@phosphor-icons/react";
 import { Link, getRouteApi } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { CaretRightIcon, UserPlusIcon } from "@/components/icons.ts";
 import { Group, GroupHeading } from "@/components/layout/Group.tsx";
 import { PageHeading } from "@/components/layout/PageHeading.tsx";
 import { ThemeToggle } from "@/components/ThemeToggle.tsx";

@@ -1,7 +1,7 @@
-import { TrashIcon } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
+import { TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { forgetOfflineCache } from "@/lib/offline-cache.ts";
 import { forgetPushDevice } from "@/lib/push-device.ts";

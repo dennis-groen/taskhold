@@ -1,8 +1,8 @@
-import { BasketIcon, CheckCircleIcon, CheckIcon, ConfettiIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
 
 import { BackLink } from "@/components/BackLink.tsx";
+import { BasketIcon, CheckCircleIcon, CheckIcon, ConfettiIcon } from "@/components/icons.ts";
 import { CollapsibleGroup } from "@/components/layout/CollapsibleGroup.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Group } from "@/components/layout/Group.tsx";

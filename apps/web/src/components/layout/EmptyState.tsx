@@ -1,6 +1,6 @@
-import type { Icon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
+import type { Icon } from "@/components/icons.ts";
 import { cn } from "cn";
 
 /** What a list says when there's nothing in it: an icon in a soft circle over a line of text */

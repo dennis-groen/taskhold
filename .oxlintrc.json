@@ -129,6 +129,25 @@
       }
     },
 
+    // Icons come from one module, so the icon library can be swapped in one file.
+    // Repeated in the layering overrides below, because a later override replaces the rule's options.
+    {
+      "files": ["apps/web/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^@phosphor-icons/",
+                "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
+              }
+            ]
+          }
+        ]
+      }
+    },
+
     // Web layering: routes -> features -> shared (components, lib). Features never import each other.
     {
       "files": ["apps/web/src/components/**", "apps/web/src/lib/**"],
@@ -140,6 +159,10 @@
               {
                 "group": ["@/features/**", "@/routes/**"],
                 "message": "Shared code can't depend on features or routes."
+              },
+              {
+                "regex": "^@phosphor-icons/",
+                "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
               }
             ]
           }
@@ -165,6 +188,10 @@
               {
                 "regex": "^\\.\\./",
                 "message": "Relative imports stay inside the feature. Use @/components or @/lib for shared code."
+              },
+              {
+                "regex": "^@phosphor-icons/",
+                "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
               }
             ]
           }
@@ -190,6 +217,10 @@
               {
                 "regex": "^\\.\\./\\.\\./",
                 "message": "Relative imports stay inside the feature. Use @/components or @/lib for shared code."
+              },
+              {
+                "regex": "^@phosphor-icons/",
+                "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
               }
             ]
           }
@@ -219,6 +250,23 @@
       "plugins": ["react"],
       "rules": {
         "react/only-export-components": "off"
+      }
+    },
+    {
+      // shadcn components import icons directly (kept as shipped), and icons.ts is the one place that may
+      "files": ["apps/web/src/components/ui/**", "apps/web/src/components/icons.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/**", "@/routes/**"],
+                "message": "Shared code can't depend on features or routes."
+              }
+            ]
+          }
+        ]
       }
     },
     {

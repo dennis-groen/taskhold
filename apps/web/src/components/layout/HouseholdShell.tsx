@@ -1,8 +1,8 @@
-import { BroomIcon, HouseIcon, LockIcon, ShoppingCartIcon, type Icon } from "@phosphor-icons/react";
 import { Link, useLocation, type LinkProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { ConnectionStatus } from "@/components/ConnectionStatus.tsx";
+import { BroomIcon, HouseIcon, LockIcon, ShoppingCartIcon, type Icon } from "@/components/icons.ts";
 import { Wordmark } from "@/components/Wordmark.tsx";
 import { cn } from "cn";
 

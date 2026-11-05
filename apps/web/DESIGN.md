@@ -49,7 +49,7 @@ Browser surfaces are themed too: `::selection`, `caret-color`, `scrollbar-color`
 
 ## Icons
 
-Phosphor only. `regular` by default, `bold` for small glyphs (carets, plus, repeat), `duotone` for illustrative spots (empty states, categories), and `fill` for the current tab.
+Phosphor only, imported from `components/icons.ts` (lint blocks direct imports outside `components/ui`). Add a new icon there first. `regular` by default, `bold` for small glyphs (carets, plus, repeat), `duotone` for illustrative spots (empty states, categories), and `fill` for the current tab.
 
 ## Motion
 

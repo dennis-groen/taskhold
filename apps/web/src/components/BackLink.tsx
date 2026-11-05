@@ -1,5 +1,6 @@
-import { CaretLeftIcon } from "@phosphor-icons/react";
 import { Link, type LinkProps } from "@tanstack/react-router";
+
+import { CaretLeftIcon } from "@/components/icons.ts";
 
 export function BackLink({ to, label = "Back" }: { to: LinkProps["to"]; label?: string }) {
   return (

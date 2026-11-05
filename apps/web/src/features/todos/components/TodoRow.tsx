@@ -1,6 +1,6 @@
-import { NoteIcon } from "@phosphor-icons/react";
 import { useId } from "react";
 
+import { NoteIcon } from "@/components/icons.ts";
 import { Checkbox } from "@/components/ui/checkbox";
 import { daysBetween, dueLabel } from "@/lib/dates.ts";
 import { cn } from "cn";

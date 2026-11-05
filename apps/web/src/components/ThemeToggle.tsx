@@ -1,5 +1,4 @@
-import { CircleHalfIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
-
+import { CircleHalfIcon, MoonIcon, SunIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { useTheme, type ThemeChoice } from "@/lib/theme.ts";
 

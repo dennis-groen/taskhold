@@ -1,7 +1,7 @@
-import { CheckIcon } from "@phosphor-icons/react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { CheckIcon } from "@/components/icons.ts";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Wordmark } from "@/components/Wordmark.tsx";
 import { cn } from "cn";

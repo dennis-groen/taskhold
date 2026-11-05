@@ -1,7 +1,7 @@
-import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 
+import { PencilSimpleIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,

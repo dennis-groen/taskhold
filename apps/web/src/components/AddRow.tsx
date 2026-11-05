@@ -1,6 +1,6 @@
-import { PlusIcon } from "@phosphor-icons/react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
+import { PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { cn } from "cn";
 import { Spinner } from "@/components/ui/spinner";

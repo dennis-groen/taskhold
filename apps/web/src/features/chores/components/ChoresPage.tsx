@@ -1,8 +1,8 @@
-import { BroomIcon, CheckCircleIcon, PlusIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
+import { BroomIcon, CheckCircleIcon, PlusIcon } from "@/components/icons.ts";
 import { CollapsibleGroup } from "@/components/layout/CollapsibleGroup.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Group, GroupHeading } from "@/components/layout/Group.tsx";

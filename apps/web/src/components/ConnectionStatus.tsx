@@ -1,6 +1,7 @@
-import { CloudSlashIcon } from "@phosphor-icons/react";
 import { onlineManager, useIsMutating } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
+
+import { CloudSlashIcon } from "@/components/icons.ts";
 
 /**
  * A small pill at the top while the device is offline, so a tick in a basement supermarket

@@ -1,7 +1,7 @@
-import { CaretRightIcon, HouseLineIcon, KeyIcon, type Icon } from "@phosphor-icons/react";
 import { Link, getRouteApi, type LinkProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { CaretRightIcon, HouseLineIcon, KeyIcon, type Icon } from "@/components/icons.ts";
 import { PageHeading } from "@/components/layout/PageHeading.tsx";
 
 const routeApi = getRouteApi("/onboarding/");

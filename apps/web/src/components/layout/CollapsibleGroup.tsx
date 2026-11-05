@@ -1,6 +1,6 @@
-import { CaretRightIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
+import { CaretRightIcon } from "@/components/icons.ts";
 import { Group } from "@/components/layout/Group.tsx";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

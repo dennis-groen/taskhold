@@ -1,5 +1,4 @@
-import { PlusIcon } from "@phosphor-icons/react";
-
+import { PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 
 import type { Member } from "./ChoreForm.tsx";

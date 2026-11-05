@@ -1,6 +1,6 @@
-import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useId } from "react";
 
+import { PencilSimpleIcon } from "@/components/icons.ts";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

@@ -23,6 +23,7 @@ A phone-first PWA for people who share a household: shared shopping lists, chore
 - `apps/web/src/features/<noun>/`: api, queries, mutations, hooks, components
 - `apps/web/src/routes/`: thin TanStack file routes that compose feature components
 - `apps/web/src/components/ui/`: shadcn primitives; never import a feature
+- `apps/web/src/components/icons.ts`: every icon the app uses; import icons from here, never from `@phosphor-icons/react`
 - `apps/web/src/lib/api.ts`: the typed RPC client; every API call goes through it
 
 ## Features

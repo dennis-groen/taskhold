@@ -1,9 +1,9 @@
-import { CheckCircleIcon, LockIcon, NotePencilIcon } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AddRow } from "@/components/AddRow.tsx";
+import { CheckCircleIcon, LockIcon, NotePencilIcon } from "@/components/icons.ts";
 import { CollapsibleGroup } from "@/components/layout/CollapsibleGroup.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Group, GroupHeading } from "@/components/layout/Group.tsx";

@@ -1,7 +1,7 @@
-import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useRouter } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
+import { ArrowsClockwiseIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 
 import { regenerateInviteCode } from "../households.api.ts";

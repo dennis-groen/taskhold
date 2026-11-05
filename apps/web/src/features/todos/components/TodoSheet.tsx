@@ -1,7 +1,7 @@
-import { HouseIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { HouseIcon, TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,

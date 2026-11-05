@@ -11,7 +11,7 @@ import {
   SprayBottleIcon,
   TagIcon,
   type Icon,
-} from "@phosphor-icons/react";
+} from "@/components/icons.ts";
 
 import type { Category } from "./categories.ts";
 

@@ -1,7 +1,7 @@
-import { ArrowClockwiseIcon, CloudSlashIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import { ArrowClockwiseIcon, CloudSlashIcon, WarningCircleIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Wordmark.tsx";
 
