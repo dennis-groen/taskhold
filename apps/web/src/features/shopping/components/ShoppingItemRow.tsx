@@ -1,4 +1,4 @@
-import { XIcon } from "@phosphor-icons/react";
+import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useId } from "react";
 
 import { UserAvatar } from "@/components/UserAvatar.tsx";
@@ -13,7 +13,7 @@ export function ShoppingItemRow({
   settling = false,
   fresh = false,
   onToggle,
-  onRemove,
+  onEdit,
 }: {
   item: ShoppingItem;
   /** Just ticked or unticked here, and held in place for a moment (see useSettlingItems) */
@@ -22,7 +22,8 @@ export function ShoppingItemRow({
   fresh?: boolean;
   viewerId: string;
   onToggle: (checked: boolean) => void;
-  onRemove: () => void;
+  /** Opens the sheet to fix the name or quantity, or remove the item */
+  onEdit: () => void;
 }) {
   const nameId = useId();
   const quantityId = useId();
@@ -72,12 +73,13 @@ export function ShoppingItemRow({
       <Button
         variant="ghost"
         size="icon-lg"
-        aria-label={`Remove ${item.name}`}
-        // Quieter than the item: a column of crosses shouldn't out-shout what's on the list
-        className="shrink-0 text-muted-foreground/75 hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive"
-        onClick={onRemove}
+        aria-label={`Edit ${item.name}`}
+        aria-haspopup="dialog"
+        // Quieter than the item: a column of pencils shouldn't out-shout what's on the list
+        className="shrink-0 text-muted-foreground/75 active:bg-muted active:text-foreground"
+        onClick={onEdit}
       >
-        <XIcon className="size-[1.125rem]" />
+        <PencilSimpleIcon className="size-[1.125rem]" />
       </Button>
     </li>
   );

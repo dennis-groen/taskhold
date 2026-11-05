@@ -99,6 +99,54 @@ describe("shopping lists", () => {
     expect(after.items.map((item) => item.id)).toEqual([id]);
   });
 
+  it("let anyone in the household fix an item's name and quantity", async () => {
+    const owner = await signUp("Owner");
+    const member = await signUp("Member");
+    await householdWith(owner, member);
+    const list = await listOf(owner);
+    const { item } = await json(
+      await owner.api.shopping.lists[":listId"].items.$post({
+        param: { listId: list.id },
+        json: { name: "Bred" },
+      }),
+      201,
+    );
+    const edit = (changes: { name?: string; quantity?: string | null }) =>
+      member.api.shopping.lists[":listId"].items[":itemId"].$patch({
+        param: { listId: list.id, itemId: item.id },
+        json: changes,
+      });
+
+    const { item: fixed } = await json(await edit({ name: " Bread ", quantity: " 2 " }), 200);
+    expect(fixed).toMatchObject({ id: item.id, name: "Bread", quantity: "2", checked: false });
+    // Still credited to whoever added it
+    expect(fixed.addedBy).toEqual({ id: owner.id, name: "Owner" });
+
+    // Only what's sent changes, and a blank or null quantity clears it
+    expect((await json(await edit({ quantity: "" }), 200)).item).toMatchObject({
+      name: "Bread",
+      quantity: null,
+    });
+    await json(await edit({ quantity: "500 g" }), 200);
+    expect((await json(await edit({ quantity: null }), 200)).item.quantity).toBeNull();
+
+    expect(await errorCode(await edit({ name: "  " }), 400)).toBe("INVALID_REQUEST");
+    expect(await errorCode(await edit({ quantity: "x".repeat(21) }), 400)).toBe("INVALID_REQUEST");
+    expect(await errorCode(await edit({}), 400)).toBe("INVALID_REQUEST");
+  });
+
+  it("say an item is gone when someone removed it before the edit arrived", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const list = await listOf(owner);
+    const param = { listId: list.id, itemId: randomUUID() };
+    const edited = await owner.api.shopping.lists[":listId"].items[":itemId"].$patch({
+      param,
+      json: { quantity: "2" },
+    });
+    expect(await errorCode(edited, 404)).toBe("ITEM_NOT_FOUND");
+  });
+
   it("clear only the checked items", async () => {
     const owner = await signUp();
     await householdWith(owner);
