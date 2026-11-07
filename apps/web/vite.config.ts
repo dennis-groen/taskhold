@@ -7,7 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-import { contentSecurityPolicy } from "./content-security-policy.ts";
+import { contentSecurityPolicy, withoutSonnerInlineStyles } from "./content-security-policy.ts";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -20,6 +20,7 @@ export default defineConfig({
     tailwindcss(),
     babel({ presets: [reactCompilerPreset()] }),
     contentSecurityPolicy(),
+    withoutSonnerInlineStyles(),
     // A service worker that keeps the app itself (HTML, JS, CSS, fonts, icons) on the device, so
     // the installed app opens without a connection. API responses are never cached: they're private
     // and change all the time.
