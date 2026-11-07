@@ -1,4 +1,4 @@
-import { api, parseResponse, type InferResponseType } from "@/lib/api.ts";
+import { api, parseResponse, pathParam, type InferResponseType } from "@/lib/api.ts";
 
 const chores = api.chores;
 
@@ -18,7 +18,8 @@ export async function fetchChores(): Promise<Chore[]> {
 }
 
 export async function fetchChore(choreId: string): Promise<ChoreDetail> {
-  return (await parseResponse(chores[":choreId"].$get({ param: { choreId } }))).chore;
+  return (await parseResponse(chores[":choreId"].$get({ param: { choreId: pathParam(choreId) } })))
+    .chore;
 }
 
 export async function createChore(input: ChoreInput): Promise<ChoreDetail> {
@@ -29,24 +30,34 @@ export async function updateChore(
   choreId: string,
   changes: Partial<ChoreInput>,
 ): Promise<ChoreDetail> {
-  return (await parseResponse(chores[":choreId"].$patch({ param: { choreId }, json: changes })))
-    .chore;
+  return (
+    await parseResponse(
+      chores[":choreId"].$patch({ param: { choreId: pathParam(choreId) }, json: changes }),
+    )
+  ).chore;
 }
 
 export async function deleteChore(choreId: string): Promise<void> {
-  await parseResponse(chores[":choreId"].$delete({ param: { choreId } }));
+  await parseResponse(chores[":choreId"].$delete({ param: { choreId: pathParam(choreId) } }));
 }
 
 /** Marks the chore done today, `today` being the date on this device */
 export async function completeChore(choreId: string, today: string): Promise<ChoreDetail> {
   return (
-    await parseResponse(chores[":choreId"].complete.$post({ param: { choreId }, json: { today } }))
+    await parseResponse(
+      chores[":choreId"].complete.$post({
+        param: { choreId: pathParam(choreId) },
+        json: { today },
+      }),
+    )
   ).chore;
 }
 
 /** Takes back the chore's most recent completion */
 export async function undoCompletion(choreId: string): Promise<ChoreDetail> {
-  return (await parseResponse(chores[":choreId"].undo.$post({ param: { choreId } }))).chore;
+  return (
+    await parseResponse(chores[":choreId"].undo.$post({ param: { choreId: pathParam(choreId) } }))
+  ).chore;
 }
 
 /** Removes one-off chores that are done */

@@ -8,7 +8,7 @@ import * as choresService from "../chores/chores.service.ts";
 import { env } from "../../env.ts";
 import * as remindersRepo from "./reminders.repo.ts";
 import { noReminderDevices, remindersOff, remindersUnavailable } from "./reminders.errors.ts";
-import type { SubscribeInput } from "./reminders.schema.ts";
+import { isPushService, type SubscribeInput } from "./reminders.schema.ts";
 
 const DEFAULT_REMIND_AT = Temporal.PlainTime.from("08:00");
 // A summary names this many chores, then says how many more there are
@@ -107,7 +107,8 @@ async function deliver(
 ): Promise<number> {
   let sent = 0;
   for (const device of devices) {
-    const result = await send(device, message);
+    // Saved before the endpoint check was strict enough: never send to it, and forget it
+    const result = isPushService(device.endpoint) ? await send(device, message) : "gone";
     if (result === "sent") sent += 1;
     if (result === "gone") await remindersRepo.deleteSubscriptionByEndpoint(device.endpoint);
   }

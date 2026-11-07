@@ -3,7 +3,7 @@
 //
 // A repeating chore's next due date counts from the day it was done, not from when it was due, so a
 // household that falls behind doesn't come back to a pile of overdue chores.
-import { transaction } from "../../db/db.ts";
+import { transaction, type Executor } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
@@ -42,16 +42,25 @@ export async function getChore(userId: string, choreId: string): Promise<ChoreDe
   return loadDetail(household.id, choreId);
 }
 
-export async function createChore(userId: string, input: CreateChoreInput): Promise<ChoreDetail> {
-  const household = await householdsService.getMembershipOf(userId);
-  await checkChore(household.id, input);
-  const { id } = await choresRepo.insertChore({
-    householdId: household.id,
-    ...toValues(input),
-  });
+/**
+ * Pass `executor` when creating the chore as part of another feature's transaction (e.g. moving a
+ * to-do): every query then runs on it, instead of waiting on the pool for a second connection
+ * while the transaction holds one.
+ */
+export async function createChore(
+  userId: string,
+  input: CreateChoreInput,
+  executor?: Executor,
+): Promise<ChoreDetail> {
+  const household = await householdsService.getMembershipOf(userId, executor);
+  await checkChore(household.id, input, executor);
+  const { id } = await choresRepo.insertChore(
+    { householdId: household.id, ...toValues(input) },
+    executor,
+  );
   annotate("chores", { chore_id: id, repeats: input.repeat !== null });
-  await changed(household.id);
-  return loadDetail(household.id, id);
+  await changed(household.id, executor);
+  return loadDetail(household.id, id, executor);
 }
 
 export async function updateChore(
@@ -78,7 +87,7 @@ export async function updateChore(
       dueOn: changes.dueOn !== undefined ? changes.dueOn : current.dueOn,
       assigneeId: changes.assigneeId ?? null,
     };
-    await checkChore(household.id, merged);
+    await checkChore(household.id, merged, tx);
 
     await choresRepo.updateChore(
       ref,
@@ -207,17 +216,25 @@ export async function findDueChores(
 async function checkChore(
   householdId: string,
   chore: { repeat: Repeat | null; dueOn: Temporal.PlainDate | null; assigneeId: string | null },
+  executor?: Executor,
 ) {
   if (chore.repeat && !chore.dueOn) throw dueDateRequired();
-  if (chore.assigneeId && !(await householdsService.isMemberOf(householdId, chore.assigneeId))) {
+  if (
+    chore.assigneeId &&
+    !(await householdsService.isMemberOf(householdId, chore.assigneeId, executor))
+  ) {
     throw assigneeNotMember();
   }
 }
 
-async function loadDetail(householdId: string, choreId: string): Promise<ChoreDetail> {
-  const record = await choresRepo.findChore({ householdId, choreId });
+async function loadDetail(
+  householdId: string,
+  choreId: string,
+  executor?: Executor,
+): Promise<ChoreDetail> {
+  const record = await choresRepo.findChore({ householdId, choreId }, executor);
   if (!record) throw choreNotFound();
-  const history = await choresRepo.findCompletions(choreId, HISTORY_LENGTH);
+  const history = await choresRepo.findCompletions(choreId, HISTORY_LENGTH, executor);
   return {
     ...toChore(record, history[0] ?? null),
     history: history.map(toCompletion),
@@ -263,6 +280,6 @@ function toCompletion(record: choresRepo.CompletionRecord): ChoreCompletion {
 }
 
 /** Tells everyone in the household that its chores changed */
-function changed(householdId: string) {
-  return announce({ householdId, topic: "chores" });
+function changed(householdId: string, executor?: Executor) {
+  return announce({ householdId, topic: "chores" }, executor);
 }

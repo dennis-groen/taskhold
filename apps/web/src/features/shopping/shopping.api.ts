@@ -1,4 +1,4 @@
-import { api, parseResponse, type InferResponseType } from "@/lib/api.ts";
+import { api, parseResponse, pathParam, type InferResponseType } from "@/lib/api.ts";
 
 const lists = api.shopping.lists;
 
@@ -17,7 +17,8 @@ export async function fetchLists(): Promise<ShoppingListSummary[]> {
 }
 
 export async function fetchList(listId: string): Promise<ShoppingList> {
-  return (await parseResponse(lists[":listId"].$get({ param: { listId } }))).list;
+  return (await parseResponse(lists[":listId"].$get({ param: { listId: pathParam(listId) } })))
+    .list;
 }
 
 export async function createList(name: string): Promise<ShoppingList> {
@@ -25,19 +26,24 @@ export async function createList(name: string): Promise<ShoppingList> {
 }
 
 export async function renameList(listId: string, name: string): Promise<void> {
-  await parseResponse(lists[":listId"].$patch({ param: { listId }, json: { name } }));
+  await parseResponse(
+    lists[":listId"].$patch({ param: { listId: pathParam(listId) }, json: { name } }),
+  );
 }
 
 export async function deleteList(listId: string): Promise<void> {
-  await parseResponse(lists[":listId"].$delete({ param: { listId } }));
+  await parseResponse(lists[":listId"].$delete({ param: { listId: pathParam(listId) } }));
 }
 
 export async function addItem(
   listId: string,
   item: { id: string; name: string; quantity: string | null },
 ): Promise<ShoppingItem> {
-  return (await parseResponse(lists[":listId"].items.$post({ param: { listId }, json: item })))
-    .item;
+  return (
+    await parseResponse(
+      lists[":listId"].items.$post({ param: { listId: pathParam(listId) }, json: item }),
+    )
+  ).item;
 }
 
 export async function updateItem(
@@ -47,17 +53,27 @@ export async function updateItem(
 ): Promise<ShoppingItem> {
   return (
     await parseResponse(
-      lists[":listId"].items[":itemId"].$patch({ param: { listId, itemId }, json: changes }),
+      lists[":listId"].items[":itemId"].$patch({
+        param: { listId: pathParam(listId), itemId: pathParam(itemId) },
+        json: changes,
+      }),
     )
   ).item;
 }
 
 export async function deleteItem(listId: string, itemId: string): Promise<void> {
-  await parseResponse(lists[":listId"].items[":itemId"].$delete({ param: { listId, itemId } }));
+  await parseResponse(
+    lists[":listId"].items[":itemId"].$delete({
+      param: { listId: pathParam(listId), itemId: pathParam(itemId) },
+    }),
+  );
 }
 
 /** Removes every checked item from the list */
 export async function clearCheckedItems(listId: string): Promise<number> {
-  return (await parseResponse(lists[":listId"]["clear-checked"].$post({ param: { listId } })))
-    .removed;
+  return (
+    await parseResponse(
+      lists[":listId"]["clear-checked"].$post({ param: { listId: pathParam(listId) } }),
+    )
+  ).removed;
 }

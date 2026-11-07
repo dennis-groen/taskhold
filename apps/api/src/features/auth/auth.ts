@@ -38,6 +38,13 @@ const UNUSED_ENDPOINTS = [
 
 const authLogger = logger.child({ component: "better-auth" });
 
+// Over https the cookies get the __Host- prefix rather than Better Auth's default __Secure-. Browsers
+// only accept a __Host- cookie that is Secure, has Path=/ and no Domain, so a page on another
+// subdomain of the same site can't plant its own session or OAuth state cookie under our name.
+// Better Auth adds __Secure- itself unless useSecureCookies is false, and then leaves out Secure,
+// which defaultCookieAttributes puts back. Plain http (local development) keeps the default names.
+const hostOnlyCookies = new URL(env.BETTER_AUTH_URL).protocol === "https:";
+
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
@@ -54,6 +61,11 @@ export const auth = betterAuth({
   rateLimit: { enabled: env.NODE_ENV !== "test" },
   advanced: {
     ipAddress: { trustedProxies: env.TRUSTED_PROXIES },
+    ...(hostOnlyCookies && {
+      useSecureCookies: false,
+      cookiePrefix: "__Host-taskhold",
+      defaultCookieAttributes: { secure: true, path: "/" },
+    }),
   },
   // During a request its messages go on the request's wide event (auth.logs), otherwise on a line
   // of their own. Only errors among the extra arguments are kept: others can be provider

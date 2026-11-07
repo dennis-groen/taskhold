@@ -3,6 +3,15 @@ import { DetailedError, hcWithType, parseResponse, type ApiErrorBody } from "@ta
 // Typed Hono RPC client. Same origin as the app: Vite proxies /api to the API in dev.
 export const api = hcWithType("/").api;
 
+/**
+ * Encodes a value for an RPC path parameter. The client inserts params as-is, so a "?", "#" or
+ * "/" in one (e.g. from a crafted URL) would end or change the request path: "/lists/<id>?"
+ * plus "/items/<item>" becomes a request to the list itself.
+ */
+export function pathParam(value: string): string {
+  return encodeURIComponent(value);
+}
+
 /** Resolves to the success body, throws DetailedError for any non-2xx response */
 export { parseResponse };
 export type { InferResponseType } from "@taskhold/api/client";

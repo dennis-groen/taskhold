@@ -5,9 +5,22 @@ import { z } from "zod";
 const PUSH_HOSTS = ["fcm.googleapis.com", "android.googleapis.com"];
 const PUSH_HOST_SUFFIXES = [".push.services.mozilla.com", ".notify.windows.com", ".push.apple.com"];
 
-function isPushService(endpoint: string): boolean {
+// Letters, digits and hyphens in dot-separated labels. web-push re-parses the endpoint with Node's
+// legacy url.parse, which ends the host at characters URL accepts ("%", ";", "`", "{"), so
+// "https://evil.example;.push.apple.com" would pass a suffix check and then connect to evil.example.
+const PLAIN_HOSTNAME = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+
+/**
+ * Whether the server may send to this endpoint. Also checked before each send, for endpoints
+ * stored before this check was as strict as it is now.
+ */
+export function isPushService(endpoint: string): boolean {
   const url = URL.parse(endpoint);
   if (url?.protocol !== "https:" || url.port !== "") return false;
+  // The exact string we store is the one web-push will parse, so it must already be canonical
+  // (no backslashes, case or encoding that URL rewrites) and carry no user info.
+  if (url.href !== endpoint || url.username !== "" || url.password !== "") return false;
+  if (!PLAIN_HOSTNAME.test(url.hostname)) return false;
   return (
     PUSH_HOSTS.includes(url.hostname) ||
     PUSH_HOST_SUFFIXES.some((suffix) => url.hostname.endsWith(suffix))

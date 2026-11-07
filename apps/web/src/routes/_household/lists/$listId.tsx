@@ -7,8 +7,12 @@ import { otherHousemates } from "@/lib/shared-with.ts";
 
 const householdRoute = getRouteApi("/_household");
 
+// List ids are UUIDs. Anything else in the link (e.g. "<id>%3F") isn't a list.
+const LIST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const Route = createFileRoute("/_household/lists/$listId")({
   loader: async ({ context, params }) => {
+    if (!LIST_ID.test(params.listId)) throw notFound();
     try {
       await context.queryClient.ensureQueryData(listQuery(params.listId));
     } catch (err) {

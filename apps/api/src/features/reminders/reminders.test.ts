@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import * as remindersRepo from "./reminders.repo.ts";
 import * as remindersService from "./reminders.service.ts";
 import type { PushMessage, PushResult, PushTarget } from "../../lib/push.ts";
 import {
@@ -65,6 +66,14 @@ describe("turning reminders on", () => {
       "https://fcm.googleapis.com:8443/fcm/send/abc",
       "https://fcm.googleapis.com.evil.example/x",
       "https://localhost/fcm",
+      // Hosts that web-push's legacy url.parse reads as attacker.example or evil.example
+      "https://attacker.example%2e.push.apple.com/x",
+      "https://127.0.0.1%2E.push.apple.com/x",
+      "https://evil.example;.notify.windows.com/",
+      "https://evil.example`.notify.windows.com/",
+      "https://evil.example{.push.services.mozilla.com/",
+      "https://fcm.googleapis.com\\@evil.example/",
+      "https://user:pass@fcm.googleapis.com/fcm/send/abc",
     ]) {
       const response = await person.api.reminders.subscription.$put({
         json: { subscription: { endpoint, keys: { p256dh: "abc", auth: "def" } }, timeZone: "UTC" },
@@ -195,6 +204,25 @@ describe("devices", () => {
     await expect(remindersService.sendTest(person.id, recorder().send)).rejects.toMatchObject({
       code: "NO_REMINDER_DEVICES",
     });
+  });
+
+  it("saved before the endpoint check was strict are never sent to, and are forgotten", async () => {
+    const person = await signUp();
+    const keep = await turnOn(person);
+    // Passed the old suffix check, but web-push would connect to evil.example
+    await remindersRepo.upsertSubscription({
+      userId: person.id,
+      endpoint: `https://evil.example;.push.apple.com/${randomUUID()}`,
+      p256dh: "BPublicKey-x_1",
+      auth: "secret_1",
+    });
+
+    const push = recorder();
+    expect(await remindersService.sendTest(person.id, push.send)).toBe(1);
+    expect(push.sent.map((s) => s.endpoint)).toEqual([keep]);
+    const again = recorder();
+    await remindersService.sendTest(person.id, again.send);
+    expect(again.sent.map((s) => s.endpoint)).toEqual([keep]);
   });
 
   it("move to whoever signs in on that browser, and turn off one at a time", async () => {

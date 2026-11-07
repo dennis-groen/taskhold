@@ -86,13 +86,13 @@ export async function moveToChores(userId: string, todoId: string): Promise<Chor
     if (!removed) throw todoNotFound();
     // Sent when the transaction commits; createChore announces the new chore itself
     await announce({ userId, topic: "todos" }, tx);
-    // If this fails (e.g. not in a household), throwing rolls the delete back
-    return choresService.createChore(userId, {
-      name: removed.name.slice(0, 60),
-      repeat: null,
-      dueOn: removed.dueOn,
-      assigneeId: null,
-    });
+    // On the same transaction, so a failure (e.g. not in a household) rolls the delete back and
+    // the move never waits on the pool for a second connection
+    return choresService.createChore(
+      userId,
+      { name: removed.name.slice(0, 60), repeat: null, dueOn: removed.dueOn, assigneeId: null },
+      tx,
+    );
   });
 }
 

@@ -34,14 +34,38 @@ export type SendPush = (target: PushTarget, message: PushMessage) => Promise<Pus
 
 // A reminder that can't be delivered within half a day is no longer useful
 const TIME_TO_LIVE = Temporal.Duration.from({ hours: 12 });
+// web-push's timeout only fires when the socket goes idle, so a push service that keeps trickling
+// bytes would hold a send (and the reminder loop waiting on it) forever. DEADLINE caps the whole send.
 const TIMEOUT = Temporal.Duration.from({ seconds: 10 });
+const DEADLINE = Temporal.Duration.from({ seconds: 20 });
+
+class DeadlineExceeded extends Error {
+  constructor() {
+    super(`The push service didn't answer within ${DEADLINE.total("seconds")} seconds`);
+  }
+}
+
+/** Rejects with DeadlineExceeded if `promise` hasn't settled by DEADLINE */
+async function withDeadline<T>(promise: Promise<T>): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new DeadlineExceeded()), DEADLINE.total("milliseconds"));
+  });
+  try {
+    return await Promise.race([promise, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export const sendPush: SendPush = async (target, message) => {
   try {
-    await sendNotification(
-      { endpoint: target.endpoint, keys: { p256dh: target.p256dh, auth: target.auth } },
-      JSON.stringify(message),
-      { TTL: TIME_TO_LIVE.total("seconds"), timeout: TIMEOUT.total("milliseconds") },
+    await withDeadline(
+      sendNotification(
+        { endpoint: target.endpoint, keys: { p256dh: target.p256dh, auth: target.auth } },
+        JSON.stringify(message),
+        { TTL: TIME_TO_LIVE.total("seconds"), timeout: TIMEOUT.total("milliseconds") },
+      ),
     );
     return "sent";
   } catch (err) {

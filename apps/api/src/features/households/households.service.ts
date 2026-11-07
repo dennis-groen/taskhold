@@ -3,7 +3,7 @@
 //
 // Every change to who is in a household runs in a transaction that locks the household row,
 // so concurrent joins, leaves and removals in one household happen one at a time.
-import { transaction, type Transaction } from "../../db/db.ts";
+import { transaction, type Executor, type Transaction } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsRepo from "./households.repo.ts";
@@ -32,24 +32,34 @@ const MAX_INVITE_CODE_ATTEMPTS = 5;
 const INVITE_GUESS_LIMIT = 10;
 const INVITE_GUESS_WINDOW = Temporal.Duration.from({ minutes: 15 });
 
-/** The household a user belongs to, or null when they haven't created or joined one */
-export async function findMembership(userId: string): Promise<Membership | null> {
-  const membership = await householdsRepo.findMembershipByUserId(userId);
+/**
+ * The household a user belongs to, or null when they haven't created or joined one. Callers inside
+ * a transaction pass it, so they don't wait on the pool for a second connection.
+ */
+export async function findMembership(
+  userId: string,
+  executor?: Executor,
+): Promise<Membership | null> {
+  const membership = await householdsRepo.findMembershipByUserId(userId, executor);
   if (!membership) return null;
   annotate("household", { id: membership.householdId, role: membership.role });
   return { id: membership.householdId, name: membership.householdName, role: membership.role };
 }
 
 /** Like findMembership, for features that only work inside a household */
-export async function getMembershipOf(userId: string): Promise<Membership> {
-  const membership = await findMembership(userId);
+export async function getMembershipOf(userId: string, executor?: Executor): Promise<Membership> {
+  const membership = await findMembership(userId, executor);
   if (!membership) throw notInHousehold();
   return membership;
 }
 
 /** Whether someone is in this household right now, e.g. before assigning them something */
-export function isMemberOf(householdId: string, userId: string): Promise<boolean> {
-  return householdsRepo.isMember({ householdId, userId });
+export function isMemberOf(
+  householdId: string,
+  userId: string,
+  executor?: Executor,
+): Promise<boolean> {
+  return householdsRepo.isMember({ householdId, userId }, executor);
 }
 
 export async function getHouseholdOf(userId: string): Promise<Household> {

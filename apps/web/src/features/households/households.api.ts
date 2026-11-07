@@ -1,4 +1,4 @@
-import { api, errorMessage, parseResponse, type InferResponseType } from "@/lib/api.ts";
+import { api, errorMessage, parseResponse, pathParam, type InferResponseType } from "@/lib/api.ts";
 
 const households = api.households;
 
@@ -47,8 +47,11 @@ export async function createHousehold(name: string): Promise<Household> {
 }
 
 export async function acceptInvite(code: string): Promise<Household> {
-  return (await parseResponse(households.invites[":code"].accept.$post({ param: { code } })))
-    .household;
+  return (
+    await parseResponse(
+      households.invites[":code"].accept.$post({ param: { code: pathParam(code) } }),
+    )
+  ).household;
 }
 
 export type InviteLookup =
@@ -60,7 +63,9 @@ export type InviteLookup =
 /** Looks up an invite code without throwing, so the result can go straight into UI state */
 export async function lookUpInvite(code: string): Promise<InviteLookup> {
   try {
-    const { invite } = await parseResponse(households.invites[":code"].$get({ param: { code } }));
+    const { invite } = await parseResponse(
+      households.invites[":code"].$get({ param: { code: pathParam(code) } }),
+    );
     return { status: "found", invite };
   } catch (err) {
     return { status: "error", message: errorMessage(err, "Couldn't check this code. Try again.") };
@@ -79,6 +84,9 @@ export async function regenerateInviteCode(): Promise<Household> {
 
 /** Owner only */
 export async function removeMember(userId: string): Promise<Household> {
-  return (await parseResponse(households.current.members[":userId"].$delete({ param: { userId } })))
-    .household;
+  return (
+    await parseResponse(
+      households.current.members[":userId"].$delete({ param: { userId: pathParam(userId) } }),
+    )
+  ).household;
 }
