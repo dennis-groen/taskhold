@@ -84,7 +84,7 @@ describe("deleting an account", () => {
 
     expect((await owner.api.viewer.$delete()).status).toBe(204);
     const visitor = await signUp();
-    const preview = await visitor.api.households.invites[":code"].$get({
+    const preview = await visitor.api.households.invites[":code"].preview.$post({
       param: { code: inviteCode },
     });
     expect(await errorCode(preview, 404)).toBe("INVITE_NOT_FOUND");

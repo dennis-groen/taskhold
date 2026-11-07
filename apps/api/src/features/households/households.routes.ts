@@ -27,7 +27,9 @@ export const householdRoutes = protectedRouter()
     const household = await householdsService.createHousehold(c.get("user").id, name);
     return c.json({ household }, 201);
   })
-  .get("/invites/:code", validate("param", inviteCodeParam), async (c) => {
+  // A POST, though it changes nothing the visitor sees: each miss spends the person's guess budget,
+  // so another site must not be able to make their browser look codes up (requireSameOrigin).
+  .post("/invites/:code/preview", validate("param", inviteCodeParam), async (c) => {
     const invite = await householdsService.previewInvite(
       c.get("user").id,
       c.req.valid("param").code,

@@ -1,0 +1,84 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e81dada4-3e97-4ee3-9db8-92ed5195959a",
+  "prevIds": [
+    "5cf6cd02-c592-495c-aaa5-66adcd0bdbca"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "invite_code_attempt"
+      ],
+      "writes": [
+        "s|fk|public.invite_code_attempt.invite_code_attempt_user_id_user_id_fk",
+        "n|fk|public.invite_code_attempt.invite_code_attempt_user_id_user_id_fk",
+        "e|fk|public.invite_code_attempt.invite_code_attempt_user_id_user_id_fk",
+        "n|con|public.invite_code_attempt.invite_code_attempt_user_id_user_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.invite_code_attempt",
+        "n|sch|public",
+        "e|col|public.invite_code_attempt.user_id"
+      ]
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "invite_code_attempt",
+        "invite_code_attempt_userId_attemptedAt_idx"
+      ],
+      "writes": [
+        "s|idx|public.invite_code_attempt_userId_attemptedAt_idx",
+        "n|idx|public.invite_code_attempt_userId_attemptedAt_idx",
+        "e|idx|public.invite_code_attempt_userId_attemptedAt_idx",
+        "n|rel|public.invite_code_attempt_userId_attemptedAt_idx"
+      ],
+      "reads": [
+        "e|tbl|public.invite_code_attempt",
+        "n|sch|public",
+        "e|col|public.invite_code_attempt.user_id",
+        "e|col|public.invite_code_attempt.attempted_at"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "invite_code_attempt",
+        "user_id"
+      ],
+      "writes": [
+        "s|col|public.invite_code_attempt.user_id",
+        "n|col|public.invite_code_attempt.user_id",
+        "e|col|public.invite_code_attempt.user_id"
+      ],
+      "reads": [
+        "n|tbl|public.invite_code_attempt",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"invite_code_attempt\",\"user_id\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"invite_code_attempt_userId_attemptedAt_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"invite_code_attempt\",\"invite_code_attempt_user_id_user_id_fk\"]"
+    }
+  ]
+}

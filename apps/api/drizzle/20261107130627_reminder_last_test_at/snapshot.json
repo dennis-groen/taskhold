@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3eb16885-424a-4481-9cdb-4204931a6438",
+  "prevIds": [
+    "e81dada4-3e97-4ee3-9db8-92ed5195959a"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "reminder_setting",
+        "last_test_at"
+      ],
+      "writes": [
+        "s|col|public.reminder_setting.last_test_at",
+        "n|col|public.reminder_setting.last_test_at",
+        "e|col|public.reminder_setting.last_test_at"
+      ],
+      "reads": [
+        "n|tbl|public.reminder_setting",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "reminder_setting",
+        "name": "last_test_at",
+        "type": "timestamp",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

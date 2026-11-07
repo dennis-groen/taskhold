@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { errorCode, householdWith, json, signUp } from "../../../test/harness.ts";
+import { anonymous, errorCode, householdWith, json, signUp } from "../../../test/harness.ts";
 
 describe("creating and joining", () => {
   it("makes the creator the owner, and anyone with the code a member", async () => {
@@ -36,7 +36,7 @@ describe("creating and joining", () => {
 
     const loose = `${inviteCode.slice(0, 4)}-${inviteCode.slice(4).toLowerCase()}`;
     const { invite } = await json(
-      await visitor.api.households.invites[":code"].$get({ param: { code: loose } }),
+      await visitor.api.households.invites[":code"].preview.$post({ param: { code: loose } }),
       200,
     );
     expect(invite.householdName).toBe("Test home");
@@ -51,7 +51,7 @@ describe("guessing invite codes", () => {
     const { inviteCode } = await householdWith(owner);
 
     for (let attempt = 0; attempt < 10; attempt++) {
-      const miss = await guesser.api.households.invites[":code"].$get({
+      const miss = await guesser.api.households.invites[":code"].preview.$post({
         param: { code: `ZZZZ${String(attempt).padStart(4, "Z")}` },
       });
       expect(await errorCode(miss, 404)).toBe("INVITE_NOT_FOUND");
@@ -68,6 +68,53 @@ describe("guessing invite codes", () => {
       param: { code: inviteCode },
     });
     await json(joined, 200);
+  });
+
+  it("keeps counting after the guesser deletes their account and signs in again", async () => {
+    const owner = await signUp();
+    const googleId = crypto.randomUUID();
+    const first = await signUp("Guesser", { googleId });
+    const { inviteCode } = await householdWith(owner);
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const miss = await first.api.households.invites[":code"].preview.$post({
+        param: { code: `YYYY${String(attempt).padStart(4, "Y")}` },
+      });
+      expect(await errorCode(miss, 404)).toBe("INVITE_NOT_FOUND");
+    }
+    expect((await first.api.viewer.$delete()).status).toBe(204);
+
+    const again = await signUp("Guesser", { googleId });
+    const real = await again.api.households.invites[":code"].accept.$post({
+      param: { code: inviteCode },
+    });
+    expect(await errorCode(real, 429)).toBe("TOO_MANY_INVITE_ATTEMPTS");
+  });
+
+  it("counts guesses sent all at once", async () => {
+    const guesser = await signUp();
+    const burst = await Promise.all(
+      Array.from({ length: 25 }, (_, attempt) =>
+        guesser.api.households.invites[":code"].preview.$post({
+          param: { code: `XXXX${String(attempt).padStart(4, "X")}` },
+        }),
+      ),
+    );
+    const statuses: number[] = burst.map((response) => response.status);
+    expect(statuses.filter((status) => status === 404)).toHaveLength(10);
+    expect(statuses.filter((status) => status === 429)).toHaveLength(15);
+  });
+
+  it("only looks codes up for requests from the app itself", async () => {
+    const owner = await signUp();
+    const visitor = await signUp();
+    const { inviteCode } = await householdWith(owner);
+
+    const crossSite = await anonymous.households.invites[":code"].preview.$post(
+      { param: { code: inviteCode } },
+      { headers: { cookie: visitor.cookie, origin: "https://evil.example" } },
+    );
+    expect(await errorCode(crossSite, 403)).toBe("CROSS_ORIGIN_REQUEST");
   });
 });
 
@@ -143,7 +190,7 @@ describe("managing members", () => {
       householdDeleted: true,
     });
     const visitor = await signUp();
-    const preview = await visitor.api.households.invites[":code"].$get({
+    const preview = await visitor.api.households.invites[":code"].preview.$post({
       param: { code: inviteCode },
     });
     expect(await errorCode(preview, 404)).toBe("INVITE_NOT_FOUND");

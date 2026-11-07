@@ -1,6 +1,6 @@
 // Data access for households: the only place that queries household tables.
 // Functions return plain records and take an optional executor so services can run them in a transaction.
-import { and, asc, count, eq, gte, lt } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 
 import { db, type Executor, type Transaction } from "../../db/db.ts";
 import { isUniqueViolation } from "../../db/pg-errors.ts";
@@ -189,29 +189,45 @@ export async function updateInviteCode(
   }
 }
 
-/** How many codes this user tried since `since` that matched no household */
+/**
+ * Takes a lock on one person's invite guesses until the transaction ends, so their concurrent
+ * lookups count and record misses one at a time instead of all reading the same count
+ */
+export async function lockInviteAttempts(identity: string, tx: Transaction): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${identity}, 0))`);
+}
+
+/** How many codes this person tried since `since` that matched no household */
 export async function countFailedInviteAttempts(
-  userId: string,
+  identity: string,
   since: Temporal.Instant,
   executor: Executor = db,
 ): Promise<number> {
   const rows = await executor
     .select({ count: count() })
     .from(inviteCodeAttempt)
-    .where(and(eq(inviteCodeAttempt.userId, userId), gte(inviteCodeAttempt.attemptedAt, since)));
+    .where(
+      and(eq(inviteCodeAttempt.identity, identity), gte(inviteCodeAttempt.attemptedAt, since)),
+    );
   return rows[0]?.count ?? 0;
 }
 
-/** Records a code that matched no household, and drops this user's attempts older than `prunedBefore` */
+/**
+ * Records a code that matched no household, and drops this person's attempts older than
+ * `prunedBefore` (and old rows from before attempts had an identity)
+ */
 export async function recordFailedInviteAttempt(
-  userId: string,
+  identity: string,
   prunedBefore: Temporal.Instant,
   executor: Executor = db,
 ): Promise<void> {
-  await executor.insert(inviteCodeAttempt).values({ userId });
+  await executor.insert(inviteCodeAttempt).values({ identity });
   await executor
     .delete(inviteCodeAttempt)
     .where(
-      and(eq(inviteCodeAttempt.userId, userId), lt(inviteCodeAttempt.attemptedAt, prunedBefore)),
+      and(
+        or(eq(inviteCodeAttempt.identity, identity), isNull(inviteCodeAttempt.identity)),
+        lt(inviteCodeAttempt.attemptedAt, prunedBefore),
+      ),
     );
 }

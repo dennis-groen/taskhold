@@ -1,6 +1,6 @@
 // Data access for chore reminders: the only place that queries the push subscription and
 // reminder setting tables.
-import { and, eq, exists, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, exists, isNull, lt, notInArray, or } from "drizzle-orm";
 
 import { db, type Executor } from "../../db/db.ts";
 import { pushSubscription, reminderSetting } from "./reminders.table.ts";
@@ -14,7 +14,10 @@ export type SubscriptionValues = {
 export type SubscriptionRecord = Pick<SubscriptionValues, "endpoint" | "p256dh" | "auth">;
 export type SettingRecord = typeof reminderSetting.$inferSelect;
 
-/** Adds the device, or hands it to this user if someone else had it (they signed in there) */
+/**
+ * Adds the device, or hands it to this user if someone else had it (they signed in there). Either
+ * way it counts as subscribed now, so it's the last of the person's devices to be dropped.
+ */
 export async function upsertSubscription(
   values: SubscriptionValues,
   executor: Executor = db,
@@ -24,8 +27,32 @@ export async function upsertSubscription(
     .values(values)
     .onConflictDoUpdate({
       target: pushSubscription.endpoint,
-      set: { userId: values.userId, p256dh: values.p256dh, auth: values.auth },
+      set: {
+        userId: values.userId,
+        p256dh: values.p256dh,
+        auth: values.auth,
+        createdAt: Temporal.Now.instant(),
+      },
     });
+}
+
+/** Deletes the person's devices except the `keep` most recently subscribed */
+export async function deleteOldestSubscriptions(
+  userId: string,
+  keep: number,
+  executor: Executor = db,
+): Promise<number> {
+  const newest = executor
+    .select({ id: pushSubscription.id })
+    .from(pushSubscription)
+    .where(eq(pushSubscription.userId, userId))
+    .orderBy(desc(pushSubscription.createdAt), desc(pushSubscription.id))
+    .limit(keep);
+  const rows = await executor
+    .delete(pushSubscription)
+    .where(and(eq(pushSubscription.userId, userId), notInArray(pushSubscription.id, newest)))
+    .returning({ id: pushSubscription.id });
+  return rows.length;
 }
 
 export async function deleteSubscription(
@@ -129,6 +156,28 @@ export async function claimDay(
       and(
         eq(reminderSetting.userId, userId),
         or(isNull(reminderSetting.lastSentOn), lt(reminderSetting.lastSentOn, date)),
+      ),
+    )
+    .returning({ userId: reminderSetting.userId });
+  return rows.length > 0;
+}
+
+/**
+ * Records a test notification sent now. False when the person sent one since `sentBefore`, or has
+ * no setting; the check and the write are one statement, so two requests can't both pass.
+ */
+export async function claimTestSend(
+  userId: string,
+  sentBefore: Temporal.Instant,
+  executor: Executor = db,
+): Promise<boolean> {
+  const rows = await executor
+    .update(reminderSetting)
+    .set({ lastTestAt: Temporal.Now.instant() })
+    .where(
+      and(
+        eq(reminderSetting.userId, userId),
+        or(isNull(reminderSetting.lastTestAt), lt(reminderSetting.lastTestAt, sentBefore)),
       ),
     )
     .returning({ userId: reminderSetting.userId });

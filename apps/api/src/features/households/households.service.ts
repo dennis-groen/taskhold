@@ -5,7 +5,9 @@
 // so concurrent joins, leaves and removals in one household happen one at a time.
 import { transaction, type Executor, type Transaction } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
+import { oneAtATime } from "../../lib/one-at-a-time.ts";
 import { annotate } from "../../lib/wide-event.ts";
+import * as authService from "../auth/auth.service.ts";
 import * as householdsRepo from "./households.repo.ts";
 import {
   alreadyInHousehold,
@@ -216,20 +218,32 @@ async function getHousehold(householdId: string): Promise<Household> {
   };
 }
 
-/** Looks up the household behind a code, counting misses against the user's guess budget */
+/**
+ * Looks up the household behind a code, counting misses against the person's guess budget. The
+ * budget belongs to their sign-in identity, so a new account for the same Google login doesn't get
+ * a fresh one, and their lookups run one at a time, so a burst of guesses can't all pass the check:
+ * queued in this process first, so waiting lookups don't hold database connections, then under a
+ * database lock for lookups on other API instances.
+ */
 async function findByInviteCode(userId: string, rawCode: string) {
-  const windowStart = Temporal.Now.instant().subtract(INVITE_GUESS_WINDOW);
-  const failures = await householdsRepo.countFailedInviteAttempts(userId, windowStart);
-  annotate("invite", { recent_failed_attempts: failures });
-  if (failures >= INVITE_GUESS_LIMIT) throw tooManyInviteAttempts();
+  const identity = await authService.signInIdentityOf(userId);
+  const lookUp = () =>
+    transaction(async (tx) => {
+      await householdsRepo.lockInviteAttempts(identity, tx);
+      const windowStart = Temporal.Now.instant().subtract(INVITE_GUESS_WINDOW);
+      const failures = await householdsRepo.countFailedInviteAttempts(identity, windowStart, tx);
+      annotate("invite", { recent_failed_attempts: failures });
+      if (failures >= INVITE_GUESS_LIMIT) throw tooManyInviteAttempts();
 
-  const code = normalizeInviteCode(rawCode);
-  const household = code ? await householdsRepo.findHouseholdByInviteCode(code) : null;
-  annotate("invite", { matched: household !== null });
-  if (!household) {
-    await householdsRepo.recordFailedInviteAttempt(userId, windowStart);
-    throw inviteNotFound();
-  }
+      const code = normalizeInviteCode(rawCode);
+      const found = code ? await householdsRepo.findHouseholdByInviteCode(code, tx) : null;
+      annotate("invite", { matched: found !== null });
+      // Recorded, not thrown, so the miss commits
+      if (!found) await householdsRepo.recordFailedInviteAttempt(identity, windowStart, tx);
+      return { household: found, missed: !found };
+    });
+  const { household, missed } = await oneAtATime(`invite:${identity}`, lookUp);
+  if (missed || !household) throw inviteNotFound();
   annotate("invite", { household_id: household.id });
   return household;
 }

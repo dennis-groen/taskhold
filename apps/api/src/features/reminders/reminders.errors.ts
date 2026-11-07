@@ -6,6 +6,13 @@ export const remindersUnavailable = () =>
 export const remindersOff = () =>
   new AppError("conflict", "REMINDERS_OFF", "Turn reminders on first.");
 
+export const testSentRecently = () =>
+  new AppError(
+    "too_many_requests",
+    "TEST_SENT_RECENTLY",
+    "A test notification was just sent. Wait a minute before sending another.",
+  );
+
 export const noReminderDevices = () =>
   new AppError(
     "conflict",

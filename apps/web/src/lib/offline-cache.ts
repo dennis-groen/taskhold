@@ -92,7 +92,7 @@ export function asWaiting(client: PersistedClient): PersistedClient {
 }
 
 /** Saves to localStorage, which is synchronous, so a save while the app is being hidden finishes */
-function createPersister(): Persister & { flush: () => void } {
+function createPersister(): Persister & { flush: () => void; discard: () => void } {
   let pending: PersistedClient | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -110,6 +110,13 @@ function createPersister(): Persister & { flush: () => void } {
     }
   }
 
+  /** Forgets a save that hasn't happened yet, leaving what's stored alone */
+  function discard() {
+    clearTimeout(timer);
+    timer = undefined;
+    pending = null;
+  }
+
   return {
     persistClient(client) {
       pending = client;
@@ -121,9 +128,7 @@ function createPersister(): Persister & { flush: () => void } {
       return saved === null ? undefined : (JSON.parse(saved) as PersistedClient);
     },
     removeClient() {
-      clearTimeout(timer);
-      timer = undefined;
-      pending = null;
+      discard();
       try {
         localStorage.removeItem(STORAGE_KEY);
       } catch {
@@ -131,12 +136,18 @@ function createPersister(): Persister & { flush: () => void } {
       }
     },
     flush,
+    discard,
   };
 }
 
 const persister = createPersister();
 
-let current: { userId: string; ready: Promise<void>; stop: () => void } | null = null;
+let current: {
+  userId: string;
+  queryClient: QueryClient;
+  ready: Promise<void>;
+  stop: () => void;
+} | null = null;
 
 /**
  * Restores what was saved for this person, keeps saving from then on, and sends the changes that
@@ -185,6 +196,7 @@ export function openOfflineCache(queryClient: QueryClient, userId: string | null
 
   current = {
     userId,
+    queryClient,
     ready,
     stop: () => {
       stopped = true;
@@ -209,7 +221,16 @@ export async function openSavedCopy(queryClient: QueryClient): Promise<void> {
 /** The person the saved copy belongs to, read from its buster */
 function savedFor(): string | null {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    return ownerOf(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    // Storage switched off
+    return null;
+  }
+}
+
+/** The person a saved copy (as stored) belongs to, read from its buster */
+function ownerOf(saved: string | null): string | null {
+  try {
     if (saved === null) return null;
     const parsed: unknown = JSON.parse(saved);
     const buster =
@@ -218,9 +239,27 @@ function savedFor(): string | null {
     if (typeof buster !== "string" || !buster.startsWith(prefix)) return null;
     return buster.slice(prefix.length) || null;
   } catch {
-    // Unreadable, or storage switched off
+    // Unreadable
     return null;
   }
+}
+
+/**
+ * Another tab signed out, or signed in as someone else, and removed or replaced the saved copy.
+ * This tab still holds the last person's data and keeps saving it, which would put it back for
+ * the next person. So it stops, drops it, and starts again to find out who is signed in now.
+ */
+function followOtherTab(event: StorageEvent) {
+  // A null key means the other tab cleared all of storage
+  if (event.key !== null && event.key !== STORAGE_KEY) return;
+  if (!current || ownerOf(event.newValue) === current.userId) return;
+  const { queryClient } = current;
+  current.stop();
+  current = null;
+  // Not removeClient: what's stored now belongs to the other tab
+  persister.discard();
+  queryClient.clear();
+  location.reload();
 }
 
 /**
@@ -257,4 +296,9 @@ if (typeof document !== "undefined") {
     if (document.visibilityState === "hidden") persister.flush();
   });
   window.addEventListener("pagehide", persister.flush);
+}
+
+// Other tabs of the app share the saved copy; `storage` fires here when one of them changes it
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("storage", followOtherTab);
 }

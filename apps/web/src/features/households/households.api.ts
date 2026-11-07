@@ -5,7 +5,7 @@ const households = api.households;
 export type Household = InferResponseType<typeof households.current.$get, 200>["household"];
 export type HouseholdMember = Household["members"][number];
 export type InvitePreview = InferResponseType<
-  (typeof households.invites)[":code"]["$get"],
+  (typeof households.invites)[":code"]["preview"]["$post"],
   200
 >["invite"];
 
@@ -64,7 +64,7 @@ export type InviteLookup =
 export async function lookUpInvite(code: string): Promise<InviteLookup> {
   try {
     const { invite } = await parseResponse(
-      households.invites[":code"].$get({ param: { code: pathParam(code) } }),
+      households.invites[":code"].preview.$post({ param: { code: pathParam(code) } }),
     );
     return { status: "found", invite };
   } catch (err) {

@@ -41,19 +41,20 @@ export const householdMember = pgTable(
   (table) => [index("household_member_householdId_idx").on(table.householdId)],
 );
 
-// One row per invite code that didn't match a household, so guessing codes can be capped per account
+// One row per invite code that didn't match a household, so guessing codes can be capped per person.
+// Keyed by the sign-in identity (e.g. "google:<account id>") rather than the user row, with no
+// foreign key: deleting the account and signing in again must not reset the budget.
 export const inviteCodeAttempt = pgTable(
   "invite_code_attempt",
   {
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    // Null only on rows from before this column existed, which no count matches
+    identity: text("identity"),
     attemptedAt: instant("attempted_at").default(now).notNull(),
   },
   (table) => [
-    index("invite_code_attempt_userId_attemptedAt_idx").on(table.userId, table.attemptedAt),
+    index("invite_code_attempt_identity_attemptedAt_idx").on(table.identity, table.attemptedAt),
   ],
 );

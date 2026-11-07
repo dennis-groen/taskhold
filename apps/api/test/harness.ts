@@ -8,7 +8,7 @@ import { afterAll } from "vitest";
 import { app } from "../src/app.ts";
 import { env } from "../src/env.ts";
 import { db, pool } from "../src/db/db.ts";
-import { session, user } from "../src/features/auth/auth.table.ts";
+import { account, session, user } from "../src/features/auth/auth.table.ts";
 
 // Every test file gets its own pool; close it so Vitest can exit
 afterAll(() => pool.end());
@@ -25,10 +25,15 @@ export type TestUser = {
 export const anonymous = clientFor({});
 
 /**
- * A new user with a session, the way Better Auth stores one after Google sign-in. The session
- * cookie is the token plus its HMAC-SHA256 signature, as Better Auth signs it.
+ * A new user with a session and a Google account, the way Better Auth stores them after Google
+ * sign-in. Pass the same `googleId` to sign the same Google login up again (e.g. after deleting
+ * the account). The session cookie is the token plus its HMAC-SHA256 signature, as Better Auth
+ * signs it.
  */
-export async function signUp(name = "Test Person"): Promise<TestUser> {
+export async function signUp(
+  name = "Test Person",
+  { googleId = randomUUID() }: { googleId?: string } = {},
+): Promise<TestUser> {
   const id = randomUUID();
   const token = randomUUID();
   const now = Temporal.Now.instant();
@@ -37,6 +42,14 @@ export async function signUp(name = "Test Person"): Promise<TestUser> {
     name,
     email: `${id}@example.test`,
     emailVerified: true,
+    createdAt: toDate(now),
+    updatedAt: toDate(now),
+  });
+  await db.insert(account).values({
+    id: randomUUID(),
+    accountId: googleId,
+    providerId: "google",
+    userId: id,
     createdAt: toDate(now),
     updatedAt: toDate(now),
   });

@@ -45,10 +45,30 @@ async function useOnlineAsSam() {
   return app;
 }
 
+/** What the app does on `window` events, recorded so tests can fire them */
+const windowListeners = new Map<string, EventListener>();
+const reload = vi.fn();
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal("localStorage", memoryStorage());
+  windowListeners.clear();
+  vi.stubGlobal("addEventListener", (type: string, listener: EventListener) => {
+    windowListeners.set(type, listener);
+  });
+  reload.mockClear();
+  vi.stubGlobal("location", { reload });
 });
+
+/** Another tab of the app changing the saved copy, as this tab hears of it */
+function otherTabStores(newValue: string | null) {
+  if (newValue === null) localStorage.removeItem(STORAGE_KEY);
+  else localStorage.setItem(STORAGE_KEY, newValue);
+  const listener = windowListeners.get("storage");
+  if (!listener) throw new Error("The app doesn't follow other tabs");
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the fields the app reads
+  listener({ key: STORAGE_KEY, newValue } as unknown as StorageEvent);
+}
 
 afterEach(() => {
   vi.useRealTimers();
@@ -132,5 +152,35 @@ describe("opening the app without a connection", () => {
     await vi.advanceTimersByTimeAsync(2 * 24 * 60 * 60 * 1_000);
 
     expect(app.keptForOffline(app.queryClient, "viewer")).toEqual(viewer);
+  });
+});
+
+describe("another tab of the app", () => {
+  it.each([
+    ["signs out", null],
+    ["signs in as someone else", JSON.stringify({ buster: "1:bo", timestamp: 0 })],
+  ])("when it %s, stops this tab saving the last person's data", async (_, newValue) => {
+    const app = await useOnlineAsSam();
+    // A change that is still waiting to be saved when the other tab signs out
+    app.queryClient.setQueryData(["shopping", "lists"], [...lists, { id: "diy", name: "DIY" }]);
+
+    otherTabStores(newValue);
+    app.queryClient.setQueryData(["todos"], ["Private thing"]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    windowListeners.get("pagehide")?.(new Event("pagehide"));
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(newValue);
+    expect(app.queryClient.getQueryData(["shopping", "lists"])).toBeUndefined();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("leaves this tab alone when it saves for the same person", async () => {
+    const app = await useOnlineAsSam();
+    const other = JSON.stringify({ buster: "1:sam", timestamp: Date.now(), clientState: {} });
+
+    otherTabStores(other);
+
+    expect(app.queryClient.getQueryData(["shopping", "lists"])).toEqual(lists);
+    expect(reload).not.toHaveBeenCalled();
   });
 });

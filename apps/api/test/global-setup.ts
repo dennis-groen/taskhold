@@ -22,6 +22,9 @@ export async function setup(project: TestProject) {
   try {
     const exists = await admin.query("select 1 from pg_database where datname = $1", [database]);
     if (exists.rowCount === 0) await admin.query(`create database "${database}"`);
+    // West of UTC on purpose: the app's pool must pin its sessions to UTC (db.ts), and with a UTC
+    // default here a missing pin would go unnoticed
+    await admin.query(`alter database "${database}" set timezone to 'America/New_York'`);
   } finally {
     await admin.end();
   }

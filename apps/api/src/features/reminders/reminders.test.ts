@@ -220,9 +220,8 @@ describe("devices", () => {
     const push = recorder();
     expect(await remindersService.sendTest(person.id, push.send)).toBe(1);
     expect(push.sent.map((s) => s.endpoint)).toEqual([keep]);
-    const again = recorder();
-    await remindersService.sendTest(person.id, again.send);
-    expect(again.sent.map((s) => s.endpoint)).toEqual([keep]);
+    const left = await remindersRepo.findSubscriptions(person.id);
+    expect(left.map((device) => device.endpoint)).toEqual([keep]);
   });
 
   it("move to whoever signs in on that browser, and turn off one at a time", async () => {
@@ -241,9 +240,8 @@ describe("devices", () => {
       }),
       200,
     );
-    const firstPush = recorder();
-    await remindersService.sendTest(first.id, firstPush.send);
-    expect(firstPush.sent.map((s) => s.endpoint)).toEqual([keep]);
+    const firstDevices = await remindersRepo.findSubscriptions(first.id);
+    expect(firstDevices.map((device) => device.endpoint)).toEqual([keep]);
 
     // Someone else's device can't be turned off by its endpoint
     const off = await first.api.reminders.subscription.$delete({ json: { endpoint: browser } });
@@ -251,5 +249,50 @@ describe("devices", () => {
     const secondPush = recorder();
     await remindersService.sendTest(second.id, secondPush.send);
     expect(secondPush.sent.map((s) => s.endpoint)).toEqual([browser]);
+  });
+
+  it("are kept to the 10 most recently turned on, per person", async () => {
+    const person = await signUp();
+    const oldest = await turnOn(person);
+    const second = await turnOn(person);
+    for (let device = 0; device < 8; device++) await turnOn(person);
+    // Turning a device on again makes it the newest
+    await json(
+      await person.api.reminders.subscription.$put({
+        json: {
+          subscription: { endpoint: oldest, keys: { p256dh: "BPublicKey-x_1", auth: "secret_1" } },
+          timeZone: "UTC",
+        },
+      }),
+      200,
+    );
+    const newest = await turnOn(person);
+
+    const endpoints = (await remindersRepo.findSubscriptions(person.id)).map((d) => d.endpoint);
+    expect(endpoints).toHaveLength(10);
+    expect(endpoints).toEqual(expect.arrayContaining([oldest, newest]));
+    expect(endpoints).not.toContain(second);
+  });
+});
+
+describe("test notifications", () => {
+  it("go out at most once a minute per person, even when asked for all at once", async () => {
+    const person = await signUp();
+    await turnOn(person);
+
+    const push = recorder();
+    const burst = await Promise.allSettled(
+      Array.from({ length: 5 }, () => remindersService.sendTest(person.id, push.send)),
+    );
+    expect(burst.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(push.sent).toHaveLength(1);
+
+    const again = await person.api.reminders.test.$post();
+    expect(await errorCode(again, 429)).toBe("TEST_SENT_RECENTLY");
+
+    // Only this person is held back
+    const other = await signUp();
+    await turnOn(other);
+    expect(await remindersService.sendTest(other.id, recorder().send)).toBe(1);
   });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE "reminder_setting" ADD COLUMN "last_test_at" timestamp;

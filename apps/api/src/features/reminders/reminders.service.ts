@@ -7,12 +7,22 @@ import { annotate } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
 import { env } from "../../env.ts";
 import * as remindersRepo from "./reminders.repo.ts";
-import { noReminderDevices, remindersOff, remindersUnavailable } from "./reminders.errors.ts";
+import {
+  noReminderDevices,
+  remindersOff,
+  remindersUnavailable,
+  testSentRecently,
+} from "./reminders.errors.ts";
 import { isPushService, type SubscribeInput } from "./reminders.schema.ts";
 
 const DEFAULT_REMIND_AT = Temporal.PlainTime.from("08:00");
 // A summary names this many chores, then says how many more there are
 const NAMES_SHOWN = 4;
+// Each device is a push request every day, and a stored endpoint; a household's phones, tablets
+// and browsers fit well within this. Subscribing another drops the one subscribed longest ago.
+const MAX_DEVICES = 10;
+// A test notification goes to every device, so one per person per minute
+const TEST_INTERVAL = Temporal.Duration.from({ minutes: 1 });
 
 export async function getStatus(userId: string) {
   const setting = await remindersRepo.findSetting(userId);
@@ -33,6 +43,8 @@ export async function subscribe(userId: string, input: SubscribeInput): Promise<
   const { endpoint, keys } = input.subscription;
   await transaction(async (tx) => {
     await remindersRepo.upsertSubscription({ userId, endpoint, ...keys }, tx);
+    const dropped = await remindersRepo.deleteOldestSubscriptions(userId, MAX_DEVICES, tx);
+    if (dropped > 0) annotate("reminders", { devices_dropped: dropped });
     await remindersRepo.upsertSetting(
       { userId, remindAt: DEFAULT_REMIND_AT, timeZone: input.timeZone },
       tx,
@@ -56,6 +68,8 @@ export async function sendTest(userId: string, send: SendPush = sendPush): Promi
   if (!pushConfigured) throw remindersUnavailable();
   const devices = await remindersRepo.findSubscriptions(userId);
   if (devices.length === 0) throw noReminderDevices();
+  const sentBefore = Temporal.Now.instant().subtract(TEST_INTERVAL);
+  if (!(await remindersRepo.claimTestSend(userId, sentBefore))) throw testSentRecently();
   const sent = await deliver(
     devices,
     {

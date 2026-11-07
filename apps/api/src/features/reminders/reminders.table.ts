@@ -6,6 +6,7 @@ import { user } from "../auth/auth.table.ts";
 
 // A browser or phone that gets chore reminders: the Web Push subscription it handed the app.
 // The endpoint is unique per browser, so signing in as someone else there moves it to them.
+// A person keeps only their most recently subscribed devices (see reminders.service.ts).
 export const pushSubscription = pgTable(
   "push_subscription",
   {
@@ -34,6 +35,8 @@ export const reminderSetting = pgTable("reminder_setting", {
   timeZone: text("time_zone").notNull(),
   // The local date of the last summary, so each day gets at most one
   lastSentOn: plainDate("last_sent_on"),
+  // When the person last sent themselves a test notification, so they can't send one after another
+  lastTestAt: instant("last_test_at"),
   updatedAt: instant("updated_at")
     .default(now)
     .$onUpdate(() => Temporal.Now.instant())

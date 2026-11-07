@@ -17,6 +17,10 @@ export const pool = new Pool({
   statement_timeout: 10_000,
   // Postgres ends a session that sits in an open transaction without sending anything
   idle_in_transaction_session_timeout: 10_000,
+  // Timestamps are stored without time zone and read as UTC (see columns.ts), and `now()` defaults
+  // are written in the session's time zone. Pinning it here keeps both on one clock whatever the
+  // server or database default is; otherwise e.g. the invite guess budget never fills up.
+  options: "-c TimeZone=UTC",
 });
 
 // An idle connection can fail (Postgres restarted, network dropped). Without a listener that's an

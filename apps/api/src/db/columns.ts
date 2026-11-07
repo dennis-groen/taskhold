@@ -6,8 +6,8 @@ import { customType } from "drizzle-orm/pg-core";
 /**
  * A `timestamp` (without time zone) holding a UTC instant, read as a Temporal.Instant.
  * Postgres returns "2026-11-01 13:31:33.621921", or "2026-11-01T13:31:33.621921" inside the JSON of
- * relational queries. Both are read as UTC: the app writes UTC, and `now` defaults assume the
- * database's time zone is UTC, as it is in compose.yaml.
+ * relational queries. Both are read as UTC: the app writes UTC, and `now` defaults are written in
+ * the session's time zone, which the pool pins to UTC (db.ts).
  */
 export const instant = customType<{ data: Temporal.Instant; driverData: string }>({
   dataType: () => "timestamp",

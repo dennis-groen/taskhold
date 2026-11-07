@@ -1,0 +1,99 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "5cf6cd02-c592-495c-aaa5-66adcd0bdbca",
+  "prevIds": [
+    "b0cf72fd-5339-40a6-b7e1-1915988ad52e"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "invite_code_attempt",
+        "identity"
+      ],
+      "writes": [
+        "s|col|public.invite_code_attempt.identity",
+        "n|col|public.invite_code_attempt.identity",
+        "e|col|public.invite_code_attempt.identity"
+      ],
+      "reads": [
+        "n|tbl|public.invite_code_attempt",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "invite_code_attempt",
+        "invite_code_attempt_identity_attemptedAt_idx"
+      ],
+      "writes": [
+        "s|idx|public.invite_code_attempt_identity_attemptedAt_idx",
+        "n|idx|public.invite_code_attempt_identity_attemptedAt_idx",
+        "e|idx|public.invite_code_attempt_identity_attemptedAt_idx",
+        "n|rel|public.invite_code_attempt_identity_attemptedAt_idx"
+      ],
+      "reads": [
+        "n|tbl|public.invite_code_attempt",
+        "n|sch|public",
+        "n|col|public.invite_code_attempt.identity",
+        "n|col|public.invite_code_attempt.attempted_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "invite_code_attempt",
+        "name": "identity",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "invite_code_attempt",
+        "name": "invite_code_attempt_identity_attemptedAt_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "identity",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "attempted_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}
