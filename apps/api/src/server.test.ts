@@ -44,7 +44,11 @@ describe("serving the web app next to the API", () => {
     expect((await server.request("/favicon.svg")).headers.get("content-type")).toContain("svg");
 
     // Not the app's HTML, which would then be cached forever under an asset's name
-    expect((await server.request("/assets/index-old999.js")).status).toBe(404);
+    const missing = await server.request("/assets/index-old999.js");
+    expect(missing.status).toBe(404);
+    // Nor the 404 itself: a CDN would keep answering 404 for a file that exists once the deploy
+    // that adds it has finished
+    expect(missing.headers.get("cache-control")).toBe("no-store");
   });
 
   it("keeps the API's own responses, and answers unknown API paths with JSON", async () => {

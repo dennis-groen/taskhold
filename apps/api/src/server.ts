@@ -38,12 +38,7 @@ export function createServer(webRoot: string | undefined) {
       )
       .use("*", async (c, next) => {
         await next();
-        c.res.headers.set(
-          "Cache-Control",
-          // Built assets have content hashes in their names, so they never change. Everything else
-          // (index.html above all) is checked on every visit, so people get the current asset names.
-          c.req.path.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
-        );
+        c.res.headers.set("Cache-Control", cacheControl(c.req.path, c.res.status));
       })
       .get("*", serveStatic({ root: webRoot }))
       // A missing asset (e.g. an old file name after a deploy) is a 404, not the app's HTML
@@ -51,4 +46,15 @@ export function createServer(webRoot: string | undefined) {
       // Every app route (/lists, /chores, ...) is index.html; the router takes it from there
       .get("*", serveStatic({ root: webRoot, path: "index.html" }))
   );
+}
+
+/**
+ * Built assets have content hashes in their names, so they never change. Everything else
+ * (index.html above all) is checked on every visit, so people get the current asset names. Errors
+ * aren't kept anywhere: during a deploy a new asset can briefly be missing, and a 404 a CDN keeps
+ * for a year breaks every browser that asks for it after the deploy finished.
+ */
+function cacheControl(path: string, status: number): string {
+  if (status >= 400) return "no-store";
+  return path.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache";
 }
