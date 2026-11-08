@@ -53,7 +53,19 @@ export async function completeChore(choreId: string, today: string): Promise<Cho
   ).chore;
 }
 
-/** Takes back the chore's most recent completion */
+/**
+ * Skips a repeating chore this time: its due date moves one interval on, and the skip goes in its
+ * history. `today` is the date on this device.
+ */
+export async function skipChore(choreId: string, today: string): Promise<ChoreDetail> {
+  return (
+    await parseResponse(
+      chores[":choreId"].skip.$post({ param: { choreId: pathParam(choreId) }, json: { today } }),
+    )
+  ).chore;
+}
+
+/** Takes back the chore's most recent completion or skip */
 export async function undoCompletion(choreId: string): Promise<ChoreDetail> {
   return (
     await parseResponse(chores[":choreId"].undo.$post({ param: { choreId: pathParam(choreId) } }))

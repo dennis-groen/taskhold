@@ -1,0 +1,1 @@
+ALTER TABLE "chore_completion" ADD COLUMN "skipped" boolean DEFAULT false NOT NULL;

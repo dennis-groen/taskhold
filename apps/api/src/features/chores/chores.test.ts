@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addInterval, couldBeToday } from "./chore-dates.ts";
+import { addInterval, couldBeToday, skippedTo } from "./chore-dates.ts";
 import {
   errorCode,
   householdWith,
@@ -39,6 +39,13 @@ function complete(person: TestUser, choreId: string, today = utcToday()) {
   });
 }
 
+function skip(person: TestUser, choreId: string, today = utcToday()) {
+  return person.api.chores[":choreId"].skip.$post({
+    param: { choreId },
+    json: { today: today.toString() },
+  });
+}
+
 describe("due date rules", () => {
   it("adds days and weeks to calendar dates, across daylight saving changes", () => {
     const date = Temporal.PlainDate.from("2026-03-28");
@@ -47,6 +54,15 @@ describe("due date rules", () => {
     expect(addInterval(Temporal.PlainDate.from("2026-12-30"), 3, "day").toString()).toBe(
       "2027-01-02",
     );
+  });
+
+  it("skips to one interval after the due date, or after today once it's overdue", () => {
+    const today = Temporal.PlainDate.from("2026-11-08");
+    const skipped = (dueOn: string) =>
+      skippedTo(Temporal.PlainDate.from(dueOn), today, 1, "week").toString();
+    expect(skipped("2026-11-08")).toBe("2026-11-15");
+    expect(skipped("2026-11-05")).toBe("2026-11-15");
+    expect(skipped("2026-11-10")).toBe("2026-11-17");
   });
 
   it("accepts as today only dates within a day of the UTC date", () => {
@@ -121,6 +137,89 @@ describe("completing chores", () => {
   });
 });
 
+describe("skipping chores", () => {
+  it("moves the date on and keeps the skip in the history, without counting it as done", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner, { dueOn: utcToday().subtract({ days: 3 }).toString() });
+
+    const { chore: skipped } = await json(await skip(owner, chore.id), 200);
+    expect(skipped.dueOn).toBe(utcToday().add({ weeks: 1 }).toString());
+    expect(skipped.done).toBe(false);
+    expect(skipped.history).toHaveLength(1);
+    expect(skipped.history[0]).toMatchObject({
+      skipped: true,
+      completedOn: utcToday().toString(),
+      completedBy: { id: owner.id },
+    });
+  });
+
+  it("counts a second skip on the same day once", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner);
+
+    await json(await skip(owner, chore.id), 200);
+    const { chore: again } = await json(await skip(owner, chore.id), 200);
+    expect(again.history).toHaveLength(1);
+    expect(again.dueOn).toBe(utcToday().add({ weeks: 1 }).toString());
+  });
+
+  it("still lets someone do it after skipping it earlier the same day", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner);
+
+    await json(await skip(owner, chore.id), 200);
+    const { chore: done } = await json(await complete(owner, chore.id), 200);
+    expect(done.history.map((entry) => entry.skipped)).toEqual([false, true]);
+    expect(done.dueOn).toBe(utcToday().add({ weeks: 1 }).toString());
+  });
+
+  it("puts the date back on undo", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const due = utcToday().subtract({ days: 2 }).toString();
+    const chore = await choreOf(owner, { dueOn: due });
+    await json(await skip(owner, chore.id), 200);
+
+    const undo = owner.api.chores[":choreId"].undo.$post({ param: { choreId: chore.id } });
+    const { chore: undone } = await json(await undo, 200);
+    expect(undone).toMatchObject({ dueOn: due, lastCompletion: null, history: [] });
+  });
+
+  it("isn't done, or cleared, once a skipped chore stops repeating", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner);
+    await json(await skip(owner, chore.id), 200);
+
+    const update = owner.api.chores[":choreId"].$patch({
+      param: { choreId: chore.id },
+      json: { repeat: null },
+    });
+    expect((await json(await update, 200)).chore.done).toBe(false);
+    expect(await json(await owner.api.chores["clear-done"].$post(), 200)).toEqual({ removed: 0 });
+  });
+
+  it("only skips repeating chores", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner, { repeat: null, dueOn: utcToday().toString() });
+
+    expect(await errorCode(await skip(owner, chore.id), 400)).toBe("CHORE_NOT_REPEATING");
+  });
+
+  it("refuses a 'today' that can't be today anywhere", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner);
+
+    const response = await skip(owner, chore.id, utcToday().add({ days: 3 }));
+    expect(await errorCode(response, 400)).toBe("INVALID_TODAY");
+  });
+});
+
 describe("chore rules", () => {
   it("needs a due date for a repeating chore", async () => {
     const owner = await signUp();
@@ -192,6 +291,7 @@ describe("chore rules", () => {
       chores.$patch({ param, json: { name: "Mine now" } }),
       chores.$delete({ param }),
       complete(outsider, chore.id),
+      skip(outsider, chore.id),
       chores.undo.$post({ param }),
     ];
     for (const attempt of await Promise.all(attempts)) {

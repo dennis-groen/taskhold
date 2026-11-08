@@ -140,7 +140,7 @@ export async function deleteChore(
   return rows.length > 0;
 }
 
-/** Deletes one-off chores that have been done. Returns how many went. */
+/** Deletes one-off chores that have been done (not just skipped). Returns how many went. */
 export async function deleteDoneOneOffChores(
   householdId: string,
   executor: Executor = db,
@@ -149,7 +149,13 @@ export async function deleteDoneOneOffChores(
     .select({ choreId: choreCompletion.choreId })
     .from(choreCompletion)
     .innerJoin(chore, eq(chore.id, choreCompletion.choreId))
-    .where(and(eq(chore.householdId, householdId), isNull(chore.repeatEvery)));
+    .where(
+      and(
+        eq(chore.householdId, householdId),
+        isNull(chore.repeatEvery),
+        eq(choreCompletion.skipped, false),
+      ),
+    );
   const rows = await executor
     .delete(chore)
     .where(
@@ -166,6 +172,7 @@ const completionFields = {
   completedByName: user.name,
   completedOn: choreCompletion.completedOn,
   previousDueOn: choreCompletion.previousDueOn,
+  skipped: choreCompletion.skipped,
   createdAt: choreCompletion.createdAt,
 };
 
@@ -227,6 +234,7 @@ export async function insertCompletion(
     completedById: string;
     completedOn: Temporal.PlainDate;
     previousDueOn: Temporal.PlainDate | null;
+    skipped?: boolean;
   },
   executor: Executor = db,
 ): Promise<void> {

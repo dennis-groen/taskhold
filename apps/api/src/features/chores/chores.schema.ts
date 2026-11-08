@@ -37,12 +37,20 @@ export const choreRecordSchema = choreColumns
   .extend({ assignee: assigneeSchema.nullable() });
 
 export const completionRecordSchema = completionColumns
-  .pick({ id: true, choreId: true, completedOn: true, previousDueOn: true, createdAt: true })
+  .pick({
+    id: true,
+    choreId: true,
+    completedOn: true,
+    previousDueOn: true,
+    skipped: true,
+    createdAt: true,
+  })
   .extend({ completedBy: userSummarySchema.nullable() });
 
 export const choreCompletionSchema = completionRecordSchema.pick({
   id: true,
   completedOn: true,
+  skipped: true,
   createdAt: true,
   completedBy: true,
 });
@@ -97,6 +105,9 @@ export const completeChoreBody = z.object({
   /** What day it is where the person is */
   today: plainDateInputSchema,
 });
+
+/** Skipping says what day it is too: an overdue chore's next date counts on from today */
+export const skipChoreBody = completeChoreBody;
 
 export type CreateChoreInput = z.output<typeof createChoreBody>;
 export type UpdateChoreInput = z.output<typeof updateChoreBody>;

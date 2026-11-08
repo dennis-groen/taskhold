@@ -7,13 +7,14 @@ import { transaction, type Executor } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
-import { addInterval, couldBeToday } from "./chore-dates.ts";
+import { addInterval, couldBeToday, skippedTo } from "./chore-dates.ts";
 import * as choresRepo from "./chores.repo.ts";
 import {
   assigneeNotMember,
   choreNotFound,
   dueDateRequired,
   implausibleToday,
+  notRepeating,
   nothingToUndo,
 } from "./chores.errors.ts";
 import type {
@@ -137,9 +138,9 @@ export async function completeChore(
     const [latest] = await choresRepo.findCompletions(choreId, 1, tx);
     const { repeatEvery, repeatUnit } = current;
     const repeats = repeatEvery !== null && repeatUnit !== null;
-    const alreadyDone = repeats
-      ? latest !== undefined && latest.completedOn.equals(today)
-      : latest !== undefined;
+    // A skip earlier today doesn't count: someone may do it after all
+    const alreadyDone =
+      latest !== undefined && !latest.skipped && (!repeats || latest.completedOn.equals(today));
     annotate("chores", { repeats, already_done: alreadyDone });
     if (alreadyDone) return;
 
@@ -155,7 +156,50 @@ export async function completeChore(
   return loadDetail(household.id, choreId);
 }
 
-/** Removes the chore's most recent completion and puts its due date back to what it was */
+/**
+ * Skips a repeating chore this time: its due date moves one interval on (see skippedTo) and the
+ * skip goes in its history, so Undo can put the date back and nobody's credited with doing it.
+ * Skipping twice the same day changes nothing, so a double tap counts once.
+ */
+export async function skipChore(
+  userId: string,
+  choreId: string,
+  today: Temporal.PlainDate,
+): Promise<ChoreDetail> {
+  annotate("chores", { chore_id: choreId });
+  if (!couldBeToday(today)) throw implausibleToday();
+  const household = await householdsService.getMembershipOf(userId);
+  const ref = { householdId: household.id, choreId };
+
+  await transaction(async (tx) => {
+    const current = await choresRepo.lockChore(ref, tx);
+    if (!current) throw choreNotFound();
+    const { repeatEvery, repeatUnit, dueOn } = current;
+    if (repeatEvery === null || repeatUnit === null || dueOn === null) throw notRepeating();
+
+    const [latest] = await choresRepo.findCompletions(choreId, 1, tx);
+    const alreadySkipped =
+      latest !== undefined && latest.skipped && latest.completedOn.equals(today);
+    annotate("chores", { already_skipped: alreadySkipped });
+    if (alreadySkipped) return;
+
+    await choresRepo.insertCompletion(
+      { choreId, completedById: userId, completedOn: today, previousDueOn: dueOn, skipped: true },
+      tx,
+    );
+    await choresRepo.updateChore(
+      ref,
+      { dueOn: skippedTo(dueOn, today, repeatEvery, repeatUnit) },
+      tx,
+    );
+  });
+  await changed(household.id);
+  return loadDetail(household.id, choreId);
+}
+
+/**
+ * Removes the chore's most recent completion or skip and puts its due date back to what it was
+ */
 export async function undoLastCompletion(userId: string, choreId: string): Promise<ChoreDetail> {
   annotate("chores", { chore_id: choreId });
   const household = await householdsService.getMembershipOf(userId);
@@ -266,7 +310,7 @@ function toChore(
     dueOn: record.dueOn,
     assignee: record.assignee,
     lastCompletion: latest && toCompletion(latest),
-    done: repeat === null && latest !== null,
+    done: repeat === null && latest !== null && !latest.skipped,
   };
 }
 
@@ -275,6 +319,7 @@ function toCompletion(record: choresRepo.CompletionRecord): ChoreCompletion {
     id: record.id,
     completedBy: record.completedBy,
     completedOn: record.completedOn,
+    skipped: record.skipped,
     createdAt: record.createdAt,
   };
 }

@@ -71,7 +71,9 @@ export function registerChoreMutations(queryClient: QueryClient): void {
 
 /** The chore after `person` does it on `on`, by the same rules as the API */
 export function markedDone(chore: Chore, person: Person, on: string): Chore {
-  if (chore.repeat ? chore.lastCompletion?.completedOn === on : chore.done) return chore;
+  // A skip earlier the same day doesn't count as done: someone may do it after all
+  const doneToday = chore.lastCompletion?.completedOn === on && !chore.lastCompletion.skipped;
+  if (chore.repeat ? doneToday : chore.done) return chore;
   return {
     ...chore,
     dueOn: chore.repeat ? addInterval(on, chore.repeat) : chore.dueOn,
@@ -80,6 +82,7 @@ export function markedDone(chore: Chore, person: Person, on: string): Chore {
       id: crypto.randomUUID(),
       completedBy: person,
       completedOn: on,
+      skipped: false,
       createdAt: Temporal.Now.instant().toString(),
     },
   };

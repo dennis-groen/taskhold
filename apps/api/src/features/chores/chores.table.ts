@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 
 import { instant, now, plainDate } from "../../db/columns.ts";
 
@@ -43,7 +43,8 @@ export const chore = pgTable(
   ],
 );
 
-// Every time a chore was done. The latest one can be undone, which puts the due date back.
+// Every time a chore was done or skipped. The latest one can be undone, which puts the due date
+// back.
 export const choreCompletion = pgTable(
   "chore_completion",
   {
@@ -57,6 +58,8 @@ export const choreCompletion = pgTable(
     completedById: text("completed_by_id").references(() => user.id, { onDelete: "set null" }),
     // The date where the person was when they did it, which the next due date counts from
     completedOn: plainDate("completed_on").notNull(),
+    // Skipped rather than done: it moved the due date on, but nobody did the chore that time
+    skipped: boolean("skipped").default(false).notNull(),
     // The chore's due date before this completion moved it, so undoing can restore it
     previousDueOn: plainDate("previous_due_on"),
     createdAt: instant("created_at").default(now).notNull(),

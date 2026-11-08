@@ -20,5 +20,12 @@ export const implausibleToday = () =>
     "Your device's date looks wrong. Check its date settings and try again.",
   );
 
+export const notRepeating = () =>
+  new AppError(
+    "bad_request",
+    "CHORE_NOT_REPEATING",
+    "Only repeating chores can be skipped. Change its date instead.",
+  );
+
 export const nothingToUndo = () =>
   new AppError("conflict", "NOTHING_TO_UNDO", "There's nothing to undo for this chore.");

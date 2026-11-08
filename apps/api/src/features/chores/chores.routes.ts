@@ -6,6 +6,7 @@ import {
   choreParam,
   completeChoreBody,
   createChoreBody,
+  skipChoreBody,
   updateChoreBody,
 } from "./chores.schema.ts";
 
@@ -50,6 +51,20 @@ export const choreRoutes = protectedRouter()
     async (c) => {
       const { choreId } = c.req.valid("param");
       const chore = await choresService.completeChore(
+        c.get("user").id,
+        choreId,
+        c.req.valid("json").today,
+      );
+      return c.json({ chore }, 200);
+    },
+  )
+  .post(
+    "/:choreId/skip",
+    validate("param", choreParam),
+    validate("json", skipChoreBody),
+    async (c) => {
+      const { choreId } = c.req.valid("param");
+      const chore = await choresService.skipChore(
         c.get("user").id,
         choreId,
         c.req.valid("json").today,

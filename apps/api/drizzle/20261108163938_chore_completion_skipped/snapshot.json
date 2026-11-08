@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "03ca6fda-8983-40ff-921e-dad594cdf05d",
+  "prevIds": [
+    "3eb16885-424a-4481-9cdb-4204931a6438"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "chore_completion",
+        "skipped"
+      ],
+      "writes": [
+        "s|col|public.chore_completion.skipped",
+        "n|col|public.chore_completion.skipped",
+        "e|col|public.chore_completion.skipped"
+      ],
+      "reads": [
+        "n|tbl|public.chore_completion",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "chore_completion",
+        "name": "skipped",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}
