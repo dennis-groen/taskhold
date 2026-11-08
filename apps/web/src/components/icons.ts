@@ -27,6 +27,7 @@ export {
   HandSoapIcon,
   HouseIcon,
   HouseLineIcon,
+  InfoIcon,
   JarIcon,
   KeyIcon,
   LinkIcon,

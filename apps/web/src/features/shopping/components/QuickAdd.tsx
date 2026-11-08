@@ -15,9 +15,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 
-import { useAddItem, useBuyAgain } from "../shopping.hooks.ts";
+import type { Entry } from "../item-entry.ts";
+import { useAddEntry, useAddItem, useBuyAgain, useEditItem } from "../shopping.hooks.ts";
 import type { ShoppingListSummary } from "../shopping.api.ts";
-import { listsQuery } from "../shopping.queries.ts";
+import { listQuery, listsQuery } from "../shopping.queries.ts";
+import { AlreadyOnList } from "./AlreadyOnList.tsx";
 import { BuyAgain } from "./BuyAgain.tsx";
 import { NewListForm } from "./NewListForm.tsx";
 
@@ -75,11 +77,13 @@ function QuickAddForm({
   const [picked, setPicked] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [added, setAdded] = useState<{ count: number; text: string } | null>(null);
+  // What the last add did, counted so the same message animates in again
+  const [notice, setNotice] = useState<Notice | null>(null);
   // Chips tapped in this sheet, per list, so one leaves the row at once, even before that list
   // has loaded and can say it's on there
   const [tapped, setTapped] = useState<string[]>([]);
-  const add = useAddItem(viewer);
+  const addEntry = useAddEntry(viewer);
+  const addAnyway = useAddItem(viewer);
 
   const destination =
     lists?.find((list) => list.id === picked) ??
@@ -88,6 +92,16 @@ function QuickAddForm({
   const suggestions = useBuyAgain(destination?.id, name).filter(
     (suggestion) => !tapped.includes(`${destination?.id}:${suggestion}`),
   );
+  const edit = useEditItem(destination?.id);
+  // Already loaded for "buy again"; read here so the notice follows housemates' changes
+  const { data: destinationList } = useQuery({
+    ...listQuery(destination?.id ?? ""),
+    enabled: destination !== undefined,
+  });
+  const alreadyOn =
+    notice?.kind === "already" && notice.listId === destination?.id
+      ? destinationList?.items.find((item) => item.id === notice.itemId && !item.checked)
+      : undefined;
 
   if (!lists)
     return (
@@ -107,17 +121,32 @@ function QuickAddForm({
     );
   }
 
-  /** Adds to the chosen list with what's in the quantity field, then clears both fields */
+  /**
+   * Adds to the chosen list with what's in the quantity field, unless the list already has it,
+   * then clears both fields
+   */
   function addToList(itemName: string) {
     if (!destination) return;
-    add(destination.id, itemName, quantity.trim() || null);
+    const result = addEntry(destination.id, itemName, quantity);
     setName("");
     setQuantity("");
-    setAdded((last) => ({
-      count: (last?.count ?? 0) + 1,
-      text: `Added ${itemName} to ${destination.name}`,
-    }));
+    setNotice((last) => {
+      const count = (last?.count ?? 0) + 1;
+      return result.kind === "already"
+        ? {
+            count,
+            kind: "already",
+            listId: destination.id,
+            itemId: result.item.id,
+            entry: result.entry,
+          }
+        : { count, kind: "said", text: `Added ${result.entry.name} to ${destination.name}` };
+    });
     nameRef.current?.focus();
+  }
+
+  function say(text: string) {
+    setNotice((last) => ({ count: (last?.count ?? 0) + 1, kind: "said", text }));
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -161,15 +190,30 @@ function QuickAddForm({
         </Button>
       </div>
 
-      <div className="h-6 pt-1.5 text-sm" aria-live="polite">
-        {added && (
+      <div className="min-h-6 pt-1.5 text-sm" aria-live="polite">
+        {notice?.kind === "said" && (
           <span
-            key={added.count}
+            key={notice.count}
             className="inline-flex items-center gap-1 font-medium text-primary-soft-foreground animate-in fade-in slide-in-from-bottom-1 duration-200"
           >
             <CheckIcon className="size-4" weight="bold" aria-hidden />
-            {added.text}
+            {notice.text}
           </span>
+        )}
+        {notice?.kind === "already" && alreadyOn && destination && (
+          <AlreadyOnList
+            key={notice.count}
+            item={alreadyOn}
+            entry={notice.entry}
+            onSetQuantity={(nextQuantity) => {
+              edit(alreadyOn.id, { quantity: nextQuantity });
+              say(`${alreadyOn.name} is now ${nextQuantity}`);
+            }}
+            onAddAnyway={() => {
+              addAnyway(destination.id, notice.entry.name, notice.entry.quantity);
+              say(`Added ${notice.entry.name} to ${destination.name}`);
+            }}
+          />
         )}
       </div>
 
@@ -205,3 +249,7 @@ function QuickAddForm({
     </form>
   );
 }
+
+type Notice =
+  | { count: number; kind: "said"; text: string }
+  | { count: number; kind: "already"; listId: string; itemId: string; entry: Entry };

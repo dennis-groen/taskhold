@@ -1,5 +1,6 @@
 // "Buy again": which of the household's past buys to offer as one-tap chips. Ranked here, not in
 // the API, so suggestions follow what's on the list and what's being typed, offline too.
+import { foldName as fold } from "./item-entry.ts";
 import type { BoughtItem } from "./shopping.api.ts";
 
 /** How many chips to offer with nothing typed, and while typing */
@@ -82,13 +83,4 @@ function score(trips: number, lateness: number | null): number {
 
 function byScore(a: { name: string; score: number }, b: { name: string; score: number }) {
   return b.score - a.score || a.name.localeCompare(b.name);
-}
-
-/** "Crème fraîche " and "creme fraiche" are the same thing */
-function fold(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
 }
