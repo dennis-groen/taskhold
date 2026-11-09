@@ -148,6 +148,26 @@
       }
     },
 
+    // Rules the web app bundles from the API (exports in apps/api/package.json) import types only,
+    // so no server code reaches the browser
+    {
+      "files": ["apps/api/src/features/chores/chore-schedule.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": ".*",
+                "allowTypeImports": true,
+                "message": "The web app bundles this file (@taskhold/api/chore-schedule). Import types only, so no server code reaches the browser."
+              }
+            ]
+          }
+        ]
+      }
+    },
+
     // Web layering: routes -> features -> shared (components, lib). Features never import each other,
     // and write through changes (lib/offline-changes.ts) rather than their own mutations.
     {

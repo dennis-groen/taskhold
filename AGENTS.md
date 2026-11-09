@@ -43,7 +43,8 @@ Folder names match in both apps and follow the URL.
 
 - API files: `<feature>.<role>.ts`. Roles: `routes`, `service`, `repo`, `table`, `schema` (zod contract: request input and response shapes), `errors`, `middleware`, `scheduler`, `test`
 - Web files: `<feature>.<role>.ts`. Roles: `api` (RPC calls), `queries` (query keys and queryOptions), `changes` (writes, declared with `defineChange` from `lib/offline-changes.ts`), `hooks`, `test`
-- Domain logic that isn't a role gets a descriptive name: `invite-code.ts`, `chore-dates.ts`. Both exist in both apps on purpose: the web copy mirrors the API's rule
+- Domain logic that isn't a role gets a descriptive name: `invite-code.ts`, `chore-schedule.ts`
+- A rule both apps need lives once in the API and the web app imports it through an export in `apps/api/package.json` (`chore-schedule.ts` as `@taskhold/api/chore-schedule`). Such a file imports types only, which lint enforces. `invite-code.ts` predates this and is still mirrored
 - Components: PascalCase file named after the component it exports (`ChoreRow.tsx` exports `ChoreRow`)
 - A web feature stays flat until it has about 10 files, then moves its components and pages to `components/`. No other subfolders
 - Tests sit next to their source as `*.test.ts`

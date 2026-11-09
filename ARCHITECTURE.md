@@ -26,7 +26,7 @@ features/
     households.test.ts        integration tests for the feature's routes
     invite-code.ts            pure domain logic: generate and normalize codes
   shopping/               shopping lists and items, scoped to the user's household
-  chores/                 chores and their completions; chore-dates.ts holds the due-date rules
+  chores/                 chores and their history; chore-schedule.ts holds the due-date rules, shared with the web app
   todos/                  private to-dos, scoped to the user rather than a household; can move one to chores
   reminders/              push subscriptions and reminder settings; reminders.scheduler.ts sends due reminders
   live/                   server-sent change notifications
@@ -45,6 +45,7 @@ Requests flow `routes → service → repo → database`, never backwards.
 
 - Services throw `AppError(kind, code, message)`. `lib/error-handler.ts` maps the `kind` to a status code and responds with `{ error: { code, message } }`.
 - Every request is logged as one wide event (`lib/request-logger.ts`). Services add what they know about the request with `annotate(group, fields)` from `lib/wide-event.ts`, using ids and counts, never names, codes or other user content. Don't log separate lines during a request: add to its event instead.
+- A rule the web app needs too (what marking a chore done or skipping it does to its due date) lives once in the API and is exported for the web app in `package.json`, like the RPC client: `features/chores/chore-schedule.ts` is `@taskhold/api/chore-schedule`. The web app bundles that file, so it may import types only (lint enforces it), and it stays free of HTTP and the database: the service applies its answers inside its transaction.
 - A feature may call another feature's service, never its repo. `viewer` uses `auth` and `households` this way, `shopping` asks `householdsService.getMembershipOf()` which household a user is in, and `todos` calls `choresService.createChore()` to move a to-do to chores.
 - Data that belongs to a household is always queried with the household id in the `WHERE` clause, so an id from another household reads as missing (404) and never leaks.
 - Table files may import other features' tables, because foreign keys cross features.
@@ -96,7 +97,8 @@ features/
     chores.queries.ts     React Query keys and queryOptions
     chores.changes.ts     marking done, putting off, and taking either back
     chores.hooks.ts       useChores: the chores plus marking done; usePutOff: tomorrow and skip
-    chore-dates.ts        repeat rule (mirrors the API's) and repeat labels; general date helpers are in lib/dates.ts
+    chore-dates.ts        scheduleOf (a chore for the API's schedule rules) and repeat labels; general date
+                          helpers are in lib/dates.ts
     components/           ChoreForm, ChoreRow, ChoreSheet, NewChoreDrawer, AddChoreButton, ChoresPage
   todos/
     todos.api.ts, todos.queries.ts, todos.changes.ts
@@ -146,6 +148,7 @@ Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/Ja
 - API routes and middleware can't import a repo, a table, the database client or `drizzle-orm`.
 - API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's repo.
 - API repo files can't import services or routes. `lib/` and `env.ts` can't import features.
+- `chore-schedule.ts`, which the web app bundles, imports types only.
 - Web shared code can't import features or routes. Features can't import routes or other features, and can't nest folders more than one level deep.
 - Web features don't import `useMutation` or `mutationOptions`: writes are changes (`lib/offline-changes.ts`).
 - Web code imports icons from `components/icons.ts`, never from `@phosphor-icons/react`, so the icon library can be swapped in one file. Only `icons.ts` and the shadcn files in `components/ui/` import the library.
