@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addInterval, couldBeToday, skippedTo } from "./chore-dates.ts";
+import { couldBeToday } from "./chore-dates.ts";
 import {
   errorCode,
   householdWith,
@@ -46,25 +46,8 @@ function skip(person: TestUser, choreId: string, today = utcToday()) {
   });
 }
 
-describe("due date rules", () => {
-  it("adds days and weeks to calendar dates, across daylight saving changes", () => {
-    const date = Temporal.PlainDate.from("2026-03-28");
-    expect(addInterval(date, 1, "day").toString()).toBe("2026-03-29");
-    expect(addInterval(date, 2, "week").toString()).toBe("2026-04-11");
-    expect(addInterval(Temporal.PlainDate.from("2026-12-30"), 3, "day").toString()).toBe(
-      "2027-01-02",
-    );
-  });
-
-  it("skips to one interval after the due date, or after today once it's overdue", () => {
-    const today = Temporal.PlainDate.from("2026-11-08");
-    const skipped = (dueOn: string) =>
-      skippedTo(Temporal.PlainDate.from(dueOn), today, 1, "week").toString();
-    expect(skipped("2026-11-08")).toBe("2026-11-15");
-    expect(skipped("2026-11-05")).toBe("2026-11-15");
-    expect(skipped("2026-11-10")).toBe("2026-11-17");
-  });
-
+// What marking done and skipping do to a due date is tested in chore-schedule.test.ts
+describe("today from the client", () => {
   it("accepts as today only dates within a day of the UTC date", () => {
     const utc = Temporal.PlainDate.from("2026-11-01");
     expect(couldBeToday(Temporal.PlainDate.from("2026-10-31"), utc)).toBe(true);

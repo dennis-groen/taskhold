@@ -1,29 +1,4 @@
-// Pure date rules for chores. Due dates are Temporal.PlainDates: calendar days with no time or
-// time zone, so adding days or weeks never trips over a daylight saving change.
-import type { RepeatUnit } from "./chores.table.ts";
-
-/** The date `every` days or weeks after `date` */
-export function addInterval(
-  date: Temporal.PlainDate,
-  every: number,
-  unit: RepeatUnit,
-): Temporal.PlainDate {
-  return date.add(unit === "week" ? { weeks: every } : { days: every });
-}
-
-/**
- * Where skipping a repeating chore moves it: one interval after its due date, or after today when
- * it's overdue, so skipping never leaves it overdue straight away
- */
-export function skippedTo(
-  dueOn: Temporal.PlainDate,
-  today: Temporal.PlainDate,
-  every: number,
-  unit: RepeatUnit,
-): Temporal.PlainDate {
-  const from = Temporal.PlainDate.compare(dueOn, today) < 0 ? today : dueOn;
-  return addInterval(from, every, unit);
-}
+// Date checks only the API needs. The schedule rules both apps share are in chore-schedule.ts.
 
 /**
  * Whether `date` can be today somewhere on Earth right now. Clients say what day it is for them;

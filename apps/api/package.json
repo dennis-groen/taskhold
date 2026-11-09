@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./client": "./src/rpc-client.ts"
+    "./client": "./src/rpc-client.ts",
+    "./chore-schedule": "./src/features/chores/chore-schedule.ts"
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",

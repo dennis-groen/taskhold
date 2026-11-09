@@ -1,13 +1,14 @@
 // Business rules for chores. Every member of a household can see, change and do all of its chores;
 // nobody else can, and a chore from another household looks the same as one that doesn't exist.
 //
-// A repeating chore's next due date counts from the day it was done, not from when it was due, so a
-// household that falls behind doesn't come back to a pile of overdue chores.
+// What marking done, skipping and putting off do to a due date is chore-schedule.ts's, shared with
+// the web app. This file decides who may do it, locks, and writes.
 import { transaction, type Executor } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
-import { addInterval, couldBeToday, skippedTo } from "./chore-dates.ts";
+import { couldBeToday } from "./chore-dates.ts";
+import { isDone, markDone, skip, type ChoreSchedule } from "./chore-schedule.ts";
 import * as choresRepo from "./chores.repo.ts";
 import {
   assigneeNotMember,
@@ -136,29 +137,27 @@ export async function completeChore(
     if (!current) throw choreNotFound();
 
     const [latest] = await choresRepo.findCompletions(choreId, 1, tx);
-    const { repeatEvery, repeatUnit } = current;
-    const repeats = repeatEvery !== null && repeatUnit !== null;
-    // A skip earlier today doesn't count: someone may do it after all
-    const alreadyDone =
-      latest !== undefined && !latest.skipped && (!repeats || latest.completedOn.equals(today));
-    annotate("chores", { repeats, already_done: alreadyDone });
-    if (alreadyDone) return;
+    const schedule = scheduleOf(current, latest ?? null);
+    const done = markDone(schedule, today);
+    annotate("chores", {
+      repeats: schedule.repeat !== null,
+      already_done: done.kind === "unchanged",
+    });
+    if (done.kind === "unchanged") return;
 
     await choresRepo.insertCompletion(
       { choreId, completedById: userId, completedOn: today, previousDueOn: current.dueOn },
       tx,
     );
-    if (repeats) {
-      await choresRepo.updateChore(ref, { dueOn: addInterval(today, repeatEvery, repeatUnit) }, tx);
-    }
+    if (schedule.repeat) await choresRepo.updateChore(ref, { dueOn: done.dueOn }, tx);
   });
   await changed(household.id);
   return loadDetail(household.id, choreId);
 }
 
 /**
- * Skips a repeating chore this time: its due date moves one interval on (see skippedTo) and the
- * skip goes in its history, so Undo can put the date back and nobody's credited with doing it.
+ * Skips a repeating chore this time: its due date moves one repeat on (see chore-schedule.ts) and
+ * the skip goes in its history, so Undo can put the date back and nobody's credited with doing it.
  * Skipping twice the same day changes nothing, so a double tap counts once.
  */
 export async function skipChore(
@@ -174,24 +173,23 @@ export async function skipChore(
   await transaction(async (tx) => {
     const current = await choresRepo.lockChore(ref, tx);
     if (!current) throw choreNotFound();
-    const { repeatEvery, repeatUnit, dueOn } = current;
-    if (repeatEvery === null || repeatUnit === null || dueOn === null) throw notRepeating();
-
     const [latest] = await choresRepo.findCompletions(choreId, 1, tx);
-    const alreadySkipped =
-      latest !== undefined && latest.skipped && latest.completedOn.equals(today);
-    annotate("chores", { already_skipped: alreadySkipped });
-    if (alreadySkipped) return;
+    const skipped = skip(scheduleOf(current, latest ?? null), today);
+    if (skipped.kind === "not-repeating") throw notRepeating();
+    annotate("chores", { already_skipped: skipped.kind === "unchanged" });
+    if (skipped.kind === "unchanged") return;
 
     await choresRepo.insertCompletion(
-      { choreId, completedById: userId, completedOn: today, previousDueOn: dueOn, skipped: true },
+      {
+        choreId,
+        completedById: userId,
+        completedOn: today,
+        previousDueOn: current.dueOn,
+        skipped: true,
+      },
       tx,
     );
-    await choresRepo.updateChore(
-      ref,
-      { dueOn: skippedTo(dueOn, today, repeatEvery, repeatUnit) },
-      tx,
-    );
+    await choresRepo.updateChore(ref, { dueOn: skipped.dueOn }, tx);
   });
   await changed(household.id);
   return loadDetail(household.id, choreId);
@@ -310,7 +308,20 @@ function toChore(
     dueOn: record.dueOn,
     assignee: record.assignee,
     lastCompletion: latest && toCompletion(latest),
-    done: repeat === null && latest !== null && !latest.skipped,
+    done: isDone(scheduleOf(record, latest)),
+  };
+}
+
+/** A chore as the schedule rules see it, from its row and the newest entry in its history */
+function scheduleOf(
+  chore: Pick<choresRepo.ChoreRecord, "repeatEvery" | "repeatUnit" | "dueOn">,
+  latest: Pick<choresRepo.CompletionRecord, "completedOn" | "skipped"> | null,
+): ChoreSchedule {
+  const { repeatEvery: every, repeatUnit: unit, dueOn } = chore;
+  return {
+    repeat: every !== null && unit !== null ? { every, unit } : null,
+    dueOn,
+    last: latest && { on: latest.completedOn, skipped: latest.skipped },
   };
 }
 
