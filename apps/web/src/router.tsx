@@ -5,7 +5,7 @@ import { createRouter } from "@tanstack/react-router";
 import { PageSkeleton } from "./components/PageSkeleton.tsx";
 import { registerChoreMutations } from "./features/chores/chores.mutations.ts";
 import { shoppingChanges } from "./features/shopping/shopping.changes.ts";
-import { registerTodoMutations } from "./features/todos/todos.mutations.ts";
+import { todoChanges } from "./features/todos/todos.changes.ts";
 import { registerChanges } from "./lib/offline-changes.ts";
 import { routeTree } from "./routeTree.gen";
 
@@ -24,7 +24,7 @@ export const queryClient = new QueryClient({
 // before any page sets them up. Registered before the saved copy is restored.
 registerChanges(queryClient, shoppingChanges);
 registerChoreMutations(queryClient);
-registerTodoMutations(queryClient);
+registerChanges(queryClient, todoChanges);
 
 // React Query assumes it's online until the browser says otherwise. Opening the app without a
 // connection must hold changes back from the start, not send them and fail.
