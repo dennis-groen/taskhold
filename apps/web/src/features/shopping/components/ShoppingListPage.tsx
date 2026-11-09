@@ -21,7 +21,7 @@ import type { Housemate } from "@/lib/shared-with.ts";
 import { ShoppingItemRow } from "./ShoppingItemRow.tsx";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { useBuyAgain, useShoppingList } from "../shopping.hooks.ts";
-import type { ItemChanges } from "../shopping.mutations.ts";
+import type { ItemChanges } from "../shopping.changes.ts";
 import { CATEGORY_ICONS } from "../category-icons.ts";
 import { categorize } from "../categories.ts";
 import type { Entry } from "../item-entry.ts";

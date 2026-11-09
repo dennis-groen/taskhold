@@ -4,8 +4,9 @@ import { createRouter } from "@tanstack/react-router";
 // Import the generated route tree
 import { PageSkeleton } from "./components/PageSkeleton.tsx";
 import { registerChoreMutations } from "./features/chores/chores.mutations.ts";
-import { registerShoppingMutations } from "./features/shopping/shopping.mutations.ts";
+import { shoppingChanges } from "./features/shopping/shopping.changes.ts";
 import { registerTodoMutations } from "./features/todos/todos.mutations.ts";
+import { registerChanges } from "./lib/offline-changes.ts";
 import { routeTree } from "./routeTree.gen";
 
 export const queryClient = new QueryClient({
@@ -21,7 +22,7 @@ export const queryClient = new QueryClient({
 
 // Changes saved on the device find their API call and optimistic update here after a restart,
 // before any page sets them up. Registered before the saved copy is restored.
-registerShoppingMutations(queryClient);
+registerChanges(queryClient, shoppingChanges);
 registerChoreMutations(queryClient);
 registerTodoMutations(queryClient);
 

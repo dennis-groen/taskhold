@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { stepQuantity } from "../item-quantity.ts";
-import type { ItemChanges } from "../shopping.mutations.ts";
+import type { ItemChanges } from "../shopping.changes.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
 
 /**

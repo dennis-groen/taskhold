@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, dehydrate } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // React Query keeps everything forever on a server, which Node looks like without a window. The app
@@ -152,6 +152,17 @@ describe("opening the app without a connection", () => {
     await vi.advanceTimersByTimeAsync(2 * 24 * 60 * 60 * 1_000);
 
     expect(app.keptForOffline(app.queryClient, "viewer")).toEqual(viewer);
+  });
+});
+
+describe("what's kept on the device", () => {
+  it("keeps only lists, chores and to-dos", async () => {
+    const { queryClient, dehydrateOptions } = await openApp();
+    queryClient.setQueryData(["shopping", "list", "groceries"], { id: "groceries", items: [] });
+    queryClient.setQueryData(["reminders", "status"], { enabled: true });
+
+    const { queries } = dehydrate(queryClient, dehydrateOptions);
+    expect(queries.map((query) => query.queryKey)).toEqual([["shopping", "list", "groceries"]]);
   });
 });
 

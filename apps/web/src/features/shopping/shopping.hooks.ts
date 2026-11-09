@@ -1,10 +1,10 @@
-import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { offerUndo } from "@/lib/feedback.ts";
+import { useChange } from "@/lib/offline-changes.ts";
 
 import { findWaiting, parseEntry, type Entry } from "./item-entry.ts";
 import type { ShoppingItem } from "./shopping.api.ts";
-import { shoppingMutations, type ItemChanges } from "./shopping.mutations.ts";
+import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
 import { suggestBuyAgain } from "./buy-again.ts";
 import { historyQuery, isListGone, listQuery } from "./shopping.queries.ts";
 
@@ -12,24 +12,16 @@ type Person = { id: string; name: string };
 
 /**
  * A list plus the changes people make to it. Every change shows on screen straight away and is
- * rolled back if the API rejects it (see shopping.mutations.ts).
+ * rolled back if the API rejects it (see shopping.changes.ts).
  */
 export function useShoppingList(listId: string, viewer: Person) {
   const { data: list, error: refetchError } = useSuspenseQuery(listQuery(listId));
-  const mutations = shoppingMutations(useQueryClient());
   const add = useAddItem(viewer);
   const addEntry = useAddEntry(viewer);
-  const toggle = useMutation(mutations.toggle);
-
-  const removals = removalScope(listId);
-  const edit = useMutation({ ...mutations.edit, scope: removals });
-  const remove = useMutation({ ...mutations.remove, scope: removals });
-  const clearChecked = useMutation({ ...mutations.clearChecked, scope: removals });
-  const restore = useMutation({ ...mutations.restore, scope: removals });
-
-  function offerRestore(removed: ShoppingItem[], message: string) {
-    offerUndo(message, () => restore.mutate({ listId, items: removed }));
-  }
+  const toggle = useChange(shoppingChanges.toggle);
+  const edit = useChange(shoppingChanges.edit);
+  const remove = useChange(shoppingChanges.remove);
+  const clearChecked = useChange(shoppingChanges.clearChecked);
 
   return {
     list,
@@ -40,30 +32,28 @@ export function useShoppingList(listId: string, viewer: Person) {
     /** Adds an entry even though the list has it already. Returns the new item's id. */
     addAnyway: (entry: Entry) => add(listId, entry.name, entry.quantity),
     toggle: (itemId: string, checked: boolean) =>
-      toggle.mutate({ listId, itemId, checked, by: person(viewer) }),
+      toggle.run({ listId, itemId, checked, by: person(viewer) }),
     /** Changes the name and quantity; leave a field out to keep it */
-    edit: (itemId: string, changes: ItemChanges) => edit.mutate({ listId, itemId, changes }),
+    edit: (itemId: string, changes: ItemChanges) => edit.run({ listId, itemId, changes }),
     remove: (itemId: string) => {
       const item = list.items.find((candidate) => candidate.id === itemId);
       if (!item) return;
-      remove.mutate({ listId, itemId });
-      offerRestore([item], `${item.name} removed`);
+      remove.run({ listId, itemId }, { message: `${item.name} removed` });
     },
     clearChecked: () => {
-      const checked = list.items.filter((item) => item.checked);
-      if (checked.length === 0) return;
-      clearChecked.mutate({ listId });
-      offerRestore(checked, cleared(checked.length));
+      const count = list.items.filter((item) => item.checked).length;
+      if (count === 0) return;
+      clearChecked.run({ listId }, { message: cleared(count) });
     },
   };
 }
 
 /** Adds an item to any list, optimistically when that list is on screen or cached */
 export function useAddItem(viewer: Person) {
-  const add = useMutation(shoppingMutations(useQueryClient()).add);
+  const add = useChange(shoppingChanges.add);
   return (listId: string, name: string, quantity: string | null) => {
     const id = crypto.randomUUID();
-    add.mutate({ listId, id, name, quantity, by: person(viewer) });
+    add.run({ listId, id, name, quantity, by: person(viewer) });
     return id;
   };
 }
@@ -93,19 +83,10 @@ export function useAddEntry(viewer: Person) {
 
 /** Changes an item's name or quantity on any list; leave a field out to keep it */
 export function useEditItem(listId: string | undefined) {
-  const mutations = shoppingMutations(useQueryClient());
-  const edit = useMutation({ ...mutations.edit, scope: removalScope(listId ?? "") });
+  const edit = useChange(shoppingChanges.edit);
   return (itemId: string, changes: ItemChanges) => {
-    if (listId) edit.mutate({ listId, itemId, changes });
+    if (listId) edit.run({ listId, itemId, changes });
   };
-}
-
-/**
- * Edits, removals and the undos that put items back run one after another, so an undo can't
- * reach the API before the removal it undoes, and an edit can't arrive after its item went
- */
-function removalScope(listId: string) {
-  return { id: `shopping-removals-${listId}` };
 }
 
 /**
