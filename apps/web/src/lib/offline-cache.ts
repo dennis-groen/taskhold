@@ -7,14 +7,7 @@ import {
   type PersistedClient,
   type Persister,
 } from "@tanstack/query-persist-client-core";
-import type {
-  DehydrateOptions,
-  Mutation,
-  Query,
-  QueryClient,
-  UseMutationOptions,
-  WithRequired,
-} from "@tanstack/react-query";
+import type { DehydrateOptions, Mutation, Query, QueryClient } from "@tanstack/react-query";
 
 const STORAGE_KEY = "taskhold:offline-cache";
 
@@ -40,31 +33,10 @@ const SAVED_AREAS = new Set<unknown>(["shopping", "chores", "todos", KEPT]);
 export type Kept = "viewer" | "household";
 
 /**
- * A change marked `meta: { idempotent: true }` does the same when the API gets it twice. Only
- * those are saved while their request is on its way, because nobody can tell whether a request
- * the app was closed during reached the server. Others are saved only while they wait for a
- * connection, when they certainly haven't been sent.
+ * Saves the areas' data, and the changes still waiting for a connection. One whose request is on
+ * its way is saved only when it's idempotent (see ChangeMeta in offline-changes.ts), because
+ * nobody can tell whether a request the app was closed during reached the server.
  */
-export type ChangeMeta = { idempotent?: boolean };
-
-/**
- * Makes a change's options the defaults for its key, so a change saved on the device can run
- * after a restart, before any page has set it up. Every change that can wait for a connection
- * needs this.
- */
-export function resumable<TData, TVariables, TOnMutateResult>(
-  queryClient: QueryClient,
-  options: WithRequired<
-    UseMutationOptions<TData, Error, TVariables, TOnMutateResult>,
-    "mutationKey"
-  >,
-): void {
-  queryClient.setMutationDefaults<TData, Error, TVariables, TOnMutateResult>(
-    options.mutationKey,
-    options,
-  );
-}
-
 export const dehydrateOptions: DehydrateOptions = {
   shouldDehydrateQuery: (query: Query) =>
     query.state.status === "success" && SAVED_AREAS.has(query.queryKey[0]),

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { SkipForwardIcon, SunHorizonIcon, TrashIcon } from "@/components/icons.ts";
@@ -12,18 +12,11 @@ import {
 } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { daysBetween, dueLabel, pastDateLabel } from "@/lib/dates.ts";
-import { changeFailed, offerUndo } from "@/lib/feedback.ts";
 import { cn } from "cn";
 
 import { repeatLabel } from "../chore-dates.ts";
-import {
-  deleteChore,
-  skipChore,
-  updateChore,
-  type Chore,
-  type ChoreDetail,
-  type ChoreInput,
-} from "../chores.api.ts";
+import { deleteChore, updateChore, type Chore, type ChoreInput } from "../chores.api.ts";
+import { usePutOff } from "../chores.hooks.ts";
 import { choreKeys, choreQuery } from "../chores.queries.ts";
 import { ChoreForm, type Member } from "./ChoreForm.tsx";
 
@@ -126,7 +119,7 @@ function SheetBody({
       </DrawerHeader>
 
       <div className="overflow-y-auto px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-        <PutOff chore={chore} today={today} onUndoSkip={onUndo} onDone={onClose} />
+        <PutOff chore={chore} today={today} onDone={onClose} />
 
         <ChoreForm
           // Starts over when an undo moves the due date, so saving can't put the old one back
@@ -203,47 +196,11 @@ type PutOffHow = "tomorrow" | "skip";
 /**
  * For a chore that can't be done now. Tomorrow (once it's due) moves the date and nothing else.
  * Skip this time (repeating chores) moves it one interval on and says so in the history, so
- * nobody has to tick it off when it wasn't done. Either one closes the sheet and offers Undo.
+ * nobody has to tick it off when it wasn't done. Either one closes the sheet and offers Undo, and
+ * waits on the device when there's no connection.
  */
-function PutOff({
-  chore,
-  today,
-  onUndoSkip,
-  onDone,
-}: {
-  chore: Chore;
-  today: string;
-  onUndoSkip: (choreId: string) => void;
-  onDone: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const tomorrow = Temporal.PlainDate.from(today).add({ days: 1 }).toString();
-
-  async function show(updated: ChoreDetail) {
-    queryClient.setQueryData(choreKeys.detail(updated.id), updated);
-    await queryClient.invalidateQueries({ queryKey: choreKeys.list() });
-  }
-
-  const putOff = useMutation({
-    mutationFn: (how: PutOffHow) =>
-      how === "skip" ? skipChore(chore.id, today) : updateChore(chore.id, { dueOn: tomorrow }),
-    onSuccess: async (updated, how) => {
-      await show(updated);
-      onDone();
-      if (how === "tomorrow") {
-        offerUndo(`${chore.name} moved to tomorrow.`, () => {
-          // Puts back the date it had; the move isn't kept in the history
-          updateChore(chore.id, { dueOn: chore.dueOn }).then(show, (err: unknown) =>
-            changeFailed(err, "Couldn't undo that. Try again."),
-          );
-        });
-      } else {
-        const due = updated.dueOn ? ` ${dueLabel(updated.dueOn, today)}.` : "";
-        offerUndo(`${chore.name} skipped.${due}`, () => onUndoSkip(chore.id));
-      }
-    },
-    onError: (err) => changeFailed(err, "Couldn't move that. Check your connection and try again."),
-  });
+function PutOff({ chore, today, onDone }: { chore: Chore; today: string; onDone: () => void }) {
+  const putOff = usePutOff();
 
   const canTomorrow = !chore.done && chore.dueOn !== null && daysBetween(today, chore.dueOn) <= 0;
   // Skipped already today: a second skip would change nothing, and Undo is in the history
@@ -255,10 +212,12 @@ function PutOff({
     <Button
       variant="outline"
       size="lg"
-      disabled={putOff.isPending}
-      onClick={() => putOff.mutate(how)}
+      onClick={() => {
+        putOff[how](chore, today);
+        onDone();
+      }}
     >
-      {putOff.isPending && putOff.variables === how ? <Spinner /> : <Icon aria-hidden />}
+      <Icon aria-hidden />
       {label}
     </Button>
   );

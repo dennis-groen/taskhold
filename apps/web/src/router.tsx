@@ -3,7 +3,7 @@ import { createRouter } from "@tanstack/react-router";
 
 // Import the generated route tree
 import { PageSkeleton } from "./components/PageSkeleton.tsx";
-import { registerChoreMutations } from "./features/chores/chores.mutations.ts";
+import { choreChanges } from "./features/chores/chores.changes.ts";
 import { shoppingChanges } from "./features/shopping/shopping.changes.ts";
 import { todoChanges } from "./features/todos/todos.changes.ts";
 import { registerChanges } from "./lib/offline-changes.ts";
@@ -23,7 +23,7 @@ export const queryClient = new QueryClient({
 // Changes saved on the device find their API call and optimistic update here after a restart,
 // before any page sets them up. Registered before the saved copy is restored.
 registerChanges(queryClient, shoppingChanges);
-registerChoreMutations(queryClient);
+registerChanges(queryClient, choreChanges);
 registerChanges(queryClient, todoChanges);
 
 // React Query assumes it's online until the browser says otherwise. Opening the app without a

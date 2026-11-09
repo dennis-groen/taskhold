@@ -11,7 +11,6 @@ import { SharedWithLine } from "@/components/SharedWithLine.tsx";
 import type { Housemate } from "@/lib/shared-with.ts";
 import { Button } from "@/components/ui/button";
 import { DUE_GROUPS, dueGroup, dueLabel, today as todayOnDevice } from "@/lib/dates.ts";
-import { offerUndo } from "@/lib/feedback.ts";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { cn } from "cn";
 
@@ -75,18 +74,15 @@ export function ChoresPage({
   }
 
   function markDone(chore: Chore) {
-    const after = complete(chore);
+    const after = complete(chore, (marked) => ({
+      message:
+        marked.repeat && marked.dueOn
+          ? `${chore.name} done. ${dueLabel(marked.dueOn, today)}.`
+          : `${chore.name} done.`,
+      onUndo: () => hold(chore, null),
+    }));
     // Its old place and due date, but done, with this completion ("Done by you today")
     hold(chore, { ...chore, done: true, lastCompletion: after.lastCompletion });
-    offerUndo(
-      after.repeat && after.dueOn
-        ? `${chore.name} done. ${dueLabel(after.dueOn, today)}.`
-        : `${chore.name} done.`,
-      () => {
-        hold(chore, null);
-        undo(chore.id);
-      },
-    );
   }
 
   // Errors stay in the confirm dialog, so people can retry or cancel
