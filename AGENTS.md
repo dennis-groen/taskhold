@@ -2,7 +2,7 @@
 
 A phone-first PWA for people who share a household: shared shopping lists, chores with reminders, and private to-dos.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) explains the layers, data flow and lint rules in full. This file is the short map.
+[ARCHITECTURE.md](ARCHITECTURE.md) explains the layers, data flow and lint rules in full. This file is the short map. [GLOSSARY.md](GLOSSARY.md) holds the domain's words.
 
 ## Commands
 
@@ -20,7 +20,7 @@ A phone-first PWA for people who share a household: shared shopping lists, chore
 - `apps/api/src/db/schema.ts`: re-exports every `*.table.ts`, listed by hand
 - `apps/api/src/lib/`: infrastructure only (AppError, error handler, logger, push). No business logic
 - `apps/api/test/`: shared test setup only (`harness.ts`, `global-setup.ts`)
-- `apps/web/src/features/<noun>/`: api, queries, mutations, hooks, components
+- `apps/web/src/features/<noun>/`: api, queries, changes, hooks, components
 - `apps/web/src/routes/`: thin TanStack file routes that compose feature components
 - `apps/web/src/components/ui/`: shadcn primitives; never import a feature
 - `apps/web/src/components/icons.ts`: every icon the app uses; import icons from here, never from `@phosphor-icons/react`
@@ -42,7 +42,7 @@ Folder names match in both apps and follow the URL.
 ## Conventions
 
 - API files: `<feature>.<role>.ts`. Roles: `routes`, `service`, `repo`, `table`, `schema` (zod contract: request input and response shapes), `errors`, `middleware`, `scheduler`, `test`
-- Web files: `<feature>.<role>.ts`. Roles: `api` (RPC calls), `queries` (query keys and queryOptions), `mutations` (mutation defaults), `hooks`, `test`
+- Web files: `<feature>.<role>.ts`. Roles: `api` (RPC calls), `queries` (query keys and queryOptions), `changes` (writes, declared with `defineChange` from `lib/offline-changes.ts`), `hooks`, `test`
 - Domain logic that isn't a role gets a descriptive name: `invite-code.ts`, `chore-dates.ts`. Both exist in both apps on purpose: the web copy mirrors the API's rule
 - Components: PascalCase file named after the component it exports (`ChoreRow.tsx` exports `ChoreRow`)
 - A web feature stays flat until it has about 10 files, then moves its components and pages to `components/`. No other subfolders

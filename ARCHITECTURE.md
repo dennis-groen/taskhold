@@ -87,20 +87,20 @@ features/
   shopping/
     shopping.api.ts       RPC calls and their response types
     shopping.queries.ts   React Query keys and queryOptions (loaders and components share them)
-    shopping.mutations.ts mutation defaults, registered in router.tsx so offline changes can resume
-    shopping.hooks.ts     useShoppingList: the list plus optimistic changes
+    shopping.changes.ts   changes to a list's items, registered in router.tsx so they can resume
+    shopping.hooks.ts     useShoppingList: the list plus the changes people make to it
     components/           QuickAdd (the round + button), NewListForm, ShoppingItemRow, list buttons, and
                           the all-lists and single-list pages
   chores/
     chores.api.ts         RPC calls and their response types
     chores.queries.ts     React Query keys and queryOptions
-    chores.mutations.ts   mutation defaults
-    chores.hooks.ts       useChores: the chores plus optimistic marking done
+    chores.changes.ts     marking done, putting off, and taking either back
+    chores.hooks.ts       useChores: the chores plus marking done; usePutOff: tomorrow and skip
     chore-dates.ts        repeat rule (mirrors the API's) and repeat labels; general date helpers are in lib/dates.ts
     components/           ChoreForm, ChoreRow, ChoreSheet, NewChoreDrawer, AddChoreButton, ChoresPage
   todos/
-    todos.api.ts, todos.queries.ts, todos.mutations.ts
-    todos.hooks.ts        useTodos: the to-dos plus optimistic changes
+    todos.api.ts, todos.queries.ts, todos.changes.ts
+    todos.hooks.ts        useTodos: the to-dos plus the changes to them
     components/           TodoForm, TodoRow, TodoSheet (with move to chores), NewTodoDrawer, AddTodoButton,
                           TodosPage (the Personal page)
   reminders/              small, so flat: reminders.api.ts, reminders.queries.ts, reminders.hooks.ts,
@@ -110,12 +110,14 @@ components/               shared: shadcn ui/ (extended with taskhold variants, s
                           ThemeProvider and ThemeToggle, small app-wide pieces (AddRow, SharedWithLine,
                           ConfirmDialog, UserAvatar, Wordmark, PageSkeleton)
 lib/                      shared: RPC client and errorMessage() (api.ts), dates (due groups and labels),
-                          theme context and useTheme(), offline cache, feedback toasts
+                          theme context and useTheme(), offline changes and cache, feedback toasts
 ```
 
 - Server data that changes while a page is open (shopping lists, chores, to-dos) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
-- Optimistic changes follow `shopping.hooks.ts`: update the cache in `onMutate`, roll back in `onError`, and refetch only when the last pending change on that list settles, so an early response can't undo a later change.
-- Feedback after a change goes through `lib/feedback.ts`: `offerUndo` shows a toast with Undo (a ticked chore, a removed item or to-do, a cleared cart), and `changeFailed` shows a toast when a background change didn't save. Errors in forms and dialogs stay next to the form. Deletes and the undos that restore them share a mutation `scope`, so the restore can't reach the API before the delete.
+- Writes to an area's data are **changes** (see [GLOSSARY.md](GLOSSARY.md)), declared in `<feature>.changes.ts` with `defineChange` from `lib/offline-changes.ts`. A change says what it sends, which query it shows in, and what that query looks like afterwards (`apply`), or, when only the API knows, how its answer goes in (`settle`). The module does the rest: shows it straight away, waits for a connection, survives a restart, rolls back with a `changeFailed` notice, and refetches the area after its last pending change, so an early response can't undo a later one.
+- Each feature's changes are registered once in `router.tsx` with `registerChanges`, so changes saved on the device can resume after a restart. A change's key (`[area, "change", name]`) and the shape of its variables are saved with it, so renaming one strands changes still waiting on people's phones.
+- Undo comes with the change: declare which change takes it back and with what (`undo`), and pass an `UndoOffer` when running it to show the notice. Changes marked `ordered` run one after another within their area, so an undo can't reach the API before what it undoes; a change and its undo must both be ordered.
+- Components run changes through their feature's hooks, which use `useChange`. Lint stops features importing `useMutation` or `mutationOptions`. Errors in forms and dialogs stay next to the form: forms use `runAsync`, and a change with `failure: false` leaves the notice to them.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
 - Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button, or the chores feature's add button on the chores page, into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
 - Inside a feature, imports are relative. A feature stays flat until it has about 10 files; then its components and pages move to `components/`, and nothing else nests.
@@ -145,5 +147,6 @@ Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/Ja
 - API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's repo.
 - API repo files can't import services or routes. `lib/` and `env.ts` can't import features.
 - Web shared code can't import features or routes. Features can't import routes or other features, and can't nest folders more than one level deep.
+- Web features don't import `useMutation` or `mutationOptions`: writes are changes (`lib/offline-changes.ts`).
 - Web code imports icons from `components/icons.ts`, never from `@phosphor-icons/react`, so the icon library can be swapped in one file. Only `icons.ts` and the shadcn files in `components/ui/` import the library.
 - Default exports are errors everywhere except tool configs (`*.config.ts`).

@@ -9,7 +9,6 @@ import {
 import { useCallback } from "react";
 
 import { HouseholdShell } from "@/components/layout/HouseholdShell.tsx";
-import { choreKeys } from "@/features/chores/chores.queries.ts";
 import { AddChoreButton } from "@/features/chores/components/AddChoreButton.tsx";
 import { ViewerUnavailableError } from "@/features/auth/auth.api.ts";
 import {
@@ -19,11 +18,10 @@ import {
   type SavedHousehold,
 } from "@/features/households/households.api.ts";
 import { QuickAdd } from "@/features/shopping/components/QuickAdd.tsx";
-import { shoppingKeys } from "@/features/shopping/shopping.queries.ts";
 import { AddTodoButton } from "@/features/todos/components/AddTodoButton.tsx";
-import { todoKeys } from "@/features/todos/todos.queries.ts";
 import { useLiveUpdates, type LiveMessage } from "@/lib/live-updates.ts";
 import { keepForOffline, keptForOffline } from "@/lib/offline-cache.ts";
+import { refetchArea } from "@/lib/offline-changes.ts";
 
 // Pages for people who belong to a household; loads that household once for all of them
 export const Route = createFileRoute("/_household")({
@@ -73,8 +71,6 @@ function HouseholdLayout() {
   );
 }
 
-const TOPIC_KEYS = { shopping: shoppingKeys.all, chores: choreKeys.all, todos: todoKeys.all };
-
 /** Refetches whatever another member, or another of the person's devices, just changed */
 function useRefetchOnLiveChanges() {
   const queryClient = useQueryClient();
@@ -94,11 +90,7 @@ function useRefetchOnLiveChanges() {
         void queryClient.invalidateQueries();
         return;
       }
-      const queryKey = TOPIC_KEYS[message];
-      // The person's own change is still being saved. Refetching now would briefly undo it on
-      // screen, and the change refetches when it's done anyway.
-      if (queryClient.isMutating({ mutationKey: queryKey }) > 0) return;
-      void queryClient.invalidateQueries({ queryKey });
+      refetchArea(queryClient, message);
     },
     [queryClient, router],
   );

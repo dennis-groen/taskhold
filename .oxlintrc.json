@@ -148,7 +148,8 @@
       }
     },
 
-    // Web layering: routes -> features -> shared (components, lib). Features never import each other.
+    // Web layering: routes -> features -> shared (components, lib). Features never import each other,
+    // and write through changes (lib/offline-changes.ts) rather than their own mutations.
     {
       "files": ["apps/web/src/components/**", "apps/web/src/lib/**"],
       "rules": {
@@ -176,6 +177,13 @@
         "no-restricted-imports": [
           "error",
           {
+            "paths": [
+              {
+                "name": "@tanstack/react-query",
+                "importNames": ["useMutation", "mutationOptions"],
+                "message": "Declare a change with defineChange (lib/offline-changes.ts), so it shows straight away, waits for a connection and survives a restart."
+              }
+            ],
             "patterns": [
               {
                 "group": ["@/routes/**"],
@@ -205,6 +213,13 @@
         "no-restricted-imports": [
           "error",
           {
+            "paths": [
+              {
+                "name": "@tanstack/react-query",
+                "importNames": ["useMutation", "mutationOptions"],
+                "message": "Declare a change with defineChange (lib/offline-changes.ts), so it shows straight away, waits for a connection and survives a restart."
+              }
+            ],
             "patterns": [
               {
                 "group": ["@/routes/**"],
