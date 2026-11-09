@@ -1,13 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { addInterval, repeatLabel } from "./chore-dates.ts";
+import { repeatLabel, scheduleOf } from "./chore-dates.ts";
 
 describe("chore repeats", () => {
-  // The API applies the same rule; the client uses it to show the new due date straight away
-  it("adds days or weeks to a date", () => {
-    expect(addInterval("2026-11-01", { every: 3, unit: "day" })).toBe("2026-11-04");
-    expect(addInterval("2026-11-01", { every: 2, unit: "week" })).toBe("2026-11-15");
-    expect(addInterval("2026-12-30", { every: 1, unit: "week" })).toBe("2027-01-06");
+  // The rules themselves are the API's (chore-schedule.ts) and tested there
+  it("hands the rules a chore's dates as calendar days", () => {
+    const schedule = scheduleOf({
+      repeat: { every: 1, unit: "week" },
+      dueOn: "2026-11-09",
+      lastCompletion: {
+        id: "1",
+        completedBy: null,
+        completedOn: "2026-11-02",
+        skipped: true,
+        createdAt: "2026-11-02T08:00:00Z",
+      },
+    });
+    expect(schedule.dueOn?.equals(Temporal.PlainDate.from("2026-11-09"))).toBe(true);
+    expect(schedule.last?.on.equals(Temporal.PlainDate.from("2026-11-02"))).toBe(true);
+    expect(schedule.last?.skipped).toBe(true);
+    expect(scheduleOf({ repeat: null, dueOn: null, lastCompletion: null })).toEqual({
+      repeat: null,
+      dueOn: null,
+      last: null,
+    });
   });
 
   it("describes how often a chore repeats", () => {

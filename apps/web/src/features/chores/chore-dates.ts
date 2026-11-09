@@ -1,11 +1,23 @@
-// Repeat rules for chores. General date helpers (due groups and labels) live in lib/dates.ts.
-import type { Repeat } from "./chores.api.ts";
+// Chore dates as the web app shows them. The schedule rules themselves come from the API
+// (@taskhold/api/chore-schedule); general date helpers (due groups and labels) live in lib/dates.ts.
+import type { ChoreSchedule } from "@taskhold/api/chore-schedule";
 
-/** The date `every` days or weeks after `date`. Must match the API's rule. */
-export function addInterval(date: string, { every, unit }: Repeat): string {
-  return Temporal.PlainDate.from(date)
-    .add(unit === "week" ? { weeks: every } : { days: every })
-    .toString();
+import type { Chore, Repeat } from "./chores.api.ts";
+
+/** A chore as the schedule rules see it: its dates as calendar days instead of the API's text */
+export function scheduleOf({
+  repeat,
+  dueOn,
+  lastCompletion,
+}: Pick<Chore, "repeat" | "dueOn" | "lastCompletion">): ChoreSchedule {
+  return {
+    repeat,
+    dueOn: dueOn === null ? null : Temporal.PlainDate.from(dueOn),
+    last: lastCompletion && {
+      on: Temporal.PlainDate.from(lastCompletion.completedOn),
+      skipped: lastCompletion.skipped,
+    },
+  };
 }
 
 /** "Every day", "Every 3 days", "Every week", "Every 2 weeks" */

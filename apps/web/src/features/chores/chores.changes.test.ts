@@ -112,19 +112,24 @@ describe("putting a chore off", () => {
     expect(shown(queryClient)?.dueOn).toBe("2026-11-09");
   });
 
-  it("shows a skip once the API says where the chore moved to", async () => {
-    const queryClient = appClient();
-    const skipped = deferred();
-    api.skipChore.mockReturnValue(skipped.promise);
+  it("shows a skip straight away, by the API's own rule, and keeps the API's answer", async () => {
+    const queryClient = appClient([{ ...bins, dueOn: "2026-11-05" }]);
+    const answer = deferred();
+    api.skipChore.mockReturnValue(answer.promise);
 
     const sent = runChange(queryClient, choreChanges.skip, {
       choreId: "bins",
       today: "2026-11-09",
+      by: me,
     });
-    // Only the API knows the next due date, so nothing moves before it answers
-    expect(shown(queryClient)?.dueOn).toBe("2026-11-09");
+    // Overdue, so it moves a week on from today, not from its due date
+    await vi.waitFor(() => expect(shown(queryClient)?.dueOn).toBe("2026-11-16"));
+    expect(shown(queryClient)?.lastCompletion).toMatchObject({ skipped: true, completedBy: me });
+    expect(shown(queryClient)?.done).toBe(false);
+    expect(api.skipChore).toHaveBeenCalledExactlyOnceWith("bins", "2026-11-09");
 
-    skipped.resolve({ ...bins, dueOn: "2026-11-16", history: [] });
+    const saved = { ...bins, dueOn: "2026-11-16", history: [] };
+    answer.resolve(saved);
     await sent;
     expect(shown(queryClient)).toEqual({ ...bins, dueOn: "2026-11-16" });
   });

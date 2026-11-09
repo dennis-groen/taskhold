@@ -14,7 +14,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { daysBetween, dueLabel, pastDateLabel } from "@/lib/dates.ts";
 import { cn } from "cn";
 
-import { repeatLabel } from "../chore-dates.ts";
+import { canPutOff, skip } from "@taskhold/api/chore-schedule";
+
+import { repeatLabel, scheduleOf } from "../chore-dates.ts";
 import { deleteChore, updateChore, type Chore, type ChoreInput } from "../chores.api.ts";
 import { usePutOff } from "../chores.hooks.ts";
 import { choreKeys, choreQuery } from "../chores.queries.ts";
@@ -27,7 +29,7 @@ import { ChoreForm, type Member } from "./ChoreForm.tsx";
 export function ChoreSheet({
   chore,
   members,
-  viewerId,
+  viewer,
   today,
   onUndo,
   onClose,
@@ -35,7 +37,7 @@ export function ChoreSheet({
   /** The chore to show; null keeps the sheet closed */
   chore: Chore | null;
   members: Member[];
-  viewerId: string;
+  viewer: Viewer;
   today: string;
   onUndo: (choreId: string) => void;
   onClose: () => void;
@@ -49,7 +51,7 @@ export function ChoreSheet({
             key={chore.id}
             chore={chore}
             members={members}
-            viewerId={viewerId}
+            viewer={viewer}
             today={today}
             onUndo={onUndo}
             onClose={onClose}
@@ -63,14 +65,14 @@ export function ChoreSheet({
 function SheetBody({
   chore,
   members,
-  viewerId,
+  viewer,
   today,
   onUndo,
   onClose,
 }: {
   chore: Chore;
   members: Member[];
-  viewerId: string;
+  viewer: Viewer;
   today: string;
   onUndo: (choreId: string) => void;
   onClose: () => void;
@@ -119,7 +121,7 @@ function SheetBody({
       </DrawerHeader>
 
       <div className="overflow-y-auto px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-        <PutOff chore={chore} today={today} onDone={onClose} />
+        <PutOff chore={chore} viewer={viewer} today={today} onDone={onClose} />
 
         <ChoreForm
           // Starts over when an undo moves the due date, so saving can't put the old one back
@@ -131,7 +133,7 @@ function SheetBody({
             assigneeId: chore.assignee?.id ?? null,
           }}
           members={members}
-          viewerId={viewerId}
+          viewerId={viewer.id}
           submitLabel="Save changes"
           onSubmit={save}
           footer={
@@ -165,7 +167,7 @@ function SheetBody({
                 <li key={completion.id} className="flex min-h-12 items-center gap-3 px-4 py-2">
                   <span className="min-w-0 flex-1 text-sm">
                     {completion.completedBy
-                      ? completion.completedBy.id === viewerId
+                      ? completion.completedBy.id === viewer.id
                         ? "You"
                         : completion.completedBy.name
                       : "Someone who left"}
@@ -193,19 +195,33 @@ function SheetBody({
 
 type PutOffHow = "tomorrow" | "skip";
 
+/** The person looking, as their skips are shown before the API answers */
+type Viewer = { id: string; name: string };
+
 /**
  * For a chore that can't be done now. Tomorrow (once it's due) moves the date and nothing else.
  * Skip this time (repeating chores) moves it one interval on and says so in the history, so
  * nobody has to tick it off when it wasn't done. Either one closes the sheet and offers Undo, and
  * waits on the device when there's no connection.
  */
-function PutOff({ chore, today, onDone }: { chore: Chore; today: string; onDone: () => void }) {
-  const putOff = usePutOff();
+function PutOff({
+  chore,
+  viewer,
+  today,
+  onDone,
+}: {
+  chore: Chore;
+  viewer: Viewer;
+  today: string;
+  onDone: () => void;
+}) {
+  const putOff = usePutOff(viewer);
 
-  const canTomorrow = !chore.done && chore.dueOn !== null && daysBetween(today, chore.dueOn) <= 0;
-  // Skipped already today: a second skip would change nothing, and Undo is in the history
-  const skippedToday = chore.lastCompletion?.skipped && chore.lastCompletion.completedOn === today;
-  const canSkip = chore.repeat !== null && chore.dueOn !== null && !skippedToday;
+  const schedule = scheduleOf(chore);
+  const day = Temporal.PlainDate.from(today);
+  const canTomorrow = canPutOff(schedule, day);
+  // Not when skipped already today: a second skip would change nothing, and Undo is in the history
+  const canSkip = skip(schedule, day).kind === "moved";
   if (!canTomorrow && !canSkip) return null;
 
   const button = (how: PutOffHow, Icon: typeof SkipForwardIcon, label: string) => (

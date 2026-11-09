@@ -1,9 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 
-import { today } from "@/lib/dates.ts";
+import { skip } from "@taskhold/api/chore-schedule";
+
+import { dueLabel, today } from "@/lib/dates.ts";
 import { useChange, type UndoOffer } from "@/lib/offline-changes.ts";
 
 import type { Chore } from "./chores.api.ts";
+import { scheduleOf } from "./chore-dates.ts";
 import { choreChanges, markedDone } from "./chores.changes.ts";
 import { choresQuery } from "./chores.queries.ts";
 
@@ -40,9 +43,9 @@ export function useChores(viewer: Person) {
  * Putting a chore off: to tomorrow, which moves the date and nothing else, or skipping it this
  * time, which moves a repeating chore one interval on and says so in its history. Both offer Undo.
  */
-export function usePutOff() {
+export function usePutOff(viewer: Person) {
   const putOff = useChange(choreChanges.putOff);
-  const skip = useChange(choreChanges.skip);
+  const skipChange = useChange(choreChanges.skip);
 
   return {
     /** `on` is today on this device */
@@ -54,7 +57,13 @@ export function usePutOff() {
         },
         { message: `${chore.name} moved to tomorrow.` },
       ),
-    skip: (chore: Chore, on: string) =>
-      skip.run({ choreId: chore.id, today: on }, { message: `${chore.name} skipped.` }),
+    skip: (chore: Chore, on: string) => {
+      const moved = skip(scheduleOf(chore), Temporal.PlainDate.from(on));
+      const due = moved.kind === "moved" ? ` ${dueLabel(moved.dueOn.toString(), on)}.` : "";
+      skipChange.run(
+        { choreId: chore.id, today: on, by: { id: viewer.id, name: viewer.name } },
+        { message: `${chore.name} skipped.${due}` },
+      );
+    },
   };
 }

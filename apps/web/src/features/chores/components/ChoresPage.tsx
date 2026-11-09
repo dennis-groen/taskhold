@@ -204,7 +204,7 @@ export function ChoresPage({
       <ChoreSheet
         chore={chores.find((chore) => chore.id === openId) ?? null}
         members={members}
-        viewerId={viewer.id}
+        viewer={viewer}
         today={today}
         onUndo={undo}
         onClose={() => setOpenId(null)}

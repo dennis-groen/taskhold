@@ -3,9 +3,11 @@
 // shape is part of what a phone may still have waiting, so change it only with care.
 //
 // All of them are ordered, so an undo can't reach the API before what it undoes.
+import { markDone, skip } from "@taskhold/api/chore-schedule";
+
 import { defineChange } from "@/lib/offline-changes.ts";
 
-import { addInterval } from "./chore-dates.ts";
+import { scheduleOf } from "./chore-dates.ts";
 import {
   completeChore,
   skipChore,
@@ -19,7 +21,8 @@ import { choresQuery } from "./chores.queries.ts";
 type Person = { id: string; name: string };
 
 export type CompleteChore = { choreId: string; on: string; by: Person };
-export type SkipChore = { choreId: string; today: string };
+/** `by` is only for showing the skip before the API answers; changes saved before it lack it */
+export type SkipChore = { choreId: string; today: string; by: Person };
 export type MoveChore = { choreId: string; dueOn: string | null };
 
 const theChores = () => choresQuery().queryKey;
@@ -37,8 +40,8 @@ function withDueOn(list: Chore[], { choreId, dueOn }: MoveChore): Chore[] {
   return list.map((item) => (item.id === choreId ? { ...item, dueOn } : item));
 }
 
-// Not shown before it's saved: only the API knows the due date to go back to. A second undo would
-// take back an earlier completion too.
+// Not shown before it's saved: only the API knows the due date to go back to (it's in the history
+// entry the undo removes). A second undo would take back an earlier one too.
 const undo = defineChange("chores", "undo", {
   idempotent: false,
   ordered: true,
@@ -80,13 +83,14 @@ export const choreChanges = {
 
   undo,
 
-  // Not shown before it's saved: the API works out the next due date. The API ignores a second
-  // skip on the same day.
+  // The API ignores a second skip on the same day
   skip: defineChange("chores", "skip", {
     idempotent: true,
     ordered: true,
     send: ({ choreId, today }: SkipChore) => skipChore(choreId, today),
     target: theChores,
+    apply: (list, { choreId, today, by }) =>
+      list.map((item) => (item.id === choreId ? skipped(item, by, today) : item)),
     settle: withDetail,
     failure: MOVE_FAILED,
     undo: { by: undo, vars: ({ choreId }) => choreId },
@@ -112,21 +116,32 @@ export const choreChanges = {
   moveDueDate,
 };
 
-/** The chore after `person` does it on `on`, by the same rules as the API */
+/** The chore after `person` marks it done on `on`, by the API's own rules */
 export function markedDone(chore: Chore, person: Person, on: string): Chore {
-  // A skip earlier the same day doesn't count as done: someone may do it after all
-  const doneToday = chore.lastCompletion?.completedOn === on && !chore.lastCompletion.skipped;
-  if (chore.repeat ? doneToday : chore.done) return chore;
+  const done = markDone(scheduleOf(chore), Temporal.PlainDate.from(on));
+  if (done.kind === "unchanged") return chore;
   return {
     ...chore,
-    dueOn: chore.repeat ? addInterval(on, chore.repeat) : chore.dueOn,
+    dueOn: done.dueOn?.toString() ?? null,
     done: chore.repeat === null,
-    lastCompletion: {
-      id: crypto.randomUUID(),
-      completedBy: person,
-      completedOn: on,
-      skipped: false,
-      createdAt: Temporal.Now.instant().toString(),
-    },
+    lastCompletion: shownEntry(person, on, false),
+  };
+}
+
+/** The chore after `person` skips it on `on`, by the API's own rules */
+function skipped(chore: Chore, person: Person, on: string): Chore {
+  const moved = skip(scheduleOf(chore), Temporal.PlainDate.from(on));
+  if (moved.kind !== "moved") return chore;
+  return { ...chore, dueOn: moved.dueOn.toString(), lastCompletion: shownEntry(person, on, true) };
+}
+
+/** A history entry to show until the API's own arrives */
+function shownEntry(person: Person, on: string, wasSkipped: boolean): Chore["lastCompletion"] {
+  return {
+    id: crypto.randomUUID(),
+    completedBy: person,
+    completedOn: on,
+    skipped: wasSkipped,
+    createdAt: Temporal.Now.instant().toString(),
   };
 }
