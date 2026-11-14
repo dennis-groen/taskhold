@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // How long after the last tap ticked rows stay put before moving to where done things go
 const SETTLE_AFTER = Temporal.Duration.from({ milliseconds: 2_500 });
@@ -22,6 +22,16 @@ export function useSettlingItems() {
   const leaving = useRef<Animation[]>([]);
 
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  // Folded rows keep their folded look until the list has updated, so they don't flash back
+  // before they go. Most are gone by then. One that stays where it was (a repeating chore whose
+  // next date is in the same group) would stay folded for good, so the look is dropped here,
+  // after the update and before the browser paints.
+  useLayoutEffect(() => {
+    if (settling.size > 0) return;
+    for (const animation of leaving.current) animation.cancel();
+    leaving.current = [];
+  }, [settling]);
 
   /**
    * Call on every tick or untick: each one restarts the wait. An untick keeps the item held too:
@@ -68,7 +78,6 @@ export function useSettlingItems() {
         return;
       }
     }
-    leaving.current = [];
     setSettling(new Set());
   }
 
