@@ -6,6 +6,7 @@ import {
   queryOptions,
 } from "@tanstack/react-query";
 import type { PersistedClient } from "@tanstack/query-persist-client-core";
+import { DetailedError } from "@taskhold/api/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { changeFailed, offerUndo } from "./feedback.ts";
@@ -150,10 +151,43 @@ describe("a change", () => {
     expect(changeFailed).toHaveBeenCalledOnce();
   });
 
+  it("is sent again when the API gives no answer, and stays on screen meanwhile", async () => {
+    vi.useFakeTimers();
+    try {
+      const queryClient = appClient();
+      queryClient.setQueryData(notesQuery().queryKey, []);
+      api.add.mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValue({});
+
+      const sent = runChange(queryClient, changes.add, milk);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.add).toHaveBeenCalledTimes(1);
+      expect(shown(queryClient)).toEqual([milk]);
+      expect(changeFailed).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      await sent;
+      expect(api.add).toHaveBeenCalledTimes(2);
+      expect(shown(queryClient)).toEqual([milk]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("isn't sent again on a guess when sending twice could do harm", async () => {
+    const queryClient = appClient();
+    queryClient.setQueryData(notesQuery().queryKey, [milk]);
+    api.remove.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(runChange(queryClient, changes.remove, "milk")).rejects.toThrow("Failed to fetch");
+    expect(api.remove).toHaveBeenCalledTimes(1);
+    expect(shown(queryClient)).toEqual([milk]);
+    expect(changeFailed).toHaveBeenCalledOnce();
+  });
+
   it("leaves the notice to the caller when it's quiet", async () => {
     const queryClient = appClient();
     queryClient.setQueryData(notesQuery().queryKey, [milk]);
-    api.shout.mockRejectedValue(new Error("Nope"));
+    api.shout.mockRejectedValue(new DetailedError("Nope", { statusCode: 400 }));
 
     await expect(runChange(queryClient, changes.shout, "milk")).rejects.toThrow("Nope");
     expect(changeFailed).not.toHaveBeenCalled();

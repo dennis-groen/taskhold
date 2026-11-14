@@ -127,10 +127,22 @@ let current: {
  * person does anything. Nobody signed in, or someone else, drops the saved copy and the cache, so
  * one person's data and changes never reach the next person to use the device.
  *
+ * Pass `reachable: false` when the server gave no answer: the waiting changes then stay waiting
+ * until a later call without it.
+ *
  * Resolves once the restore is done, so pages load from the restored cache.
  */
-export function openOfflineCache(queryClient: QueryClient, userId: string | null): Promise<void> {
-  if (current?.userId === userId) return current.ready;
+export function openOfflineCache(
+  queryClient: QueryClient,
+  userId: string | null,
+  { reachable = true }: { reachable?: boolean } = {},
+): Promise<void> {
+  if (current?.userId === userId) {
+    // Opened from the saved copy while the server couldn't be reached: now it can, so what was
+    // held back is sent. Does nothing when no change is waiting.
+    if (reachable) void current.ready.then(() => queryClient.resumePausedMutations());
+    return current.ready;
+  }
   if (current) forgetOfflineCache(queryClient);
   if (userId === null) {
     persister.removeClient();
@@ -162,8 +174,9 @@ export function openOfflineCache(queryClient: QueryClient, userId: string | null
         buster,
         dehydrateOptions,
       });
-      // Does nothing while offline; React Query sends them when the connection is back
-      void queryClient.resumePausedMutations();
+      // Does nothing while offline; React Query sends them when the connection is back. Held
+      // back while the server can't be reached: they'd be sent to nothing.
+      if (reachable) void queryClient.resumePausedMutations();
     });
 
   current = {
@@ -187,7 +200,7 @@ export function openOfflineCache(queryClient: QueryClient, userId: string | null
  */
 export async function openSavedCopy(queryClient: QueryClient): Promise<void> {
   const userId = current?.userId ?? savedFor();
-  if (userId) await openOfflineCache(queryClient, userId);
+  if (userId) await openOfflineCache(queryClient, userId, { reachable: false });
 }
 
 /** The person the saved copy belongs to, read from its buster */

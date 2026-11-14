@@ -48,3 +48,16 @@ export function errorCode(error: unknown): string | null {
 export function errorMessage(error: unknown, fallback: string): string {
   return errorBody(error)?.error.message ?? fallback;
 }
+
+// What a proxy in front of the API answers while the API itself is down or restarting
+const PROXY_SAYS_DOWN = new Set([502, 503, 504]);
+
+/**
+ * True when the API itself never answered: the request got no response at all (fetch throws a
+ * TypeError), or a proxy in front answered that it's down. The API turning a request down is
+ * not this.
+ */
+export function isUnreachable(error: unknown): boolean {
+  if (error instanceof DetailedError) return PROXY_SAYS_DOWN.has(error.statusCode ?? 0);
+  return error instanceof TypeError;
+}

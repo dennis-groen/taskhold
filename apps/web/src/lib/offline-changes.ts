@@ -1,6 +1,7 @@
 // Changes: what people do to an area's data (tick an item, mark a chore done, delete a to-do).
 // A change shows on screen straight away, waits for a connection when there isn't one, survives the
-// app being closed, and is rolled back with a notice if the API turns it down. Features declare
+// app being closed, and is rolled back with a notice if the API turns it down (one the API never
+// answered is sent again instead, when sending it twice is safe). Features declare
 // their changes here with defineChange; this module does the rest.
 import {
   useQueryClient,
@@ -9,6 +10,7 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 
+import { isUnreachable } from "./api.ts";
 import { changeFailed, offerUndo } from "./feedback.ts";
 
 /** A part of the app whose data is fetched, refetched and kept on the device as a whole */
@@ -23,6 +25,9 @@ export type Area = "shopping" | "chores" | "todos";
 export type ChangeMeta = { idempotent: boolean };
 
 const DEFAULT_FAILURE = "Couldn't save that change. Check your connection and try again.";
+
+// The pauses between attempts while the API gives no answer: 1 s, 2 s, 4 s … up to 30 s
+const SEND_AGAIN_AFTER_MS = (attempt: number) => Math.min(1_000 * 2 ** attempt, 30_000);
 
 /** What a feature says about one of its changes */
 type ChangeSpec<Vars, Data, Response, UndoVars> = {
@@ -68,6 +73,8 @@ type ChangeOptions<Vars> = {
   mutationKey: readonly unknown[];
   meta: ChangeMeta;
   scope?: { id: string };
+  retry?: (failureCount: number, error: Error) => boolean;
+  retryDelay?: (attempt: number) => number;
   mutationFn: (vars: Vars) => Promise<unknown>;
   onMutate: (vars: Vars) => Promise<{ previous: unknown }>;
   onSuccess: (response: unknown, vars: Vars) => void;
@@ -98,6 +105,14 @@ export function defineChange<Vars, Data, Response = unknown, UndoVars = never>(
       mutationKey: key,
       meta: { idempotent: spec.idempotent },
       ...(ordered && { scope: { id: orderedScope(area) } }),
+      // No answer from the API (one bar of signal, the server restarting) is the same as no
+      // connection: the change waits and is sent again, and only the API turning it down rolls
+      // it back. Only for changes that are safe to send twice, since nobody can tell whether a
+      // request without an answer arrived.
+      ...(spec.idempotent && {
+        retry: (_failureCount: number, error: Error) => isUnreachable(error),
+        retryDelay: SEND_AGAIN_AFTER_MS,
+      }),
       mutationFn: spec.send,
       onMutate: async (vars) => {
         if (!spec.apply) return { previous: undefined };

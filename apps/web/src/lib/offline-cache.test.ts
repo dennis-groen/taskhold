@@ -97,6 +97,21 @@ describe("opening the app without a connection", () => {
     expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
   });
 
+  it("holds waiting changes back while the server can't be reached, and sends them once it can", async () => {
+    await useOnlineAsSam();
+
+    // Opened again with no answer from the server: from the saved copy
+    const app = await openApp();
+    const resume = vi.spyOn(app.queryClient, "resumePausedMutations");
+    await app.openSavedCopy(app.queryClient);
+    expect(resume).not.toHaveBeenCalled();
+
+    // The next check gets through, as the same person
+    await app.openOfflineCache(app.queryClient, "sam");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resume).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ["someone else", "bo"],
     ["nobody", null],

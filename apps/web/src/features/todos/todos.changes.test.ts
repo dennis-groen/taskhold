@@ -1,6 +1,7 @@
 // What to-do changes do to the list. Showing, rolling back, ordering and keeping changes on the
 // device are lib/offline-changes.ts's, and tested there.
 import { QueryClient } from "@tanstack/react-query";
+import { DetailedError } from "@taskhold/api/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { changeFailed, offerUndo } from "@/lib/feedback.ts";
@@ -72,7 +73,7 @@ describe("to-do changes", () => {
 
   it("leaves a failed edit for its form to report", async () => {
     const queryClient = appClient();
-    api.updateTodo.mockRejectedValue(new Error("Too long"));
+    api.updateTodo.mockRejectedValue(new DetailedError("Too long", { statusCode: 400 }));
 
     await expect(
       runChange(queryClient, todoChanges.edit, { id: "post", name: "x".repeat(500) }),
