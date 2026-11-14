@@ -119,6 +119,17 @@ describe("guessing invite codes", () => {
 });
 
 describe("managing members", () => {
+  it("only lets the owner make a new invite code", async () => {
+    const owner = await signUp();
+    const member = await signUp();
+    const { inviteCode } = await householdWith(owner, member);
+
+    const byMember = await member.api.households.current["invite-code"].$post();
+    expect(await errorCode(byMember, 403)).toBe("OWNER_ONLY");
+    const { household } = await json(await owner.api.households.current.$get(), 200);
+    expect(household.inviteCode).toBe(inviteCode);
+  });
+
   it("lets the owner remove a member, and nobody else", async () => {
     const owner = await signUp();
     const member = await signUp();

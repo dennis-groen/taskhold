@@ -318,6 +318,35 @@ describe("chore rules", () => {
     expect(renamed.history).toHaveLength(1);
   });
 
+  it("can be deleted by a member, history included", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner);
+    await json(await complete(owner, chore.id), 200);
+    const param = { choreId: chore.id };
+
+    expect((await owner.api.chores[":choreId"].$delete({ param })).status).toBe(204);
+    expect(await errorCode(await owner.api.chores[":choreId"].$get({ param }), 404)).toBe(
+      "CHORE_NOT_FOUND",
+    );
+    expect((await json(await owner.api.chores.$get(), 200)).chores).toEqual([]);
+  });
+
+  it("are only cleared for the household that asked", async () => {
+    const owner = await signUp();
+    const outsider = await signUp();
+    await householdWith(owner);
+    await householdWith(outsider);
+    const done = await choreOf(owner, { name: "Fix tap", repeat: null, dueOn: null });
+    await json(await complete(owner, done.id), 200);
+
+    expect(await json(await outsider.api.chores["clear-done"].$post(), 200)).toEqual({
+      removed: 0,
+    });
+    const { chores } = await json(await owner.api.chores.$get(), 200);
+    expect(chores.map((chore) => chore.name)).toEqual(["Fix tap"]);
+  });
+
   it("look missing to other households, for every action", async () => {
     const owner = await signUp();
     const outsider = await signUp();

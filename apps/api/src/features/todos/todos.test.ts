@@ -15,6 +15,15 @@ async function todoOf(
 }
 
 describe("private to-dos", () => {
+  it("can be deleted by the person they belong to", async () => {
+    const owner = await signUp();
+    const todo = await todoOf(owner);
+
+    const deleted = await owner.api.todos[":todoId"].$delete({ param: { todoId: todo.id } });
+    expect(deleted.status).toBe(204);
+    expect((await json(await owner.api.todos.$get(), 200)).todos).toEqual([]);
+  });
+
   it("are invisible to everyone else, including the rest of the household", async () => {
     const owner = await signUp();
     const housemate = await signUp();

@@ -13,6 +13,29 @@ async function listOf(person: TestUser, name = "Groceries") {
 }
 
 describe("shopping lists", () => {
+  it("can be renamed and deleted by a member, items included", async () => {
+    const owner = await signUp();
+    const member = await signUp();
+    await householdWith(owner, member);
+    const list = await listOf(owner);
+    const lists = member.api.shopping.lists[":listId"];
+    const param = { listId: list.id };
+    const { item } = await json(await lists.items.$post({ param, json: { name: "Bread" } }), 201);
+
+    expect((await lists.$patch({ param, json: { name: "Market" } })).status).toBe(204);
+    expect(
+      (await json(await owner.api.shopping.lists[":listId"].$get({ param }), 200)).list.name,
+    ).toBe("Market");
+
+    const removed = await lists.items[":itemId"].$delete({ param: { ...param, itemId: item.id } });
+    expect(removed.status).toBe(204);
+    expect((await json(await lists.$get({ param }), 200)).list.items).toEqual([]);
+
+    expect((await lists.$delete({ param })).status).toBe(204);
+    expect(await errorCode(await lists.$get({ param }), 404)).toBe("LIST_NOT_FOUND");
+    expect((await json(await owner.api.shopping.lists.$get(), 200)).lists).toEqual([]);
+  });
+
   it("are shared by everyone in the household", async () => {
     const owner = await signUp("Owner");
     const member = await signUp("Member");
