@@ -1,13 +1,10 @@
 // Sends Web Push messages (chore reminders) through the browser vendors' push services.
 // Payloads are encrypted for the receiving browser, so push services can't read them.
-import webPush from "web-push";
+import { WebPushError, sendNotification, setVapidDetails } from "web-push";
 
 import { env } from "../env.ts";
 import { logger } from "./logger.ts";
 import { describeError } from "./wide-event.ts";
-
-// A CommonJS module whose functions Node doesn't expose as named imports
-const { WebPushError, sendNotification, setVapidDetails } = webPush;
 
 /** Whether this server has VAPID keys, without which nothing can be sent */
 export const pushConfigured = Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);

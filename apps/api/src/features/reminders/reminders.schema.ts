@@ -5,9 +5,10 @@ import { z } from "zod";
 const PUSH_HOSTS = ["fcm.googleapis.com", "android.googleapis.com"];
 const PUSH_HOST_SUFFIXES = [".push.services.mozilla.com", ".notify.windows.com", ".push.apple.com"];
 
-// Letters, digits and hyphens in dot-separated labels. web-push re-parses the endpoint with Node's
+// Letters, digits and hyphens in dot-separated labels. web-push 3 re-parsed the endpoint with Node's
 // legacy url.parse, which ends the host at characters URL accepts ("%", ";", "`", "{"), so
-// "https://evil.example;.push.apple.com" would pass a suffix check and then connect to evil.example.
+// "https://evil.example;.push.apple.com" passed a suffix check and then connected to evil.example.
+// web-push 4 parses with URL, but the check stays strict so no parser can read another host.
 const PLAIN_HOSTNAME = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 /**

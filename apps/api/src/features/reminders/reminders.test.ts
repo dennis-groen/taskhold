@@ -66,7 +66,7 @@ describe("turning reminders on", () => {
       "https://fcm.googleapis.com:8443/fcm/send/abc",
       "https://fcm.googleapis.com.evil.example/x",
       "https://localhost/fcm",
-      // Hosts that web-push's legacy url.parse reads as attacker.example or evil.example
+      // Hosts that legacy url.parse (web-push 3) reads as attacker.example or evil.example
       "https://attacker.example%2e.push.apple.com/x",
       "https://127.0.0.1%2E.push.apple.com/x",
       "https://evil.example;.notify.windows.com/",
@@ -209,7 +209,7 @@ describe("devices", () => {
   it("saved before the endpoint check was strict are never sent to, and are forgotten", async () => {
     const person = await signUp();
     const keep = await turnOn(person);
-    // Passed the old suffix check, but web-push would connect to evil.example
+    // Passed the old suffix check, but web-push 3 would connect to evil.example
     await remindersRepo.upsertSubscription({
       userId: person.id,
       endpoint: `https://evil.example;.push.apple.com/${randomUUID()}`,
