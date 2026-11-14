@@ -46,7 +46,13 @@ export async function followChanges(
 
   // Listening starts before membership is read, so a join in between isn't missed
   const stop = await watch(handle);
-  queue = queue.then(refreshMembership);
-  await queue;
+  try {
+    queue = queue.then(refreshMembership);
+    await queue;
+  } catch (err) {
+    // The stream never starts, so nothing else would stop the listener
+    stop();
+    throw err;
+  }
   return stop;
 }
