@@ -229,6 +229,20 @@ function isChanging(queryClient: QueryClient, area: Area): boolean {
   return queryClient.isMutating({ mutationKey: [area, "change"] }) > 0;
 }
 
+const AREAS: readonly Area[] = ["shopping", "chores", "todos"];
+
+/**
+ * Refetches everything, after the live stream reconnected or the household changed. Areas where
+ * the person's own change is still being saved are left out, for the same reason as in
+ * refetchArea: they refetch when the change is done.
+ */
+export function refetchEverything(queryClient: QueryClient): void {
+  const changing = new Set<unknown>(AREAS.filter((area) => isChanging(queryClient, area)));
+  void queryClient.invalidateQueries({
+    predicate: (query) => !changing.has(query.queryKey[0]),
+  });
+}
+
 /**
  * Builds the change in the mutation cache and runs it. Not tied to a mounted component, so an Undo
  * tapped after the page has gone still runs.

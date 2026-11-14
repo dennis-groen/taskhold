@@ -21,7 +21,7 @@ import { QuickAdd } from "@/features/shopping/components/QuickAdd.tsx";
 import { AddTodoButton } from "@/features/todos/components/AddTodoButton.tsx";
 import { useLiveUpdates, type LiveMessage } from "@/lib/live-updates.ts";
 import { keepForOffline, keptForOffline } from "@/lib/offline-cache.ts";
-import { refetchArea } from "@/lib/offline-changes.ts";
+import { refetchArea, refetchEverything } from "@/lib/offline-changes.ts";
 
 // Pages for people who belong to a household; loads that household once for all of them
 export const Route = createFileRoute("/_household")({
@@ -82,12 +82,12 @@ function useRefetchOnLiveChanges() {
         // Members, the invite code, or whether the person is still in this household at all.
         // Chores show assignees, so everything else follows.
         void router.invalidate();
-        void queryClient.invalidateQueries();
+        refetchEverything(queryClient);
         return;
       }
       if (message === "down") {
         // Refetching restarts polling. A refetch that fails keeps what's on screen.
-        void queryClient.invalidateQueries();
+        refetchEverything(queryClient);
         return;
       }
       refetchArea(queryClient, message);

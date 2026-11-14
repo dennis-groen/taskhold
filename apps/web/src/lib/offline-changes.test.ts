@@ -11,7 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { changeFailed, offerUndo } from "./feedback.ts";
 import { asWaiting, dehydrateOptions } from "./offline-cache.ts";
-import { defineChange, refetchArea, registerChanges, runChange } from "./offline-changes.ts";
+import {
+  defineChange,
+  refetchArea,
+  refetchEverything,
+  registerChanges,
+  runChange,
+} from "./offline-changes.ts";
 
 vi.mock("./feedback.ts", () => ({ changeFailed: vi.fn(), offerUndo: vi.fn() }));
 
@@ -381,5 +387,27 @@ describe("refetchArea", () => {
     refetch.mockClear();
     refetchArea(queryClient, "todos");
     expect(refetch).toHaveBeenCalledExactlyOnceWith({ queryKey: ["todos"] });
+  });
+});
+
+describe("refetchEverything", () => {
+  it("leaves an area alone while the person's own change there is still being saved", async () => {
+    const queryClient = appClient();
+    queryClient.setQueryData(notesQuery().queryKey, []);
+    queryClient.setQueryData(["chores", "list"], []);
+    queryClient.setQueryData(["reminders", "status"], {});
+    const request = deferred();
+    api.add.mockReturnValue(request.promise);
+
+    const sent = runChange(queryClient, changes.add, milk);
+    await vi.waitFor(() => expect(api.add).toHaveBeenCalled());
+    refetchEverything(queryClient);
+
+    expect(queryClient.getQueryState(notesQuery().queryKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(["chores", "list"])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(["reminders", "status"])?.isInvalidated).toBe(true);
+
+    request.resolve({});
+    await sent;
   });
 });
