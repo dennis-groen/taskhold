@@ -168,6 +168,49 @@ describe("the daily summary", () => {
     expect(onTime.to(phone).map((s) => s.message.title)).toEqual(["1 chore today"]);
   });
 
+  it("carries on with the next person when sending to one fails", async () => {
+    const unlucky = await signUp();
+    const lucky = await signUp();
+    await householdWith(unlucky);
+    await householdWith(lucky);
+    await choreOf(unlucky, { name: "Bins", dueOn: utcToday() });
+    await choreOf(lucky, { name: "Plants", dueOn: utcToday() });
+    const unluckyPhone = await turnOn(unlucky);
+    const luckyPhone = await turnOn(lucky);
+
+    const push = recorder();
+    const send = async (target: PushTarget, message: PushMessage) => {
+      if (target.endpoint === unluckyPhone) throw new Error("The push library blew up");
+      return push.send(target, message);
+    };
+    // Whatever order people come in, the run finishes and the other person hears
+    const result = await remindersService.sendDueReminders(todayAt("09:00"), send);
+
+    expect(result.failed).toBeGreaterThanOrEqual(1);
+    expect(push.to(luckyPhone)).toHaveLength(1);
+  });
+
+  it("sends to a person's devices at the same time", async () => {
+    const person = await signUp();
+    await householdWith(person);
+    await choreOf(person, { name: "Bins", dueOn: utcToday() });
+    const devices = new Set([await turnOn(person), await turnOn(person)]);
+
+    // Each of the person's sends only finishes once both have started
+    const waiting: (() => void)[] = [];
+    const send = async (target: PushTarget): Promise<PushResult> => {
+      if (!devices.has(target.endpoint)) return "sent";
+      await new Promise<void>((resolve) => {
+        waiting.push(resolve);
+        if (waiting.length === 2) for (const release of waiting) release();
+      });
+      return "sent";
+    };
+
+    await remindersService.sendDueReminders(todayAt("09:00"), send);
+    expect(waiting).toHaveLength(2);
+  });
+
   it("stays quiet when nothing is due, or there's no household", async () => {
     const busy = await signUp();
     await householdWith(busy);

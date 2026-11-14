@@ -2,8 +2,9 @@
 // zone, listing their chores that are due or overdue. Their chores are the ones assigned to them
 // or to nobody. Each device subscribes on its own; the time is per person.
 import { transaction } from "../../db/db.ts";
+import { logger } from "../../lib/logger.ts";
 import { pushConfigured, sendPush, type PushMessage, type SendPush } from "../../lib/push.ts";
-import { annotate } from "../../lib/wide-event.ts";
+import { annotate, describeError } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
 import { env } from "../../env.ts";
 import * as remindersRepo from "./reminders.repo.ts";
@@ -92,41 +93,66 @@ export async function sendTest(userId: string, send: SendPush = sendPush): Promi
 export async function sendDueReminders(
   now: Temporal.Instant,
   send: SendPush = sendPush,
-): Promise<{ people: number; notifications: number }> {
+): Promise<{ people: number; notifications: number; failed: number }> {
   let people = 0;
   let notifications = 0;
+  let failed = 0;
   for (const setting of await remindersRepo.findSettingsWithDevices()) {
-    const local = now.toZonedDateTimeISO(setting.timeZone);
-    const today = local.toPlainDate();
-    if (Temporal.PlainTime.compare(local.toPlainTime(), setting.remindAt) < 0) continue;
-    if (setting.lastSentOn && Temporal.PlainDate.compare(setting.lastSentOn, today) >= 0) continue;
-    // Claimed before sending, so two instances (or a slow run overlapping the next) don't both send
-    if (!(await remindersRepo.claimDay(setting.userId, today))) continue;
-
-    const due = await choresService.findDueChores(setting.userId, today);
-    const message = summary(due);
-    if (!message) continue;
-    const devices = await remindersRepo.findSubscriptions(setting.userId);
-    people += 1;
-    notifications += await deliver(devices, message, send);
+    try {
+      const sent = await remind(setting, now, send);
+      if (sent === null) continue;
+      people += 1;
+      notifications += sent;
+    } catch (err) {
+      // One person's trouble mustn't keep everyone after them waiting
+      failed += 1;
+      logger.warn(
+        { component: "reminders", user_id: setting.userId, error: describeError(err) },
+        "Couldn't send a person's chore reminder",
+      );
+    }
   }
-  return { people, notifications };
+  return { people, notifications, failed };
 }
 
-/** Sends to each device and forgets the ones that no longer exist. Returns how many got it. */
+/** Sends one person today's summary if it's time. Returns how many devices got it; null when nothing was due to send. */
+async function remind(
+  setting: remindersRepo.SettingRecord,
+  now: Temporal.Instant,
+  send: SendPush,
+): Promise<number | null> {
+  const local = now.toZonedDateTimeISO(setting.timeZone);
+  const today = local.toPlainDate();
+  if (Temporal.PlainTime.compare(local.toPlainTime(), setting.remindAt) < 0) return null;
+  if (setting.lastSentOn && Temporal.PlainDate.compare(setting.lastSentOn, today) >= 0) return null;
+  // Claimed before sending, so two instances (or a slow run overlapping the next) don't both send
+  if (!(await remindersRepo.claimDay(setting.userId, today))) return null;
+
+  const due = await choresService.findDueChores(setting.userId, today);
+  const message = summary(due);
+  if (!message) return null;
+  const devices = await remindersRepo.findSubscriptions(setting.userId);
+  return deliver(devices, message, send);
+}
+
+/**
+ * Sends to the person's devices at the same time, so one slow push service doesn't hold up the
+ * rest, and forgets the devices that no longer exist. Returns how many got it.
+ */
 async function deliver(
   devices: remindersRepo.SubscriptionRecord[],
   message: PushMessage,
   send: SendPush,
 ): Promise<number> {
-  let sent = 0;
-  for (const device of devices) {
-    // Saved before the endpoint check was strict enough: never send to it, and forget it
-    const result = isPushService(device.endpoint) ? await send(device, message) : "gone";
-    if (result === "sent") sent += 1;
-    if (result === "gone") await remindersRepo.deleteSubscriptionByEndpoint(device.endpoint);
-  }
-  return sent;
+  const results = await Promise.all(
+    devices.map(async (device) => {
+      // Saved before the endpoint check was strict enough: never send to it, and forget it
+      const result = isPushService(device.endpoint) ? await send(device, message) : "gone";
+      if (result === "gone") await remindersRepo.deleteSubscriptionByEndpoint(device.endpoint);
+      return result;
+    }),
+  );
+  return results.filter((result) => result === "sent").length;
 }
 
 /** "2 chores today, 1 overdue" with their names, overdue first; null when nothing is due */
