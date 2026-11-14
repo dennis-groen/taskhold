@@ -48,13 +48,23 @@ function skip(person: TestUser, choreId: string, today = utcToday()) {
 
 // What marking done and skipping do to a due date is tested in chore-schedule.test.ts
 describe("today from the client", () => {
-  it("accepts as today only dates within a day of the UTC date", () => {
-    const utc = Temporal.PlainDate.from("2026-11-01");
-    expect(couldBeToday(Temporal.PlainDate.from("2026-10-31"), utc)).toBe(true);
+  it("accepts dates within a day of the UTC date", () => {
+    const utc = Temporal.PlainDate.from("2026-11-10");
+    expect(couldBeToday(Temporal.PlainDate.from("2026-11-09"), utc)).toBe(true);
     expect(couldBeToday(utc, utc)).toBe(true);
+    expect(couldBeToday(Temporal.PlainDate.from("2026-11-11"), utc)).toBe(true);
+  });
+
+  it("accepts the day of a tap that waited on a device for up to a week", () => {
+    const utc = Temporal.PlainDate.from("2026-11-10");
+    expect(couldBeToday(Temporal.PlainDate.from("2026-11-07"), utc)).toBe(true);
     expect(couldBeToday(Temporal.PlainDate.from("2026-11-02"), utc)).toBe(true);
-    expect(couldBeToday(Temporal.PlainDate.from("2026-11-03"), utc)).toBe(false);
-    expect(couldBeToday(Temporal.PlainDate.from("2026-10-30"), utc)).toBe(false);
+    expect(couldBeToday(Temporal.PlainDate.from("2026-11-01"), utc)).toBe(false);
+  });
+
+  it("refuses dates after tomorrow", () => {
+    const utc = Temporal.PlainDate.from("2026-11-10");
+    expect(couldBeToday(Temporal.PlainDate.from("2026-11-12"), utc)).toBe(false);
   });
 });
 
@@ -100,8 +110,19 @@ describe("completing chores", () => {
     await householdWith(owner);
     const chore = await choreOf(owner);
 
-    const response = await complete(owner, chore.id, utcToday().subtract({ days: 3 }));
+    const response = await complete(owner, chore.id, utcToday().subtract({ days: 9 }));
     expect(await errorCode(response, 400)).toBe("INVALID_TODAY");
+  });
+
+  it("counts a chore done offline from the day of the tap, when it arrives days later", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner);
+    const tapped = utcToday().subtract({ days: 2 });
+
+    const { chore: done } = await json(await complete(owner, chore.id, tapped), 200);
+    expect(done.dueOn).toBe(tapped.add({ weeks: 1 }).toString());
+    expect(done.lastCompletion?.completedOn).toBe(tapped.toString());
   });
 
   it("undoes the latest completion, putting the due date back", async () => {
