@@ -17,8 +17,10 @@ export type TodoChanges = Partial<TodoInput> & { id: string; done?: boolean };
 
 const theTodos = () => todosQuery().queryKey;
 
+// Ordered, so done and not-done arrive as they were tapped, and never before the to-do's add
 const update = {
   idempotent: true,
+  ordered: true,
   send: ({ id, ...changes }: TodoChanges) => updateTodo(id, changes),
   target: theTodos,
   apply: (list: Todo[], { id, ...changes }: TodoChanges) =>
@@ -53,6 +55,7 @@ export const todoChanges = {
   // The id comes from the app, so the API ignores a second copy
   add: defineChange("todos", "add", {
     idempotent: true,
+    ordered: true,
     send: (input: TodoInput & { id: string }) => createTodo(input),
     target: theTodos,
     apply: (list, input) => [

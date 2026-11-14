@@ -54,8 +54,10 @@ const restore = defineChange("shopping", "restore", {
 });
 
 export const shoppingChanges = {
+  // Ordered, so a tick and its untick arrive as they were made, and never before the item's add
   toggle: defineChange("shopping", "toggle", {
     idempotent: true,
+    ordered: true,
     send: ({ listId, itemId, checked }: ToggleItem) => updateItem(listId, itemId, { checked }),
     target: onList,
     apply: onItems((current, { itemId, checked, by }) =>
@@ -84,9 +86,11 @@ export const shoppingChanges = {
     ),
   }),
 
-  // The id comes from the app, so the API ignores a second copy
+  // The id comes from the app, so the API ignores a second copy. Ordered, so a tick or edit made
+  // straight after can't arrive first.
   add: defineChange("shopping", "add", {
     idempotent: true,
+    ordered: true,
     send: ({ listId, id, name, quantity }: NewItem) => addItem(listId, { id, name, quantity }),
     target: onList,
     apply: onItems((current, { id, name, quantity, by }) => [

@@ -81,6 +81,35 @@ describe("shopping changes", () => {
     expect(api.updateItem).toHaveBeenCalledExactlyOnceWith("list", "bread", { checked: true });
   });
 
+  it("sends a tick and its untick one after the other, in the order they were made", async () => {
+    const queryClient = appClient();
+    const answers: ((value: unknown) => void)[] = [];
+    api.updateItem.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answers.push(resolve);
+      }),
+    );
+    const item = { listId: "list", itemId: "bread", by: me };
+
+    const tick = runChange(queryClient, shoppingChanges.toggle, { ...item, checked: true });
+    const untick = runChange(queryClient, shoppingChanges.toggle, { ...item, checked: false });
+    await vi.waitFor(() => expect(api.updateItem).toHaveBeenCalled());
+    // The untick waits for the tick's answer
+    expect(api.updateItem).toHaveBeenCalledTimes(1);
+
+    answers[0]?.({});
+    await Promise.all([tick, untick]);
+    expect(api.updateItem.mock.calls.map((call) => call[2])).toEqual([
+      { checked: true },
+      { checked: false },
+    ]);
+  });
+
+  it("runs adds in order with the other changes, so a tick can't arrive before its item", () => {
+    expect(shoppingChanges.add.ordered).toBe(true);
+    expect(shoppingChanges.toggle.ordered).toBe(true);
+  });
+
   it("sends only the fields an edit changed, so a housemate's other edit stays", async () => {
     const queryClient = appClient();
     await runChange(queryClient, shoppingChanges.edit, {

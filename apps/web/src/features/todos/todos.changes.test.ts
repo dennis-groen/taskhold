@@ -44,6 +44,12 @@ beforeEach(() => {
 });
 
 describe("to-do changes", () => {
+  it("runs adds and updates in the order they were made", () => {
+    expect(todoChanges.add.ordered).toBe(true);
+    expect(todoChanges.update.ordered).toBe(true);
+    expect(todoChanges.edit.ordered).toBe(true);
+  });
+
   it("takes away when it was done as soon as it's marked not done", async () => {
     const queryClient = appClient();
     await runChange(queryClient, todoChanges.update, { id: "post", done: false });
