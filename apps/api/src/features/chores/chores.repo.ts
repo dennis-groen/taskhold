@@ -1,6 +1,6 @@
 // Data access for chores: the only place that queries chore tables.
 // Every chore query is scoped to a household, so a chore id from another household reads as missing.
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db, type Executor, type Transaction } from "../../db/db.ts";
 import { user } from "../auth/auth.table.ts";
@@ -140,27 +140,16 @@ export async function deleteChore(
   return rows.length > 0;
 }
 
-/** Deletes one-off chores that have been done (not just skipped). Returns how many went. */
-export async function deleteDoneOneOffChores(
+/** Deletes these chores of the household. Returns how many went. */
+export async function deleteChores(
   householdId: string,
+  choreIds: string[],
   executor: Executor = db,
 ): Promise<number> {
-  const done = executor
-    .select({ choreId: choreCompletion.choreId })
-    .from(choreCompletion)
-    .innerJoin(chore, eq(chore.id, choreCompletion.choreId))
-    .where(
-      and(
-        eq(chore.householdId, householdId),
-        isNull(chore.repeatEvery),
-        eq(choreCompletion.skipped, false),
-      ),
-    );
+  if (choreIds.length === 0) return 0;
   const rows = await executor
     .delete(chore)
-    .where(
-      and(eq(chore.householdId, householdId), isNull(chore.repeatEvery), inArray(chore.id, done)),
-    )
+    .where(and(eq(chore.householdId, householdId), inArray(chore.id, choreIds)))
     .returning({ id: chore.id });
   return rows.length;
 }
@@ -246,4 +235,9 @@ export async function deleteCompletion(
   executor: Executor = db,
 ): Promise<void> {
   await executor.delete(choreCompletion).where(eq(choreCompletion.id, completionId));
+}
+
+/** Forgets the chore's whole history. The caller has checked the chore is its household's. */
+export async function deleteCompletions(choreId: string, tx: Transaction): Promise<void> {
+  await tx.delete(choreCompletion).where(eq(choreCompletion.choreId, choreId));
 }

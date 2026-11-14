@@ -91,6 +91,11 @@ export async function updateChore(
     };
     await checkChore(household.id, merged, tx);
 
+    // A one-off chore is done when the newest entry in its history is a completion. Entries from
+    // when it repeated would make it done the moment it stops, so it starts over without them.
+    const stopsRepeating = current.repeatEvery !== null && merged.repeat === null;
+    if (stopsRepeating) await choresRepo.deleteCompletions(choreId, tx);
+
     await choresRepo.updateChore(
       ref,
       {
@@ -221,10 +226,24 @@ export async function undoLastCompletion(userId: string, choreId: string): Promi
   return loadDetail(household.id, choreId);
 }
 
-/** Removes one-off chores that are done. Returns how many went. */
+/** Removes the chores that are done (see isDone). Returns how many went. */
 export async function clearDoneChores(userId: string): Promise<number> {
   const household = await householdsService.getMembershipOf(userId);
-  const removed = await choresRepo.deleteDoneOneOffChores(household.id);
+  const removed = await transaction(async (tx) => {
+    const records = await choresRepo.findChores(household.id, tx);
+    const latest = await choresRepo.findLatestCompletions(
+      records.map((record) => record.id),
+      tx,
+    );
+    const done = records.filter((record) =>
+      isDone(scheduleOf(record, latest.get(record.id) ?? null)),
+    );
+    return choresRepo.deleteChores(
+      household.id,
+      done.map((record) => record.id),
+      tx,
+    );
+  });
   annotate("chores", { removed_count: removed });
   if (removed > 0) await changed(household.id);
   return removed;

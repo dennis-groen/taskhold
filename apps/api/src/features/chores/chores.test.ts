@@ -260,6 +260,43 @@ describe("chore rules", () => {
     expect(chores.map((chore) => chore.name)).toEqual(["Bins"]);
   });
 
+  it("starts a chore that stops repeating as not done, with no history", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner, { name: "Windows" });
+    await json(await complete(owner, chore.id), 200);
+
+    const { chore: oneOff } = await json(
+      await owner.api.chores[":choreId"].$patch({
+        param: { choreId: chore.id },
+        json: { repeat: null },
+      }),
+      200,
+    );
+    expect(oneOff).toMatchObject({ repeat: null, done: false, lastCompletion: null, history: [] });
+
+    // Not done, so "Clear done" leaves it
+    expect(await json(await owner.api.chores["clear-done"].$post(), 200)).toEqual({ removed: 0 });
+    const { chores } = await json(await owner.api.chores.$get(), 200);
+    expect(chores.map((item) => item.name)).toEqual(["Windows"]);
+  });
+
+  it("keeps the history when an edit leaves the repeat alone", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner, { name: "Windows" });
+    await json(await complete(owner, chore.id), 200);
+
+    const { chore: renamed } = await json(
+      await owner.api.chores[":choreId"].$patch({
+        param: { choreId: chore.id },
+        json: { name: "All windows" },
+      }),
+      200,
+    );
+    expect(renamed.history).toHaveLength(1);
+  });
+
   it("look missing to other households, for every action", async () => {
     const owner = await signUp();
     const outsider = await signUp();

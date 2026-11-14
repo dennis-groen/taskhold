@@ -38,5 +38,5 @@ Moving a due chore to tomorrow. Only the due date changes; nothing goes in its h
 _Avoid_: postpone, snooze
 
 **History**:
-The times a chore was marked done or skipped, newest first. Undo takes back the newest.
+The times a chore was marked done or skipped, newest first. Undo takes back the newest. A chore that stops repeating starts over with an empty history.
 _Avoid_: completions
