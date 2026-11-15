@@ -1,7 +1,7 @@
 // Business rules for shopping lists. Every member of a household can see and change all of its
 // lists; nobody else can, and a list from another household looks the same as one that doesn't exist.
 import { transaction, type Transaction } from "../../db/db.ts";
-import { announce } from "../../lib/live-changes.ts";
+import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
 import * as shoppingRepo from "./shopping.repo.ts";

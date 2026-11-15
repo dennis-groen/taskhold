@@ -6,7 +6,7 @@ import { PageSkeleton } from "./components/PageSkeleton.tsx";
 import { choreChanges } from "./features/chores/chores.changes.ts";
 import { shoppingChanges } from "./features/shopping/shopping.changes.ts";
 import { todoChanges } from "./features/todos/todos.changes.ts";
-import { registerChanges } from "./lib/offline-changes.ts";
+import { registerAllChanges } from "./lib/offline-changes.ts";
 import { routeTree } from "./routeTree.gen";
 
 export const queryClient = new QueryClient({
@@ -22,9 +22,11 @@ export const queryClient = new QueryClient({
 
 // Changes saved on the device find their API call and optimistic update here after a restart,
 // before any page sets them up. Registered before the saved copy is restored.
-registerChanges(queryClient, shoppingChanges);
-registerChanges(queryClient, choreChanges);
-registerChanges(queryClient, todoChanges);
+registerAllChanges(queryClient, {
+  shopping: shoppingChanges,
+  chores: choreChanges,
+  todos: todoChanges,
+});
 
 // React Query assumes it's online until the browser says otherwise. Opening the app without a
 // connection must hold changes back from the start, not send them and fail.

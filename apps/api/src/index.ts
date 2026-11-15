@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 
 import { env } from "./env.ts";
 import { pool } from "./db/db.ts";
-import { stopFeed } from "./lib/live-changes.ts";
+import { stopFeed } from "./features/live/live-changes.ts";
 import { logger } from "./lib/logger.ts";
 import { describeError } from "./lib/wide-event.ts";
 import { startReminders } from "./features/reminders/reminders.scheduler.ts";

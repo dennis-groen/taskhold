@@ -10,11 +10,18 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 
+import type { Topic } from "@taskhold/api/live-topics";
+
 import { isUnreachable } from "./api.ts";
 import { changeFailed, offerUndo } from "./feedback.ts";
 
-/** A part of the app whose data is fetched, refetched and kept on the device as a whole */
-export type Area = "shopping" | "chores" | "todos";
+/**
+ * The parts of the app whose data is fetched, refetched and kept on the device as a whole. Each is
+ * a live topic (the API's live-topics.ts), so a live update can name the area to refetch.
+ */
+export const AREAS = ["shopping", "chores", "todos"] as const satisfies readonly Topic[];
+
+export type Area = (typeof AREAS)[number];
 
 /**
  * A change marked `idempotent` does the same when the API gets it twice. Only those are saved
@@ -166,6 +173,14 @@ export function registerChanges(
   }
 }
 
+/** Registers every area's changes at startup. Typed by area, so a new area can't be left out. */
+export function registerAllChanges(
+  queryClient: QueryClient,
+  changesByArea: Record<Area, Record<string, Change<never>>>,
+): void {
+  for (const changes of Object.values(changesByArea)) registerChanges(queryClient, changes);
+}
+
 /** Offered after a change that can be taken back, e.g. "Milk removed" with an Undo button */
 export type UndoOffer = {
   message: string;
@@ -228,8 +243,6 @@ export function refetchArea(queryClient: QueryClient, area: Area): void {
 function isChanging(queryClient: QueryClient, area: Area): boolean {
   return queryClient.isMutating({ mutationKey: [area, "change"] }) > 0;
 }
-
-const AREAS: readonly Area[] = ["shopping", "chores", "todos"];
 
 /**
  * Refetches everything, after the live stream reconnected or the household changed. Areas where

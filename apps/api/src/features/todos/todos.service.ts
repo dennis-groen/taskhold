@@ -2,7 +2,7 @@
 // it; someone else's to-do looks the same as one that doesn't exist. To-dos don't depend on a
 // household, except for moving one to the household's chores.
 import { transaction } from "../../db/db.ts";
-import { announce } from "../../lib/live-changes.ts";
+import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
 import type { ChoreDetail } from "../chores/chores.schema.ts";

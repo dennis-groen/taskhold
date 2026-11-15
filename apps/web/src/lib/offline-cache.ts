@@ -9,6 +9,8 @@ import {
 } from "@tanstack/query-persist-client-core";
 import type { DehydrateOptions, Mutation, Query, QueryClient } from "@tanstack/react-query";
 
+import { AREAS } from "./offline-changes.ts";
+
 const STORAGE_KEY = "taskhold:offline-cache";
 
 // Bump when the shape of cached data or of a change's variables changes, so an older copy is
@@ -27,7 +29,7 @@ const KEPT = "kept";
 
 // What other members can see too, the person's own to-dos, and what keepForOffline keeps: what the
 // app shows on its pages. Nothing else (reminder settings, the invite code) is saved.
-const SAVED_AREAS = new Set<unknown>(["shopping", "chores", "todos", KEPT]);
+const SAVED_AREAS = new Set<unknown>([...AREAS, KEPT]);
 
 /** Something the app needs to open offline, besides the lists themselves */
 export type Kept = "viewer" | "household";

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { watch } from "../../lib/live-changes.ts";
+import { watch } from "./live-changes.ts";
 import { findMembership } from "../households/households.service.ts";
 import { followChanges } from "./live.service.ts";
 
-vi.mock("../../lib/live-changes.ts", () => ({ watch: vi.fn() }));
+vi.mock("./live-changes.ts", () => ({ watch: vi.fn() }));
 vi.mock("../households/households.service.ts", () => ({ findMembership: vi.fn() }));
 
 beforeEach(() => {

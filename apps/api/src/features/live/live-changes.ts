@@ -1,4 +1,4 @@
-// Tells open live-update streams (features/live) that something changed, through Postgres
+// Tells open live-update streams (live.service.ts) that something changed, through Postgres
 // LISTEN/NOTIFY, so a change made through any API instance reaches people connected to any other.
 //
 // A change says only which part of the app changed and for whom, never what: apps refetch through
@@ -6,16 +6,14 @@
 import { sql } from "drizzle-orm";
 import { Client } from "pg";
 
-import { env } from "../env.ts";
-import { db, type Executor } from "../db/db.ts";
-import { logger } from "./logger.ts";
-import { describeError } from "./wide-event.ts";
+import { db, type Executor } from "../../db/db.ts";
+import { env } from "../../env.ts";
+import { logger } from "../../lib/logger.ts";
+import { describeError } from "../../lib/wide-event.ts";
+import type { Topic } from "./live-topics.ts";
 
 const CHANNEL = "taskhold_changes";
 const RECONNECT_DELAY = Temporal.Duration.from({ seconds: 2 });
-
-/** The parts of the app a change can be in, which apps refetch as a whole */
-export type Topic = "shopping" | "chores" | "todos" | "household";
 
 /** Who should hear about a change: everyone in a household, or one person on all their devices */
 export type Change =

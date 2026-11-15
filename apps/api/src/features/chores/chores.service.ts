@@ -4,7 +4,7 @@
 // What marking done, skipping and putting off do to a due date is chore-schedule.ts's, shared with
 // the web app. This file decides who may do it, locks, and writes.
 import { transaction, type Executor } from "../../db/db.ts";
-import { announce } from "../../lib/live-changes.ts";
+import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
 import { couldBeToday } from "./client-today.ts";

@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 
-import { stopFeed } from "../../lib/live-changes.ts";
+import { stopFeed } from "./live-changes.ts";
 import {
   anonymous,
   errorCode,

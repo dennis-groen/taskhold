@@ -4,7 +4,7 @@
 // Every change to who is in a household runs in a transaction that locks the household row,
 // so concurrent joins, leaves and removals in one household happen one at a time.
 import { transaction, type Executor, type Transaction } from "../../db/db.ts";
-import { announce } from "../../lib/live-changes.ts";
+import { announce } from "../live/live-changes.ts";
 import { oneAtATime } from "../../lib/one-at-a-time.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as authService from "../auth/auth.service.ts";

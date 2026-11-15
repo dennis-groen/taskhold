@@ -1,15 +1,16 @@
 // Live updates: the API's server-sent events stream (/api/live) says which part of the app another
 // member (or another of your devices) just changed, and the app refetches it. While the stream is
 // down, pages fall back to polling (see isLive).
+import { TOPICS, type Topic } from "@taskhold/api/live-topics";
 import { useEffect, useSyncExternalStore } from "react";
 
 /**
  * What the stream says: refetch one area, or refetch everything because changes may have been
  * missed ("resync", once it's back). "down" says it was lost, so polling should start again.
  */
-export type LiveMessage = "shopping" | "chores" | "todos" | "household" | "resync" | "down";
+export type LiveMessage = Topic | "resync" | "down";
 
-const MESSAGES = new Set<string>(["shopping", "chores", "todos", "household", "resync"]);
+const MESSAGES = new Set<string>([...TOPICS, "resync"]);
 
 // The browser gives up on a stream the server refused (e.g. 401 after the session expired)
 const RETRY_AFTER_REFUSAL = Temporal.Duration.from({ seconds: 30 });

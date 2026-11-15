@@ -1,6 +1,7 @@
 // Live updates: which announced changes each signed-in person's stream hears about.
 // Their household's changes, and their own (to-dos, joining or leaving, account deletion).
-import { watch, type FeedEvent, type Topic } from "../../lib/live-changes.ts";
+import { watch, type FeedEvent } from "./live-changes.ts";
+import type { Topic } from "./live-topics.ts";
 import { findMembership } from "../households/households.service.ts";
 
 /** What a stream tells the app: refetch a topic, or refetch everything after missed changes */

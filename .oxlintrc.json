@@ -153,7 +153,10 @@
     // Rules the web app bundles from the API (exports in apps/api/package.json) import types only,
     // so no server code reaches the browser
     {
-      "files": ["apps/api/src/features/chores/chore-schedule.ts"],
+      "files": [
+        "apps/api/src/features/chores/chore-schedule.ts",
+        "apps/api/src/features/live/live-topics.ts"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -162,7 +165,7 @@
               {
                 "regex": ".*",
                 "allowTypeImports": true,
-                "message": "The web app bundles this file (@taskhold/api/chore-schedule). Import types only, so no server code reaches the browser."
+                "message": "The web app bundles this file (see exports in apps/api/package.json). Import types only, so no server code reaches the browser."
               }
             ]
           }

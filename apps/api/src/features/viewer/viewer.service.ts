@@ -1,6 +1,6 @@
 // Who is using the app right now: composes the auth and households features through their services.
 import { transaction } from "../../db/db.ts";
-import { announce } from "../../lib/live-changes.ts";
+import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import { deleteUser, getSession } from "../auth/auth.service.ts";
 import { findMembership, leaveAnyHousehold } from "../households/households.service.ts";
