@@ -1,7 +1,9 @@
 # One image for the whole app: the API, which also serves the web app's build, so both share
 # one origin. Migrations run on start. Build with: docker build -t taskhold .
 
-FROM node:26-alpine AS base
+# The exact version in .node-version, pinned by digest so a moved tag can't change what ships.
+# Dependabot proposes the next one (.github/dependabot.yml).
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS base
 # Node 26 no longer ships Corepack; install the pnpm version package.json pins
 RUN npm install --global pnpm@12.3.4
 WORKDIR /repo
@@ -17,7 +19,7 @@ RUN pnpm build
 # The API with only its production dependencies, ready to copy into the final image
 RUN pnpm --filter @taskhold/api deploy --prod --legacy /deploy
 
-FROM node:26-alpine
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
 ENV NODE_ENV=production \
     PORT=3000 \
     WEB_ROOT=/app/web

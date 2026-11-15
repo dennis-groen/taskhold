@@ -1,0 +1,10 @@
+# Only the Docker base image: it's pinned by digest (see Dockerfile), so someone has to propose
+# the next one. npm dependencies and actions are updated by hand.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(docker)"
