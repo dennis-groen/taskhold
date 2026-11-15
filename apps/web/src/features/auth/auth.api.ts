@@ -46,3 +46,9 @@ function isTransient(error: unknown): boolean {
 export async function deleteAccount(): Promise<void> {
   await parseResponse(api.viewer.$delete());
 }
+
+/** Signs the person out of every other device. Resolves to how many sessions ended. */
+export async function signOutElsewhere(): Promise<number> {
+  const { ended } = await parseResponse(api.viewer["other-sessions"].$delete());
+  return ended;
+}
