@@ -1,11 +1,13 @@
-// Chore reminders: one push notification a day, at the time each person picks in their own time
-// zone, listing their chores that are due or overdue. Their chores are the ones assigned to them
-// or to nobody. Each device subscribes on its own; the time is per person.
+// Daily reminders: one push notification a day, at the time each person picks in their own time
+// zone, listing their chores and to-dos that are due or overdue. Their chores are the ones
+// assigned to them or to nobody; their to-dos are their own, in a household or not. Each device
+// subscribes on its own; the time is per person.
 import { transaction } from "../../db/db.ts";
 import { logger } from "../../lib/logger.ts";
 import { pushConfigured, sendPush, type PushMessage, type SendPush } from "../../lib/push.ts";
 import { annotate, describeError } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
+import * as todosService from "../todos/todos.service.ts";
 import { env } from "../../env.ts";
 import * as remindersRepo from "./reminders.repo.ts";
 import {
@@ -77,7 +79,7 @@ export async function sendTest(userId: string, send: SendPush = sendPush): Promi
     devices,
     {
       title: "Reminders are on",
-      body: "Chores that are due will show up here every day.",
+      body: "Chores and to-dos that are due will show up here every day.",
       url: "/chores",
       tag: "chore-reminder-test",
     },
@@ -130,8 +132,9 @@ async function remind(
   // Claimed before sending, so two instances (or a slow run overlapping the next) don't both send
   if (!(await remindersRepo.claimDay(setting.userId, today))) return null;
 
-  const due = await choresService.findDueChores(setting.userId, today);
-  const message = summary(due);
+  const chores = await choresService.findDueChores(setting.userId, today);
+  const todos = await todosService.findDueTodos(setting.userId, today);
+  const message = summary(chores, todos);
   if (!message) return null;
   const devices = await remindersRepo.findSubscriptions(setting.userId);
   return deliver(devices, message, send);
@@ -157,19 +160,27 @@ async function deliver(
   return results.filter((result) => result === "sent").length;
 }
 
-/** "2 chores today, 1 overdue" with their names, overdue first; null when nothing is due */
-export function summary(due: { today: string[]; overdue: string[] }): PushMessage | null {
-  const names = [...due.overdue, ...due.today];
+type Due = { today: string[]; overdue: string[] };
+const NOTHING_DUE: Due = { today: [], overdue: [] };
+
+/**
+ * "2 chores today, 1 overdue" with their names, overdue first; null when nothing is due. When
+ * to-dos are due too, everything is counted together ("3 due today, 1 overdue"), the names list
+ * chores before to-dos, and tapping it opens Personal if no chore is in it.
+ */
+export function summary(chores: Due, todos: Due = NOTHING_DUE): PushMessage | null {
+  const names = [...chores.overdue, ...todos.overdue, ...chores.today, ...todos.today];
   if (names.length === 0) return null;
 
+  const withTodos = todos.today.length + todos.overdue.length > 0;
+  const choresDue = chores.today.length + chores.overdue.length > 0;
+  const today = chores.today.length + todos.today.length;
+  const overdue = chores.overdue.length + todos.overdue.length;
+
   const parts = [];
-  if (due.today.length > 0) parts.push(`${count(due.today.length)} today`);
-  if (due.overdue.length > 0) {
-    parts.push(
-      due.today.length > 0
-        ? `${due.overdue.length} overdue`
-        : `${count(due.overdue.length)} overdue`,
-    );
+  if (today > 0) parts.push(withTodos ? `${today} due today` : `${count(today)} today`);
+  if (overdue > 0) {
+    parts.push(today > 0 || withTodos ? `${overdue} overdue` : `${count(overdue)} overdue`);
   }
   const shown = names.slice(0, NAMES_SHOWN);
   const more = names.length - shown.length;
@@ -177,7 +188,8 @@ export function summary(due: { today: string[]; overdue: string[] }): PushMessag
     more > 0
       ? `${shown.join(", ")} and ${more} more`
       : new Intl.ListFormat("en", { type: "conjunction" }).format(shown);
-  return { title: parts.join(", "), body, url: "/chores", tag: "chore-reminder" };
+  const url = choresDue ? "/chores" : "/personal";
+  return { title: parts.join(", "), body, url, tag: "chore-reminder" };
 }
 
 function count(n: number): string {

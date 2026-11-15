@@ -57,6 +57,13 @@ async function choreOf(
   return (await json(response, 201)).chore;
 }
 
+async function todoOf(person: TestUser, name: string, dueOn?: Temporal.PlainDate) {
+  const response = await person.api.todos.$post({
+    json: { name, ...(dueOn && { dueOn: dueOn.toString() }) },
+  });
+  return (await json(response, 201)).todo;
+}
+
 describe("turning reminders on", () => {
   it("only accepts devices of real push services", async () => {
     const person = await signUp();
@@ -224,6 +231,61 @@ describe("the daily summary", () => {
     expect([...push.to(busyPhone), ...push.to(lonerPhone)]).toEqual([]);
   });
 
+  it("reminds a person of their own due to-dos, with or without a household", async () => {
+    const person = await signUp();
+    const other = await signUp();
+    const today = utcToday();
+    await todoOf(person, "Call the dentist", today);
+    await todoOf(person, "Renew passport", today.subtract({ days: 2 }));
+    await todoOf(person, "Someday");
+    await todoOf(person, "Tomorrow's errand", today.add({ days: 1 }));
+    const finished = await todoOf(person, "Already finished", today);
+    await json(
+      await person.api.todos[":todoId"].$patch({
+        param: { todoId: finished.id },
+        json: { done: true },
+      }),
+      200,
+    );
+    await todoOf(other, "Not yours", today);
+    const phone = await turnOn(person);
+    const otherPhone = await turnOn(other);
+
+    const push = recorder();
+    await remindersService.sendDueReminders(todayAt("09:00"), push.send);
+
+    expect(push.to(phone).map((s) => s.message)).toEqual([
+      {
+        title: "1 due today, 1 overdue",
+        body: "Renew passport and Call the dentist",
+        url: "/personal",
+        tag: "chore-reminder",
+      },
+    ]);
+    expect(push.to(otherPhone).map((s) => s.message.body)).toEqual(["Not yours"]);
+  });
+
+  it("counts chores and to-dos together, and opens the chores when any chore is due", async () => {
+    const person = await signUp();
+    await householdWith(person);
+    const today = utcToday();
+    await choreOf(person, { name: "Bins", dueOn: today });
+    await todoOf(person, "Renew passport", today.subtract({ days: 1 }));
+    const phone = await turnOn(person);
+
+    const push = recorder();
+    await remindersService.sendDueReminders(todayAt("09:00"), push.send);
+
+    expect(push.to(phone).map((s) => s.message)).toEqual([
+      {
+        title: "1 due today, 1 overdue",
+        body: "Renew passport and Bins",
+        url: "/chores",
+        tag: "chore-reminder",
+      },
+    ]);
+  });
+
   it("names a few chores and counts the rest", () => {
     expect(
       remindersService.summary({ today: ["A", "B", "C"], overdue: ["D", "E", "F"] }),
@@ -233,6 +295,26 @@ describe("the daily summary", () => {
       body: "Bins",
     });
     expect(remindersService.summary({ today: [], overdue: [] })).toBeNull();
+  });
+
+  it("counts to-dos with chores, and goes to Personal when only to-dos are due", () => {
+    const none = { today: [], overdue: [] };
+    expect(
+      remindersService.summary(
+        { today: ["Bins"], overdue: [] },
+        { today: [], overdue: ["Passport"] },
+      ),
+    ).toMatchObject({ title: "1 due today, 1 overdue", body: "Passport and Bins", url: "/chores" });
+    expect(remindersService.summary(none, { today: ["Dentist"], overdue: [] })).toMatchObject({
+      title: "1 due today",
+      body: "Dentist",
+      url: "/personal",
+    });
+    expect(remindersService.summary(none, { today: [], overdue: ["A", "B"] })).toMatchObject({
+      title: "2 overdue",
+      url: "/personal",
+    });
+    expect(remindersService.summary(none, none)).toBeNull();
   });
 });
 

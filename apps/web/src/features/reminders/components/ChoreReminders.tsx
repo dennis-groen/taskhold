@@ -22,7 +22,7 @@ const UNAVAILABLE: Partial<Record<DeviceState, string>> = {
   unsupported: "This browser can't show notifications from taskhold.",
 };
 
-/** The daily chore summary: on or off for this device, and when it comes */
+/** The daily summary of chores and to-dos: on or off for this device, and when it comes */
 export function ChoreReminders() {
   const { data: status } = useQuery(reminderStatusQuery());
   // The server has no push keys: nothing to offer
@@ -69,7 +69,7 @@ function ReminderSettings({
 
   return (
     <>
-      <GroupHeading>Chore reminders</GroupHeading>
+      <GroupHeading>Reminders</GroupHeading>
       <Group>
         <div className="flex min-h-14 items-start gap-3 px-4 py-3">
           <BellRingingIcon
@@ -82,7 +82,7 @@ function ReminderSettings({
             </label>
             <p className="mt-0.5 text-sm text-pretty text-muted-foreground">
               {unavailable ??
-                "Once a day, a summary of chores that are due or overdue: yours and the ones nobody is assigned to."}
+                "Once a day, a summary of what is due or overdue: your chores, the ones nobody is assigned to, and your own to-dos."}
             </p>
           </div>
           {!unavailable &&

@@ -21,6 +21,23 @@ export async function getTodos(userId: string): Promise<Todo[]> {
   return records.map(toTodo);
 }
 
+/**
+ * For reminders: names of the person's to-dos that aren't done and are due on or before `today`,
+ * split into due today and overdue. To-dos are private to the person, so these are only ever
+ * sent to their own devices.
+ */
+export async function findDueTodos(
+  userId: string,
+  today: Temporal.PlainDate,
+): Promise<{ today: string[]; overdue: string[] }> {
+  const due = { today: [] as string[], overdue: [] as string[] };
+  for (const { name, dueOn } of await todosRepo.findDueTodos(userId, today)) {
+    if (!dueOn) continue;
+    (Temporal.PlainDate.compare(dueOn, today) === 0 ? due.today : due.overdue).push(name);
+  }
+  return due;
+}
+
 export async function createTodo(userId: string, input: CreateTodoInput): Promise<Todo> {
   const id = input.id ?? crypto.randomUUID();
   annotate("todos", { todo_id: id });

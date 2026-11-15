@@ -1,6 +1,6 @@
 // Data access for private to-dos: the only place that queries the todo table.
 // Every query is scoped to the owner, so someone else's to-do id reads as missing.
-import { and, asc, count, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 
 import { db, type Executor } from "../../db/db.ts";
 import type { Todo } from "./todos.schema.ts";
@@ -30,6 +30,26 @@ export function findTodos(userId: string, executor: Executor = db): Promise<Todo
     .from(todo)
     .where(eq(todo.userId, userId))
     .orderBy(sql`${todo.dueOn} asc nulls last`, asc(todo.createdAt), asc(todo.id));
+}
+
+/** The person's to-dos still to do that are due on or before `today`, soonest due first */
+export function findDueTodos(
+  userId: string,
+  today: Temporal.PlainDate,
+  executor: Executor = db,
+): Promise<{ name: string; dueOn: Temporal.PlainDate | null }[]> {
+  return executor
+    .select({ name: todo.name, dueOn: todo.dueOn })
+    .from(todo)
+    .where(
+      and(
+        eq(todo.userId, userId),
+        isNull(todo.doneAt),
+        isNotNull(todo.dueOn),
+        lte(todo.dueOn, today),
+      ),
+    )
+    .orderBy(asc(todo.dueOn), asc(todo.createdAt), asc(todo.id));
 }
 
 export async function findTodo(
