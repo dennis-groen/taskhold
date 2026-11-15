@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
@@ -5,7 +6,6 @@ import { TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { forgetOfflineCache } from "@/lib/offline-cache.ts";
 import { forgetPushDevice } from "@/lib/push-device.ts";
-import { queryClient } from "@/router.tsx";
 
 import { deleteAccount } from "./auth.api.ts";
 
@@ -24,6 +24,7 @@ export function DeleteAccountButton({
   currentUserId: string;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   return (
     <ConfirmDialog

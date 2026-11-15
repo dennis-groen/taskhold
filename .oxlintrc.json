@@ -14,7 +14,9 @@
   "ignorePatterns": ["**/routeTree.gen.ts"],
   "rules": {
     // Named exports keep one name per thing across every import
-    "import/no-default-export": "error"
+    "import/no-default-export": "error",
+    // A cycle between modules breaks at load time, with a binding read before it's set
+    "import/no-cycle": "error"
   },
   "overrides": [
     {
@@ -178,7 +180,7 @@
           {
             "patterns": [
               {
-                "group": ["@/features/**", "@/routes/**"],
+                "group": ["@/features/**", "@/routes/**", "@/router.tsx", "@/main.tsx"],
                 "message": "Shared code can't depend on features or routes."
               },
               {
@@ -206,8 +208,8 @@
             ],
             "patterns": [
               {
-                "group": ["@/routes/**"],
-                "message": "Features can't import routes. Read route data with getRouteApi()."
+                "group": ["@/routes/**", "@/router.tsx", "@/main.tsx"],
+                "message": "Features can't import routes or the router. Read route data with getRouteApi(), and the query client with useQueryClient()."
               },
               {
                 "group": ["@/features/**"],
@@ -242,8 +244,8 @@
             ],
             "patterns": [
               {
-                "group": ["@/routes/**"],
-                "message": "Features can't import routes. Read route data with getRouteApi()."
+                "group": ["@/routes/**", "@/router.tsx", "@/main.tsx"],
+                "message": "Features can't import routes or the router. Read route data with getRouteApi(), and the query client with useQueryClient()."
               },
               {
                 "group": ["@/features/**"],
@@ -296,7 +298,7 @@
           {
             "patterns": [
               {
-                "group": ["@/features/**", "@/routes/**"],
+                "group": ["@/features/**", "@/routes/**", "@/router.tsx", "@/main.tsx"],
                 "message": "Shared code can't depend on features or routes."
               }
             ]
