@@ -10,6 +10,7 @@ import { env } from "../../env.ts";
 import * as remindersRepo from "./reminders.repo.ts";
 import {
   noReminderDevices,
+  pushDeviceTaken,
   remindersOff,
   remindersUnavailable,
   testSentRecently,
@@ -43,7 +44,8 @@ export async function subscribe(userId: string, input: SubscribeInput): Promise<
   if (!pushConfigured) throw remindersUnavailable();
   const { endpoint, keys } = input.subscription;
   await transaction(async (tx) => {
-    await remindersRepo.upsertSubscription({ userId, endpoint, ...keys }, tx);
+    const saved = await remindersRepo.upsertSubscription({ userId, endpoint, ...keys }, tx);
+    if (!saved) throw pushDeviceTaken();
     const dropped = await remindersRepo.deleteOldestSubscriptions(userId, MAX_DEVICES, tx);
     if (dropped > 0) annotate("reminders", { devices_dropped: dropped });
     await remindersRepo.upsertSetting(

@@ -17,12 +17,15 @@ export type SettingRecord = typeof reminderSetting.$inferSelect;
 /**
  * Adds the device, or hands it to this user if someone else had it (they signed in there). Either
  * way it counts as subscribed now, so it's the last of the person's devices to be dropped.
+ *
+ * A device already stored only changes hands when the request has its secret, which the browser
+ * it belongs to always sends: knowing an endpoint isn't enough to take it. False when it didn't.
  */
 export async function upsertSubscription(
   values: SubscriptionValues,
   executor: Executor = db,
-): Promise<void> {
-  await executor
+): Promise<boolean> {
+  const rows = await executor
     .insert(pushSubscription)
     .values(values)
     .onConflictDoUpdate({
@@ -33,7 +36,10 @@ export async function upsertSubscription(
         auth: values.auth,
         createdAt: Temporal.Now.instant(),
       },
-    });
+      setWhere: eq(pushSubscription.auth, values.auth),
+    })
+    .returning({ id: pushSubscription.id });
+  return rows.length > 0;
 }
 
 /** Deletes the person's devices except the `keep` most recently subscribed */

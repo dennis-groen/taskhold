@@ -19,3 +19,10 @@ export const noReminderDevices = () =>
     "NO_REMINDER_DEVICES",
     "No device gets reminders yet. Turn them on first.",
   );
+
+export const pushDeviceTaken = () =>
+  new AppError(
+    "conflict",
+    "PUSH_DEVICE_TAKEN",
+    "This device is set up for someone else. Turn notifications off and on again in the browser.",
+  );

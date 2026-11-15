@@ -273,11 +273,11 @@ describe("devices", () => {
     const browser = await turnOn(first);
     const keep = await turnOn(first);
 
-    // Same browser, now signed in as someone else
+    // Same browser, now signed in as someone else: the same subscription, keys and all
     await json(
       await second.api.reminders.subscription.$put({
         json: {
-          subscription: { endpoint: browser, keys: { p256dh: "BOther", auth: "other" } },
+          subscription: { endpoint: browser, keys: { p256dh: "BPublicKey-x_1", auth: "secret_1" } },
           timeZone: "UTC",
         },
       }),
@@ -292,6 +292,24 @@ describe("devices", () => {
     const secondPush = recorder();
     await remindersService.sendTest(second.id, secondPush.send);
     expect(secondPush.sent.map((s) => s.endpoint)).toEqual([browser]);
+  });
+
+  it("stay with their owner when someone else submits the endpoint without its secret", async () => {
+    const owner = await signUp();
+    const other = await signUp();
+    const phone = await turnOn(owner);
+
+    const taken = await other.api.reminders.subscription.$put({
+      json: {
+        subscription: { endpoint: phone, keys: { p256dh: "BOther", auth: "other" } },
+        timeZone: "UTC",
+      },
+    });
+    expect(await errorCode(taken, 409)).toBe("PUSH_DEVICE_TAKEN");
+
+    const push = recorder();
+    expect(await remindersService.sendTest(owner.id, push.send)).toBe(1);
+    expect(await remindersRepo.findSubscriptions(other.id)).toEqual([]);
   });
 
   it("are kept to the 10 most recently turned on, per person", async () => {
