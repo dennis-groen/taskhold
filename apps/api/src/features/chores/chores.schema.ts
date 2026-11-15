@@ -76,6 +76,7 @@ const choreName = (schema: z.ZodString) =>
   schema.trim().min(1, "Give the chore a name.").max(60, "Keep the name under 60 characters.");
 
 const choreFields = {
+  id: (schema: z.ZodString) => schema.pipe(z.uuid()),
   name: choreName,
   dueOn: () => plainDateInputSchema,
   assigneeId: (schema: z.ZodString) => schema.min(1).max(64),
@@ -86,9 +87,11 @@ export const choreParam = z.object({
 });
 
 export const createChoreBody = createInsertSchema(chore, choreFields)
-  .pick({ name: true, dueOn: true, assigneeId: true })
+  // The id is optional: the app may choose it, so a chore it adds keeps its identity
+  .pick({ id: true, name: true, dueOn: true, assigneeId: true })
   // Inserts make nullable columns optional; this API requires callers to send explicit values.
   .required()
+  .partial({ id: true })
   .extend({ repeat: repeatSchema });
 
 export const updateChoreBody = z

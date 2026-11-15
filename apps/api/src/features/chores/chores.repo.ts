@@ -105,13 +105,17 @@ export async function lockChore(
   return rows[0] ?? null;
 }
 
+/** Returns false when a chore with that id already exists, e.g. a retried request */
 export async function insertChore(
-  values: ChoreValues & Pick<typeof chore.$inferInsert, "householdId">,
+  values: ChoreValues & Pick<typeof chore.$inferInsert, "householdId" | "id">,
   executor: Executor = db,
-): Promise<{ id: string }> {
-  const rows = await executor.insert(chore).values(values).returning({ id: chore.id });
-  // An insert without a conflict target always returns its row
-  return rows[0];
+): Promise<boolean> {
+  const rows = await executor
+    .insert(chore)
+    .values(values)
+    .onConflictDoNothing({ target: chore.id })
+    .returning({ id: chore.id });
+  return rows.length > 0;
 }
 
 /** Returns false when the household has no chore with that id */

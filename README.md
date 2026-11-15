@@ -126,6 +126,7 @@ Signed-in pages that need a household share one frame (`components/layout/Househ
 - Ticking a chore shows a toast with Undo for a few seconds. Later, the most recent completion can still be undone from the chore's sheet, which puts its due date back. Older history can't be changed.
 - Doing a chore again on the same day changes nothing, so a double tap or two people at once count once.
 - Done one-off chores collapse into "Done"; "Clear done" removes them.
+- The app may choose a new chore's id (`POST /api/chores` takes an optional `id`), so an add that is sent twice makes one chore, and deleting a chore that is already gone answers 204 like to-dos do.
 - Changes from other members show up straight away through live updates (see below).
 - Tables: `chore` and `chore_completion` in `apps/api/src/features/chores/chores.table.ts`. A check constraint keeps repeat settings consistent and makes repeating chores have a due date. Deleting a household or a chore deletes its history.
 

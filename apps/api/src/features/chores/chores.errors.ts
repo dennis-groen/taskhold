@@ -36,3 +36,6 @@ export const choreLimitReached = () =>
     "CHORE_LIMIT_REACHED",
     "That's as many chores as a household can have. Delete one first.",
   );
+
+export const choreIdTaken = () =>
+  new AppError("conflict", "CHORE_ID_TAKEN", "Another chore already uses this id.");

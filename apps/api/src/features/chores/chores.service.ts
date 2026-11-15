@@ -12,6 +12,7 @@ import { isDone, markDone, skip, type ChoreSchedule } from "./chore-schedule.ts"
 import * as choresRepo from "./chores.repo.ts";
 import {
   assigneeNotMember,
+  choreIdTaken,
   choreLimitReached,
   choreNotFound,
   dueDateRequired,
@@ -59,16 +60,27 @@ export async function createChore(
   executor?: Executor,
 ): Promise<ChoreDetail> {
   const household = await householdsService.getMembershipOf(userId, executor);
+  const id = input.id ?? crypto.randomUUID();
+  const ref = { householdId: household.id, choreId: id };
+
+  // A retry of an add that already got in answers with that chore, whatever has changed since
+  if (input.id && (await choresRepo.findChore(ref, executor))) {
+    annotate("chores", { chore_id: id, retried: true });
+    return loadDetail(household.id, id, executor);
+  }
+
   await checkChore(household.id, input, executor);
   if ((await choresRepo.countChores(household.id, executor)) >= MAX_CHORES) {
     throw choreLimitReached();
   }
-  const { id } = await choresRepo.insertChore(
-    { householdId: household.id, ...toValues(input) },
+  const inserted = await choresRepo.insertChore(
+    { id, householdId: household.id, ...toValues(input) },
     executor,
   );
+  // Not inserted: a retry that raced its twin, or an id that belongs to another household
+  if (!inserted && !(await choresRepo.findChore(ref, executor))) throw choreIdTaken();
   annotate("chores", { chore_id: id, repeats: input.repeat !== null });
-  await changed(household.id, executor);
+  if (inserted) await changed(household.id, executor);
   return loadDetail(household.id, id, executor);
 }
 
@@ -121,12 +133,12 @@ export async function updateChore(
   return loadDetail(household.id, choreId);
 }
 
+/** Deleting a chore that's already gone, or isn't the household's, does nothing, like for to-dos */
 export async function deleteChore(userId: string, choreId: string): Promise<void> {
   annotate("chores", { chore_id: choreId });
   const household = await householdsService.getMembershipOf(userId);
   const deleted = await choresRepo.deleteChore({ householdId: household.id, choreId });
-  if (!deleted) throw choreNotFound();
-  await changed(household.id);
+  if (deleted) await changed(household.id);
 }
 
 /**

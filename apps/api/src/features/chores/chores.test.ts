@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { db } from "../../db/db.ts";
@@ -21,10 +23,12 @@ async function choreOf(
     repeat?: { every: number; unit: "day" | "week" } | null;
     dueOn?: string | null;
     assigneeId?: string | null;
+    id?: string;
   } = {},
 ) {
   const created = await person.api.chores.$post({
     json: {
+      ...(chore.id && { id: chore.id }),
       name: chore.name ?? "Vacuum",
       repeat: chore.repeat === undefined ? weekly : chore.repeat,
       dueOn: chore.dueOn === undefined ? utcToday().toString() : chore.dueOn,
@@ -361,7 +365,6 @@ describe("chore rules", () => {
     const attempts = [
       chores.$get({ param }),
       chores.$patch({ param, json: { name: "Mine now" } }),
-      chores.$delete({ param }),
       complete(outsider, chore.id),
       skip(outsider, chore.id),
       chores.undo.$post({ param }),
@@ -369,8 +372,75 @@ describe("chore rules", () => {
     for (const attempt of await Promise.all(attempts)) {
       expect(await errorCode(attempt, 404)).toBe("CHORE_NOT_FOUND");
     }
+    // Deleting another household's chore does nothing, like deleting one that's already gone
+    expect((await chores.$delete({ param })).status).toBe(204);
     expect((await json(await outsider.api.chores.$get(), 200)).chores).toEqual([]);
     expect((await json(await owner.api.chores.$get(), 200)).chores).toHaveLength(1);
+  });
+
+  it("answers the same when a chore is deleted twice, or never existed", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const chore = await choreOf(owner);
+    const param = { choreId: chore.id };
+
+    expect((await owner.api.chores[":choreId"].$delete({ param })).status).toBe(204);
+    expect((await owner.api.chores[":choreId"].$delete({ param })).status).toBe(204);
+    expect(
+      (await owner.api.chores[":choreId"].$delete({ param: { choreId: randomUUID() } })).status,
+    ).toBe(204);
+  });
+});
+
+describe("choosing the id", () => {
+  it("makes the chore with the id it was given, once however many times it's sent", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const id = randomUUID();
+
+    const first = await choreOf(owner, { id, name: "Bins" });
+    expect(first.id).toBe(id);
+    const again = await choreOf(owner, { id, name: "Bins" });
+    expect(again.id).toBe(id);
+    expect((await json(await owner.api.chores.$get(), 200)).chores).toHaveLength(1);
+  });
+
+  it("can't take over another household's chore by reusing its id", async () => {
+    const owner = await signUp();
+    const other = await signUp();
+    await householdWith(owner);
+    await householdWith(other);
+    const id = randomUUID();
+    await choreOf(owner, { id, name: "Mine" });
+
+    const reuse = await other.api.chores.$post({
+      json: { id, name: "Overwritten", repeat: null, dueOn: null, assigneeId: null },
+    });
+    expect(await errorCode(reuse, 409)).toBe("CHORE_ID_TAKEN");
+    const { chores } = await json(await owner.api.chores.$get(), 200);
+    expect(chores.map((chore) => chore.name)).toEqual(["Mine"]);
+    expect((await json(await other.api.chores.$get(), 200)).chores).toEqual([]);
+  });
+
+  it("still accepts a retry of an add that got in when the household is at its limit", async () => {
+    const owner = await signUp();
+    const household = await householdWith(owner);
+    const id = randomUUID();
+    await choreOf(owner, { id, name: "The 200th" });
+    await db
+      .insert(choreTable)
+      .values(
+        Array.from({ length: 199 }, (_, n) => ({ householdId: household.id, name: `Chore ${n}` })),
+      );
+
+    const retry = await owner.api.chores.$post({
+      json: { id, name: "The 200th", repeat: null, dueOn: null, assigneeId: null },
+    });
+    expect(retry.status).toBe(201);
+    const oneMore = await owner.api.chores.$post({
+      json: { name: "One more", repeat: null, dueOn: null, assigneeId: null },
+    });
+    expect(await errorCode(oneMore, 409)).toBe("CHORE_LIMIT_REACHED");
   });
 });
 
