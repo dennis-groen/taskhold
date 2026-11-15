@@ -1,15 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { cn } from "cn";
+
+import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
 import { HouseIcon, TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { errorMessage } from "@/lib/api.ts";
 
@@ -35,7 +32,7 @@ export function TodoSheet({
 }) {
   return (
     <Drawer open={todo !== null} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="mx-auto max-w-[640px]">
+      <SheetContent>
         {todo && (
           <SheetBody
             // Fresh form state for each to-do
@@ -47,7 +44,7 @@ export function TodoSheet({
             onClose={onClose}
           />
         )}
-      </DrawerContent>
+      </SheetContent>
     </Drawer>
   );
 }
@@ -86,12 +83,12 @@ function SheetBody({
 
   return (
     <>
-      <DrawerHeader className="px-5 pt-5 text-left">
+      <SheetHeader>
         <DrawerTitle className="break-words">{todo.name}</DrawerTitle>
         <DrawerDescription>Only you can see this.</DrawerDescription>
-      </DrawerHeader>
+      </SheetHeader>
 
-      <div className="overflow-y-auto px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+      <div className={cn("overflow-y-auto", SHEET_BODY)}>
         <TodoForm
           initial={{ name: todo.name, notes: todo.notes, dueOn: todo.dueOn }}
           submitLabel="Save changes"

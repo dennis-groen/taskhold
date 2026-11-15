@@ -1,14 +1,11 @@
 import { useId, useRef, useState, type FormEvent, type RefObject } from "react";
 
+import { cn } from "cn";
+
+import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
 import { MinusIcon, PlusIcon, TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -42,8 +39,7 @@ export function EditItemSheet({
 
   return (
     <Drawer open={item !== null} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent
-        className="mx-auto max-w-[640px]"
+      <SheetContent
         // With a keyboard or mouse, ready to type. On a phone the keyboard would cover the − and
         // +, which are what you came for most of the time, so nothing pops up until you tap a field.
         initialFocus={(type) => (type === "touch" ? formRef.current : nameRef.current)}
@@ -65,7 +61,7 @@ export function EditItemSheet({
             }}
           />
         )}
-      </DrawerContent>
+      </SheetContent>
     </Drawer>
   );
 }
@@ -107,16 +103,19 @@ function EditItemForm({
 
   return (
     <>
-      <DrawerHeader className="px-5 pt-5 text-left">
+      <SheetHeader>
         <DrawerTitle>Edit item</DrawerTitle>
         <DrawerDescription>Everyone in your household sees the change.</DrawerDescription>
-      </DrawerHeader>
+      </SheetHeader>
 
       <form
         ref={formRef}
         tabIndex={-1}
         onSubmit={submit}
-        className="flex flex-col gap-6 overflow-y-auto overscroll-contain px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] outline-none"
+        className={cn(
+          "flex flex-col gap-6 overflow-y-auto overscroll-contain outline-none",
+          SHEET_BODY,
+        )}
       >
         <div className="flex flex-col gap-2">
           <Label htmlFor={ids.name}>Item</Label>

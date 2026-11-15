@@ -1,14 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type ReactElement } from "react";
 
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { cn } from "cn";
+
+import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
+import { Drawer, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 import { createChore } from "../chores.api.ts";
 import { choreKeys } from "../chores.queries.ts";
@@ -37,14 +33,14 @@ export function NewChoreDrawer({
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger render={trigger} />
-      <DrawerContent className="mx-auto max-w-[640px]" initialFocus={nameRef}>
-        <DrawerHeader className="px-5 pt-5 text-left">
+      <SheetContent initialFocus={nameRef}>
+        <SheetHeader>
           <DrawerTitle>New chore</DrawerTitle>
           <DrawerDescription className="sr-only">
             Name the chore, choose how often it repeats, when it's due and who it's for.
           </DrawerDescription>
-        </DrawerHeader>
-        <div className="overflow-y-auto px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+        </SheetHeader>
+        <div className={cn("overflow-y-auto", SHEET_BODY)}>
           {/* Mounted only while open, so it starts fresh each time */}
           {open && (
             <ChoreForm
@@ -56,7 +52,7 @@ export function NewChoreDrawer({
             />
           )}
         </div>
-      </DrawerContent>
+      </SheetContent>
     </Drawer>
   );
 }

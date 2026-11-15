@@ -1,15 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { SkipForwardIcon, SunHorizonIcon, TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { daysBetween, dueLabel, pastDateLabel } from "@/lib/dates.ts";
 import { cn } from "cn";
@@ -44,7 +39,7 @@ export function ChoreSheet({
 }) {
   return (
     <Drawer open={chore !== null} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="mx-auto max-w-[640px]">
+      <SheetContent>
         {chore && (
           <SheetBody
             // Fresh form state for each chore
@@ -57,7 +52,7 @@ export function ChoreSheet({
             onClose={onClose}
           />
         )}
-      </DrawerContent>
+      </SheetContent>
     </Drawer>
   );
 }
@@ -101,7 +96,7 @@ function SheetBody({
 
   return (
     <>
-      <DrawerHeader className="px-5 pt-5 text-left">
+      <SheetHeader>
         <DrawerTitle className="break-words">{chore.name}</DrawerTitle>
         <DrawerDescription className={cn(!due && !repeats && "sr-only")}>
           {due || repeats ? (
@@ -118,9 +113,9 @@ function SheetBody({
             "Change the chore, see who did it lately, or delete it."
           )}
         </DrawerDescription>
-      </DrawerHeader>
+      </SheetHeader>
 
-      <div className="overflow-y-auto px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+      <div className={cn("overflow-y-auto", SHEET_BODY)}>
         <PutOff chore={chore} viewer={viewer} today={today} onDone={onClose} />
 
         <ChoreForm

@@ -2,11 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useRef, useState, type FormEvent, type RefObject } from "react";
 
+import { cn } from "cn";
+
+import { SHEET_BODY, SheetContent } from "@/components/layout/Sheet.tsx";
 import { CheckIcon, PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
-  DrawerContent,
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
@@ -40,7 +42,7 @@ export function QuickAdd({ viewer }: { viewer: { id: string; name: string } }) {
       >
         <PlusIcon weight="bold" />
       </DrawerTrigger>
-      <DrawerContent className="mx-auto max-w-[640px]" initialFocus={nameRef}>
+      <SheetContent initialFocus={nameRef}>
         <DrawerHeader className="sr-only">
           <DrawerTitle>Add to a shopping list</DrawerTitle>
           <DrawerDescription>
@@ -57,7 +59,7 @@ export function QuickAdd({ viewer }: { viewer: { id: string; name: string } }) {
             onListCreated={() => setOpen(false)}
           />
         )}
-      </DrawerContent>
+      </SheetContent>
     </Drawer>
   );
 }
@@ -162,7 +164,7 @@ function QuickAddForm({
   }
 
   return (
-    <form onSubmit={submit} className="px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+    <form onSubmit={submit} className={cn(SHEET_BODY, "pt-5")}>
       <div className="flex gap-2">
         <Input
           ref={nameRef}

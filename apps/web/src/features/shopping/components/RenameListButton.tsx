@@ -1,16 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 
+import { cn } from "cn";
+
+import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
 import { PencilSimpleIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -33,14 +29,14 @@ export function RenameListButton({ list }: { list: ShoppingList }) {
           </Button>
         }
       />
-      <DrawerContent className="mx-auto max-w-[640px]">
-        <DrawerHeader className="px-5 pt-5 text-left">
+      <SheetContent>
+        <SheetHeader>
           <DrawerTitle>Rename list</DrawerTitle>
           <DrawerDescription>Everyone in your household sees the new name.</DrawerDescription>
-        </DrawerHeader>
+        </SheetHeader>
         {/* Mounted only while open, so it starts from the current name each time */}
         {open && <RenameForm list={list} onDone={() => setOpen(false)} />}
-      </DrawerContent>
+      </SheetContent>
     </Drawer>
   );
 }
@@ -83,7 +79,7 @@ function RenameForm({ list, onDone }: { list: ShoppingList; onDone: () => void }
   return (
     <form
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-6 px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+      className={cn("flex flex-col gap-6", SHEET_BODY)}
     >
       <div className="flex flex-col gap-2">
         <Label htmlFor={nameId}>Name</Label>

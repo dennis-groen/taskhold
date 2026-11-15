@@ -1,13 +1,9 @@
 import { useRef, useState, type ReactElement } from "react";
 
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { cn } from "cn";
+
+import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
+import { Drawer, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 import { useTodos } from "../todos.hooks.ts";
 import { TodoForm } from "./TodoForm.tsx";
@@ -21,12 +17,12 @@ export function NewTodoDrawer({ trigger }: { trigger: ReactElement }) {
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger render={trigger} />
-      <DrawerContent className="mx-auto max-w-[640px]" initialFocus={nameRef}>
-        <DrawerHeader className="px-5 pt-5 text-left">
+      <SheetContent initialFocus={nameRef}>
+        <SheetHeader>
           <DrawerTitle>New to-do</DrawerTitle>
           <DrawerDescription>Only you can see this.</DrawerDescription>
-        </DrawerHeader>
-        <div className="overflow-y-auto px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+        </SheetHeader>
+        <div className={cn("overflow-y-auto", SHEET_BODY)}>
           {/* Mounted only while open, so it starts fresh each time */}
           {open && (
             <TodoForm
@@ -40,7 +36,7 @@ export function NewTodoDrawer({ trigger }: { trigger: ReactElement }) {
             />
           )}
         </div>
-      </DrawerContent>
+      </SheetContent>
     </Drawer>
   );
 }
