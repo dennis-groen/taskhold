@@ -6,6 +6,7 @@ import { RootError } from "@/components/RootError.tsx";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdatePrompt } from "@/components/UpdatePrompt.tsx";
 import { ViewerUnavailableError, fetchViewer, type Viewer } from "@/features/auth/auth.api.ts";
+import { whereToSend } from "@/features/auth/page-access.ts";
 import {
   keepForOffline,
   keptForOffline,
@@ -15,30 +16,15 @@ import {
 
 import "@/styles/globals.css";
 
-// Every page requires a signed-in user unless it's listed here
-const PUBLIC_PATHS = new Set(["/"]);
-
-// Where signed-in users without a household are allowed to be
-function isSetupPath(path: string) {
-  return path === "/onboarding" || path.startsWith("/onboarding/") || path.startsWith("/join/");
-}
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ context, location }) => {
     const { viewer, offline } = await whoIsSignedIn(context.queryClient);
     const path = location.pathname;
 
-    if (!viewer.user) {
-      if (!PUBLIC_PATHS.has(path)) {
-        throw redirect({ to: "/", search: { redirect: location.href } });
-      }
-    } else if (!viewer.household) {
-      if (!PUBLIC_PATHS.has(path) && !isSetupPath(path)) {
-        throw redirect({ to: "/onboarding" });
-      }
-    } else if (isSetupPath(path)) {
-      throw redirect({ to: "/lists" });
-    }
+    const to = whereToSend(viewer, path);
+    // Signing in brings people back to the page they asked for
+    if (to === "/") throw redirect({ to, search: { redirect: location.href } });
+    if (to) throw redirect({ to });
 
     return { viewer, offline };
   },
