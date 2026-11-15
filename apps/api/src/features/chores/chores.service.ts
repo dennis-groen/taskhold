@@ -12,6 +12,7 @@ import { isDone, markDone, skip, type ChoreSchedule } from "./chore-schedule.ts"
 import * as choresRepo from "./chores.repo.ts";
 import {
   assigneeNotMember,
+  choreLimitReached,
   choreNotFound,
   dueDateRequired,
   implausibleToday,
@@ -26,6 +27,9 @@ import type {
   Repeat,
   UpdateChoreInput,
 } from "./chores.schema.ts";
+
+// Far above what a household uses; it keeps one account from filling the shared database
+const MAX_CHORES = 200;
 
 /** How many past completions a chore's detail shows */
 const HISTORY_LENGTH = 10;
@@ -56,6 +60,9 @@ export async function createChore(
 ): Promise<ChoreDetail> {
   const household = await householdsService.getMembershipOf(userId, executor);
   await checkChore(household.id, input, executor);
+  if ((await choresRepo.countChores(household.id, executor)) >= MAX_CHORES) {
+    throw choreLimitReached();
+  }
   const { id } = await choresRepo.insertChore(
     { householdId: household.id, ...toValues(input) },
     executor,

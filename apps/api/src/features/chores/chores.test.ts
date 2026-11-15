@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { db } from "../../db/db.ts";
 import { couldBeToday } from "./client-today.ts";
+import { chore as choreTable } from "./chores.table.ts";
 import {
   errorCode,
   householdWith,
@@ -369,5 +371,22 @@ describe("chore rules", () => {
     }
     expect((await json(await outsider.api.chores.$get(), 200)).chores).toEqual([]);
     expect((await json(await owner.api.chores.$get(), 200)).chores).toHaveLength(1);
+  });
+});
+
+describe("limits", () => {
+  it("stop a household at 200 chores", async () => {
+    const owner = await signUp();
+    const household = await householdWith(owner);
+    await db
+      .insert(choreTable)
+      .values(
+        Array.from({ length: 200 }, (_, n) => ({ householdId: household.id, name: `Chore ${n}` })),
+      );
+
+    const oneMore = await owner.api.chores.$post({
+      json: { name: "One more", repeat: null, dueOn: null, assigneeId: null },
+    });
+    expect(await errorCode(oneMore, 409)).toBe("CHORE_LIMIT_REACHED");
   });
 });

@@ -29,3 +29,10 @@ export const notRepeating = () =>
 
 export const nothingToUndo = () =>
   new AppError("conflict", "NOTHING_TO_UNDO", "There's nothing to undo for this chore.");
+
+export const choreLimitReached = () =>
+  new AppError(
+    "conflict",
+    "CHORE_LIMIT_REACHED",
+    "That's as many chores as a household can have. Delete one first.",
+  );

@@ -1,6 +1,6 @@
 // Data access for chores: the only place that queries chore tables.
 // Every chore query is scoped to a household, so a chore id from another household reads as missing.
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db, type Executor, type Transaction } from "../../db/db.ts";
 import { user } from "../auth/auth.table.ts";
@@ -240,4 +240,12 @@ export async function deleteCompletion(
 /** Forgets the chore's whole history. The caller has checked the chore is its household's. */
 export async function deleteCompletions(choreId: string, tx: Transaction): Promise<void> {
   await tx.delete(choreCompletion).where(eq(choreCompletion.choreId, choreId));
+}
+
+export async function countChores(householdId: string, executor: Executor = db): Promise<number> {
+  const rows = await executor
+    .select({ total: count() })
+    .from(chore)
+    .where(eq(chore.householdId, householdId));
+  return rows[0]?.total ?? 0;
 }
