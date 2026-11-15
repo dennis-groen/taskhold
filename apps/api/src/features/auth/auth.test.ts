@@ -13,6 +13,19 @@ describe("response headers", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("strict-transport-security")).toBe("max-age=15552000");
   });
+
+  it("tell browsers and proxies not to store API responses, errors included", async () => {
+    const person = await signUp();
+    const answers = [
+      await person.api.viewer.$get(),
+      await person.api.todos.$get(),
+      await anonymous.todos.$get(),
+      await app.request("/api/health"),
+    ];
+    for (const response of answers) {
+      expect(response.headers.get("cache-control")).toBe("no-store");
+    }
+  });
 });
 
 describe("sessions", () => {

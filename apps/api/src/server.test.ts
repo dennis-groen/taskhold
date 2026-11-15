@@ -57,6 +57,7 @@ describe("serving the web app next to the API", () => {
     expect(viewer.headers.get("content-security-policy")).toBe(
       "default-src 'none'; frame-ancestors 'none'",
     );
+    expect(viewer.headers.get("cache-control")).toBe("no-store");
 
     const unknown = await server.request("/api/nope");
     expect(unknown.status).toBe(404);

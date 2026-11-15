@@ -25,6 +25,12 @@ export const app = new Hono()
   .onError(errorHandler)
   .use(requestId())
   .use(requestLogger())
+  // What the API answers is one person's or one household's: no browser, proxy or CDN may keep
+  // it. A response that already says how to cache itself (the live stream) keeps its own header.
+  .use(async (c, next) => {
+    await next();
+    if (!c.res.headers.has("Cache-Control")) c.res.headers.set("Cache-Control", "no-store");
+  })
   // API responses are JSON or redirects, never pages: nothing in them may load or run anything,
   // and they may not be framed. The web app's own policy is in apps/web/content-security-policy.ts.
   .use(
