@@ -9,7 +9,7 @@ A part of the app whose data is fetched, refreshed and kept on the device as a w
 _Avoid_: topic, section, module
 
 **Change**:
-Something a person does to the data in an area (ticking an item, marking a chore done, skipping it) that shows straight away and reaches the server once there's a connection, even if the app is closed in between.
+Something a person does to the data in an area (ticking an item, adding a chore, marking a chore done, skipping it) that shows straight away and reaches the server once there's a connection, even if the app is closed in between.
 _Avoid_: mutation, action, optimistic update
 
 ### Chores
