@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { forgetOfflineCache } from "@/lib/offline-cache.ts";
 import { forgetPushDevice } from "@/lib/push-device.ts";
 
-import { authClient } from "./auth-client.ts";
+import { authClient } from "../auth-client.ts";
 
 export function SignOutButton() {
   const navigate = useNavigate();

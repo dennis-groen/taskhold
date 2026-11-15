@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { forgetOfflineCache } from "@/lib/offline-cache.ts";
 import { forgetPushDevice } from "@/lib/push-device.ts";
 
-import { deleteAccount } from "./auth.api.ts";
+import { deleteAccount } from "../auth.api.ts";
 
 type HouseholdSummary = {
   name: string;

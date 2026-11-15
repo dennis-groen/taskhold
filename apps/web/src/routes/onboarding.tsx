@@ -1,7 +1,7 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { AppShell } from "@/components/layout/AppShell.tsx";
-import { SignOutButton } from "@/features/auth/SignOutButton.tsx";
+import { SignOutButton } from "@/features/auth/components/SignOutButton.tsx";
 
 export const Route = createFileRoute("/onboarding")({
   beforeLoad: ({ context }) => {

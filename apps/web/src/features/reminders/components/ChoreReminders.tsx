@@ -9,9 +9,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { errorMessage } from "@/lib/api.ts";
 
-import { useDeviceReminders, type DeviceState } from "./reminders.hooks.ts";
-import { sendTestReminder, updateRemindAt } from "./reminders.api.ts";
-import { reminderKeys, reminderStatusQuery } from "./reminders.queries.ts";
+import { useDeviceReminders, type DeviceState } from "../reminders.hooks.ts";
+import { sendTestReminder, updateRemindAt } from "../reminders.api.ts";
+import { reminderKeys, reminderStatusQuery } from "../reminders.queries.ts";
 
 // Why the switch can't be used on this device
 const UNAVAILABLE: Partial<Record<DeviceState, string>> = {

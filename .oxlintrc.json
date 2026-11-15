@@ -48,6 +48,10 @@
               {
                 "group": ["drizzle-orm", "drizzle-orm/*"],
                 "message": "The HTTP layer calls services. Only repo files touch the database."
+              },
+              {
+                "regex": "^\\.\\./[^/]+/[^/]+\\.routes(\\.ts)?$",
+                "message": "Routers meet in app.ts. Call the other feature's service."
               }
             ]
           }
@@ -76,8 +80,8 @@
                 "message": "Services query through the repo. Use transaction() to group repo calls."
               },
               {
-                "regex": "^\\.\\./[^/]+/[^/]+\\.repo(\\.ts)?$",
-                "message": "Call the other feature's service, never its repo."
+                "regex": "^\\.\\./[^/]+/[^/]+\\.(repo|routes)(\\.ts)?$",
+                "message": "Call the other feature's service, never its repo or routes."
               }
             ]
           }
@@ -262,6 +266,23 @@
               {
                 "regex": "^@phosphor-icons/",
                 "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Components have one place, so nobody has to decide or guess. Any import trips this.
+      "files": ["apps/web/src/features/*/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": ".*",
+                "message": "Components go in the feature's components/ folder. Only .ts files sit at a feature's root."
               }
             ]
           }

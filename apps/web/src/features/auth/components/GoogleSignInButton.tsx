@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "cn";
 
-import { authClient } from "./auth-client.ts";
+import { authClient } from "../auth-client.ts";
 
 /** Starts Google sign-in; after it, the browser lands on `callbackURL` */
 export function GoogleSignInButton({
