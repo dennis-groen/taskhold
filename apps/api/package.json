@@ -6,6 +6,7 @@
   "exports": {
     "./client": "./src/rpc-client.ts",
     "./chore-schedule": "./src/features/chores/chore-schedule.ts",
+    "./invite-code": "./src/features/households/invite-code.ts",
     "./live-topics": "./src/features/live/live-topics.ts"
   },
   "scripts": {

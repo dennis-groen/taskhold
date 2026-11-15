@@ -1,15 +1,17 @@
-export const INVITE_CODE_LENGTH = 8;
+import { INVITE_CODE_ALPHABET, INVITE_CODE_LENGTH } from "@taskhold/api/invite-code";
+
+export { INVITE_CODE_LENGTH };
 
 /** Characters the API uses for codes (no 0/O or 1/I), in either case */
-export const INVITE_CODE_PATTERN = "^[A-HJ-NP-Za-hj-np-z2-9]*$";
+export const INVITE_CODE_PATTERN = `^[${INVITE_CODE_ALPHABET}${INVITE_CODE_ALPHABET.toLowerCase()}]*$`;
 
 /** Pulls a code out of whatever was pasted: "fqvh-79zk", "FQVH 79ZK" or a full invite link. */
 export function extractInviteCode(input: string): string {
   const fromLink = /\/join\/([^/?#\s]+)/i.exec(input)?.[1] ?? input;
-  return fromLink
-    .toUpperCase()
-    .replace(/[^A-HJ-NP-Z2-9]/g, "")
-    .slice(0, INVITE_CODE_LENGTH);
+  return Array.from(fromLink.toUpperCase())
+    .filter((char) => INVITE_CODE_ALPHABET.includes(char))
+    .slice(0, INVITE_CODE_LENGTH)
+    .join("");
 }
 
 /** "FQVH79ZK" -> "FQVH-79ZK", the way codes are shown and shared */

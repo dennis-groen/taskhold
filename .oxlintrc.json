@@ -155,6 +155,7 @@
     {
       "files": [
         "apps/api/src/features/chores/chore-schedule.ts",
+        "apps/api/src/features/households/invite-code.ts",
         "apps/api/src/features/live/live-topics.ts"
       ],
       "rules": {
