@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { couldBeToday } from "./chore-dates.ts";
+import { couldBeToday } from "./client-today.ts";
 import {
   errorCode,
   householdWith,

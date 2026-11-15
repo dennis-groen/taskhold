@@ -1,4 +1,4 @@
-// Date checks only the API needs. The schedule rules both apps share are in chore-schedule.ts.
+// Whether the day a client says it is can be right. The schedule rules both apps share are in chore-schedule.ts.
 
 // How long a change can wait on a device before it's sent: the web app keeps one for this many
 // days (MAX_AGE in apps/web/src/lib/offline-cache.ts). Keep the two the same.

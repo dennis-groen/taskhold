@@ -7,7 +7,7 @@ import { transaction, type Executor } from "../../db/db.ts";
 import { announce } from "../../lib/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
-import { couldBeToday } from "./chore-dates.ts";
+import { couldBeToday } from "./client-today.ts";
 import { isDone, markDone, skip, type ChoreSchedule } from "./chore-schedule.ts";
 import * as choresRepo from "./chores.repo.ts";
 import {
