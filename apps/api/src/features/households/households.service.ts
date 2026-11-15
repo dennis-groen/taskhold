@@ -120,7 +120,8 @@ export async function acceptInvite(userId: string, rawCode: string): Promise<Hou
 
 /**
  * Takes the user out of their household. If they were the owner, the member who joined
- * earliest takes over; if they were the last one, the household is deleted.
+ * earliest takes over; if they were the last one, the household is deleted. The household gets
+ * a new invite code, as when someone is removed.
  */
 export async function leaveHousehold(userId: string): Promise<{ householdDeleted: boolean }> {
   return transaction((tx) => leave(userId, tx));
@@ -146,6 +147,8 @@ async function leave(userId: string, tx: Transaction): Promise<{ householdDelete
     annotate("household", { deleted: true });
     return { householdDeleted: true };
   }
+  // Every member can see the invite code, so the person who left would still know how to rejoin
+  await replaceInviteCode(householdId, tx);
   if (membership.role === "owner") {
     await householdsRepo.setMemberRole(
       { householdId, userId: successor.userId, role: "owner" },
