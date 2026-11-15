@@ -268,3 +268,19 @@ export async function findPurchaseHistory(
     .limit(limit);
   return rows;
 }
+
+export async function countLists(householdId: string, executor: Executor = db): Promise<number> {
+  const rows = await executor
+    .select({ total: count() })
+    .from(shoppingList)
+    .where(eq(shoppingList.householdId, householdId));
+  return rows[0]?.total ?? 0;
+}
+
+export async function countItems(listId: string, executor: Executor = db): Promise<number> {
+  const rows = await executor
+    .select({ total: count() })
+    .from(shoppingItem)
+    .where(eq(shoppingItem.listId, listId));
+  return rows[0]?.total ?? 0;
+}

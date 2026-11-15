@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "../../db/db.ts";
-import { shoppingPurchase } from "./shopping.table.ts";
+import { shoppingItem, shoppingList, shoppingPurchase } from "./shopping.table.ts";
 import { errorCode, householdWith, json, signUp, type TestUser } from "../../../test/harness.ts";
 
 async function listOf(person: TestUser, name = "Groceries") {
@@ -342,5 +342,38 @@ describe("buy again history", () => {
   it("needs a household", async () => {
     const loner = await signUp();
     expect(await errorCode(await loner.api.shopping.history.$get(), 404)).toBe("NOT_IN_HOUSEHOLD");
+  });
+});
+
+describe("limits", () => {
+  it("stop a household at 50 lists", async () => {
+    const owner = await signUp();
+    const household = await householdWith(owner);
+    await db
+      .insert(shoppingList)
+      .values(
+        Array.from({ length: 50 }, (_, n) => ({ householdId: household.id, name: `List ${n}` })),
+      );
+
+    const oneMore = await owner.api.shopping.lists.$post({ json: { name: "One more" } });
+    expect(await errorCode(oneMore, 409)).toBe("LIST_LIMIT_REACHED");
+  });
+
+  it("stop a list at 500 items, but still accept a retry of an add that got in", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const list = await listOf(owner);
+    const items = owner.api.shopping.lists[":listId"].items;
+    const param = { listId: list.id };
+    const last = randomUUID();
+    await db
+      .insert(shoppingItem)
+      .values(Array.from({ length: 499 }, (_, n) => ({ listId: list.id, name: `Item ${n}` })));
+    await json(await items.$post({ param, json: { id: last, name: "The 500th" } }), 201);
+
+    expect(await errorCode(await items.$post({ param, json: { name: "Too many" } }), 409)).toBe(
+      "ITEM_LIMIT_REACHED",
+    );
+    await json(await items.$post({ param, json: { id: last, name: "The 500th" } }), 201);
   });
 });

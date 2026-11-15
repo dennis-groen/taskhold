@@ -5,7 +5,13 @@ import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
 import * as shoppingRepo from "./shopping.repo.ts";
-import { itemIdTaken, itemNotFound, listNotFound } from "./shopping.errors.ts";
+import {
+  itemIdTaken,
+  itemLimitReached,
+  itemNotFound,
+  listLimitReached,
+  listNotFound,
+} from "./shopping.errors.ts";
 import type {
   AddItemInput,
   BoughtItem,
@@ -15,6 +21,10 @@ import type {
   UpdateItemInput,
 } from "./shopping.schema.ts";
 
+// Far above what a household uses; they keep one account from filling the shared database
+const MAX_LISTS = 50;
+const MAX_ITEMS_PER_LIST = 500;
+
 export async function getLists(userId: string): Promise<ShoppingListSummary[]> {
   const household = await householdsService.getMembershipOf(userId);
   return shoppingRepo.findListsByHousehold(household.id);
@@ -22,6 +32,7 @@ export async function getLists(userId: string): Promise<ShoppingListSummary[]> {
 
 export async function createList(userId: string, name: string): Promise<ShoppingList> {
   const household = await householdsService.getMembershipOf(userId);
+  if ((await shoppingRepo.countLists(household.id)) >= MAX_LISTS) throw listLimitReached();
   const { id } = await shoppingRepo.insertList({ householdId: household.id, name });
   annotate("shopping", { list_id: id });
   await changed(household.id);
@@ -59,6 +70,11 @@ export async function addItem(
   const { list, householdId } = await findListOf(userId, listId);
   const id = input.id ?? crypto.randomUUID();
   annotate("shopping", { item_id: id });
+  // A retry of an add that already got in must still succeed, so only a new item counts
+  const isNew = !(await shoppingRepo.findItem({ listId: list.id, itemId: id }));
+  if (isNew && (await shoppingRepo.countItems(list.id)) >= MAX_ITEMS_PER_LIST) {
+    throw itemLimitReached();
+  }
   const inserted = await shoppingRepo.insertItem({
     id,
     listId: list.id,
