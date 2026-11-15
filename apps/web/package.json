@@ -9,6 +9,7 @@
     "typecheck": "tsc -b",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
+    "test:ci": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

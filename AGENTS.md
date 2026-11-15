@@ -10,6 +10,7 @@ A phone-first PWA for people who share a household: shared shopping lists, chore
 - `pnpm check`: format check, lint and typecheck. Run it before finishing any task
 - `pnpm test`: all tests (the API's need Postgres: `pnpm db:up`)
 - `pnpm test <feature>`: one feature's tests in both apps, e.g. `pnpm test chores`
+- `pnpm test:ci`: all tests, failing if a package runs none (what CI runs)
 - `pnpm db:generate` then `pnpm db:migrate`: after changing a `*.table.ts`
 - `pnpm auth:generate`: after changing Better Auth's config; rewrites `auth.table.ts`
 
