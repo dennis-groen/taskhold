@@ -28,7 +28,7 @@ A phone-first PWA for people who share a household: shared shopping lists, chore
 
 ## Features
 
-Folder names match in both apps and follow the URL.
+Folder names match in both apps and follow the API path (`/api/<feature>`). The web app's URLs are older than some of the names: `/lists` is shopping, `/personal` is todos, `/household`, `/invite`, `/onboarding` and `/join` are households, and `/dashboard` only redirects to `/lists`.
 
 - auth: Google sign-in through Better Auth, sign-out, account deletion
 - households: create, join with an invite code, members, leave
@@ -36,21 +36,23 @@ Folder names match in both apps and follow the URL.
 - chores: shared chores with repeat rules, marking done, skipping a time or putting it off to tomorrow, history
 - todos: private to-dos, can be moved to chores
 - reminders: push reminders for chores (API scheduler and device settings)
-- live (API only): server-sent change notifications
-- viewer (API only): `GET /api/viewer`, who is signed in and their household
+- live (API only): server-sent change notifications. The web side is `lib/live-updates.ts`, which every feature may use
+- viewer (API only): `GET /api/viewer`, who is signed in and their household, and account deletion. The web side is `features/auth/auth.api.ts`
 
 ## Conventions
 
 - API files: `<feature>.<role>.ts`. Roles: `routes`, `service`, `repo`, `table`, `schema` (zod contract: request input and response shapes), `errors`, `middleware`, `scheduler`, `test`
 - Web files: `<feature>.<role>.ts`. Roles: `api` (RPC calls), `queries` (query keys and queryOptions), `changes` (writes, declared with `defineChange` from `lib/offline-changes.ts`), `hooks`, `test`
 - Domain logic that isn't a role gets a descriptive name: `invite-code.ts`, `chore-schedule.ts`
-- A rule both apps need lives once in the API and the web app imports it through an export in `apps/api/package.json` (`chore-schedule.ts` as `@taskhold/api/chore-schedule`). Such a file imports types only, which lint enforces. `invite-code.ts` predates this and is still mirrored
+- A rule both apps need lives once in the API and the web app imports it through an export in `apps/api/package.json` (`chore-schedule.ts` as `@taskhold/api/chore-schedule`). Such a file imports types only, which lint enforces once the file is listed in that override in `.oxlintrc.json`. The exports list is the full set
+- A file name is used once per app for one thing: don't reuse a name from the other app for something unrelated
 - Components: PascalCase file named after the component it exports (`ChoreRow.tsx` exports `ChoreRow`)
-- A web feature stays flat until it has about 10 files, then moves its components and pages to `components/`. No other subfolders
+- In a web feature, every `.tsx` goes in `components/` and every `.ts` sits at the feature's root (lint enforces it). No other subfolders
 - Tests sit next to their source as `*.test.ts`
 - Named exports only (lint enforces it; tool configs are exempt). No `index.ts` barrels
 - No `utils`, `helpers` or `common` files. Name a module by what it does
-- Routes never touch the database; services never touch HTTP objects; features call each other's services, never their repos
+- Routes never touch the database; services never touch HTTP objects; features call each other's services, never their repos or routes
+- oxlint ignores a `regex` it can't parse (look-around, a typo) without saying so. After adding a lint rule, write an import that breaks it and check that `pnpm lint` fails
 - Errors: throw an `AppError` from the feature's `*.errors.ts`
 - Imports: `@/` means `apps/web/src`. It's the only alias; the API uses relative imports
 
@@ -69,6 +71,7 @@ Folder names match in both apps and follow the URL.
 4. Logic: `<noun>.service.ts` and `<noun>.errors.ts`
 5. Transport: `<noun>.routes.ts`, mounted in `app.ts`
 6. Tests: `<noun>.test.ts`, including a 404 for another household on every route
-7. Web: `<noun>.api.ts`, `<noun>.queries.ts`, then components
-8. Route file under `routes/`
-9. Add the feature to the Features list above, then run `pnpm check` and `pnpm test <noun>`
+7. Live updates, for data other people or devices see: add the topic to `apps/api/src/features/live/live-topics.ts` and call `announce()` from the service after each write. `pnpm check` then fails in the web app until the next two steps are done
+8. Web: `<noun>.api.ts`, `<noun>.queries.ts` (query keys start with the area's name), `<noun>.changes.ts`, then components. Add the area to `AREAS` in `lib/offline-changes.ts` and its changes to `registerAllChanges` in `router.tsx`
+9. Route file under `routes/`, a nav entry in `components/layout/HouseholdShell.tsx`, and the page's + button in `routes/_household.tsx`
+10. Add the feature to the Features list above, then run `pnpm check` and `pnpm test <noun>`

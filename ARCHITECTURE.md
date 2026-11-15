@@ -10,12 +10,11 @@ server.ts                 the API plus, in production (WEB_ROOT), the web app's 
 app.ts                    composes the API: middleware, error handler, one router per feature
 rpc-client.ts             typed RPC client for the web app (@taskhold/api/client)
 env.ts                    environment, validated with zod at startup
-db/db.ts                  Postgres pool (with timeouts), Drizzle instance, transaction()
-db/migrate.ts             applies migrations at container start
-db/schema.ts              re-exports every feature's *.table.ts, for migrations and relational queries
-lib/                      feature-agnostic infrastructure: AppError, error handler, validate(), logger, wide events
-features/
-  auth/                   Better Auth instance (auth.ts), its generated tables, requireAuth and protectedRouter()
+db/                       Postgres pool and transaction() (db.ts), column types, migrations at start,
+                          schema.ts (re-exports every feature's *.table.ts)
+lib/                      infrastructure that knows no feature: AppError, error handler, validate(), logger,
+                          wide events, the push sender
+features/<name>/          one folder per feature; AGENTS.md lists them. For example:
   households/
     households.routes.ts      HTTP: routes, input validation, status codes
     households.service.ts     business rules: who may create, join, see what
@@ -24,14 +23,14 @@ features/
     households.schema.ts      the contract: zod schemas for request input and the shapes returned to clients
     households.errors.ts      the feature's AppErrors
     households.test.ts        integration tests for the feature's routes
-    invite-code.ts            pure domain logic: generate and normalize codes
-  shopping/               shopping lists and items, scoped to the user's household
-  chores/                 chores and their history; chore-schedule.ts holds the due-date rules, shared with the web app
-  todos/                  private to-dos, scoped to the user rather than a household; can move one to chores
-  reminders/              push subscriptions and reminder settings; reminders.scheduler.ts sends due reminders
-  live/                   server-sent change notifications
-  viewer/                 GET /api/viewer, composed from the auth and households services
+    invite-code.ts            domain logic that isn't a role, named for what it does
 ```
+
+Files worth knowing that their names don't give away:
+
+- `features/auth/auth.ts` is the Better Auth instance; `auth.middleware.ts` has `requireAuth` and `protectedRouter()`.
+- `features/live/live-changes.ts` has `announce()`, which services call after a write, and the Postgres LISTEN/NOTIFY feed behind `/api/live`. `live-topics.ts` lists what a live update can be about.
+- `features/reminders/reminders.scheduler.ts` sends due reminders through `lib/push.ts`.
 
 ### Layers
 
@@ -45,8 +44,8 @@ Requests flow `routes → service → repo → database`, never backwards.
 
 - Services throw `AppError(kind, code, message)`. `lib/error-handler.ts` maps the `kind` to a status code and responds with `{ error: { code, message } }`.
 - Every request is logged as one wide event (`lib/request-logger.ts`). Services add what they know about the request with `annotate(group, fields)` from `lib/wide-event.ts`, using ids and counts, never names, codes or other user content. Don't log separate lines during a request: add to its event instead.
-- A rule the web app needs too (what marking a chore done or skipping it does to its due date) lives once in the API and is exported for the web app in `package.json`, like the RPC client: `features/chores/chore-schedule.ts` is `@taskhold/api/chore-schedule`. The web app bundles that file, so it may import types only (lint enforces it), and it stays free of HTTP and the database: the service applies its answers inside its transaction.
-- A feature may call another feature's service, never its repo. `viewer` uses `auth` and `households` this way, `shopping` asks `householdsService.getMembershipOf()` which household a user is in, and `todos` calls `choresService.createChore()` to move a to-do to chores.
+- A rule the web app needs too (what marking a chore done or skipping it does to its due date) lives once in the API and is exported for the web app in `package.json`, like the RPC client: `features/chores/chore-schedule.ts` is `@taskhold/api/chore-schedule`. The web app bundles that file, so it may import types only (lint enforces it), and it stays free of HTTP and the database: the service applies its answers inside its transaction. The invite code's alphabet and length (`@taskhold/api/invite-code`) and the live topics (`@taskhold/api/live-topics`) are shared the same way.
+- A feature may call another feature's service, never its repo or routes. Services also call `announce()` from `live/live-changes.ts`. `viewer` uses `auth` and `households` this way, `shopping` asks `householdsService.getMembershipOf()` which household a user is in, and `todos` calls `choresService.createChore()` to move a to-do to chores.
 - Data that belongs to a household is always queried with the household id in the `WHERE` clause, so an id from another household reads as missing (404) and never leaks.
 - Table files may import other features' tables, because foreign keys cross features.
 - Each feature mounts under its own path in `app.ts`. A feature that needs a signed-in user builds its router with `protectedRouter()`, so every route in it returns 401 without a session and 403 for a state-changing request from another origin (`lib/same-origin.ts`).
@@ -55,7 +54,7 @@ Requests flow `routes → service → repo → database`, never backwards.
 
 ### Tests
 
-Tests sit next to the code they cover: `features/<name>/<name>.test.ts`, `lib/connection.test.ts`, `server.test.ts`. `pnpm test <name>` runs one feature's tests in both apps. API tests are integration tests against a real database; the shared setup lives in `apps/api/test/`: `global-setup.ts` prepares the test database, and `harness.ts` provides:
+Tests sit next to the code they cover, in the feature that owns the route: `features/<name>/<name>.test.ts`, `lib/connection.test.ts`, `server.test.ts`. `pnpm test <name>` runs one feature's tests in both apps. API tests are integration tests against a real database; the shared setup lives in `apps/api/test/`: `global-setup.ts` prepares the test database, and `harness.ts` provides:
 
 - `signUp()`: a user with a real session;
 - `householdWith()`: a household with the given users in it;
@@ -75,54 +74,28 @@ Each test makes its own users and households, so tests don't depend on each othe
 
 ```
 routes/                   TanStack file routes: URL, guards, loaders, search params, layout (thin)
-features/
-  auth/                   small, so flat
-    auth.api.ts           RPC calls: fetchViewer
-    redirect.ts           sanitizes the post-sign-in redirect
-    SignInPage.tsx, GoogleSignInButton.tsx, SignOutButton.tsx, DeleteAccountButton.tsx
-  households/
-    households.api.ts     RPC calls and their response types
-    invite-code.ts        format and parse invite codes (mirrors the API's)
-    components/           HouseholdMembers, InviteCodeSlots, leave/remove/new-code buttons, and the
-                          setup, create, join, invite and overview pages
-  shopping/
-    shopping.api.ts       RPC calls and their response types
-    shopping.queries.ts   React Query keys and queryOptions (loaders and components share them)
-    shopping.changes.ts   changes to a list's items, registered in router.tsx so they can resume
-    shopping.hooks.ts     useShoppingList: the list plus the changes people make to it
-    components/           QuickAdd (the round + button), NewListForm, ShoppingItemRow, list buttons, and
-                          the all-lists and single-list pages
+features/<name>/          one folder per feature. For example:
   chores/
     chores.api.ts         RPC calls and their response types
-    chores.queries.ts     React Query keys and queryOptions
-    chores.changes.ts     marking done, putting off, and taking either back
-    chores.hooks.ts       useChores: the chores plus marking done; usePutOff: tomorrow and skip
-    chore-dates.ts        scheduleOf (a chore for the API's schedule rules) and repeat labels; general date
-                          helpers are in lib/dates.ts
-    components/           ChoreForm, ChoreRow, ChoreSheet, NewChoreDrawer, AddChoreButton, ChoresPage
-  todos/
-    todos.api.ts, todos.queries.ts, todos.changes.ts
-    todos.hooks.ts        useTodos: the to-dos plus the changes to them
-    components/           TodoForm, TodoRow, TodoSheet (with move to chores), NewTodoDrawer, AddTodoButton,
-                          TodosPage (the Personal page)
-  reminders/              small, so flat: reminders.api.ts, reminders.queries.ts, reminders.hooks.ts,
-                          ChoreReminders.tsx
+    chores.queries.ts     React Query keys and queryOptions (loaders and components share them)
+    chores.changes.ts     the writes: marking done, putting off, and taking either back
+    chores.hooks.ts       what components use: the data plus the changes people make to it
+    chore-dates.ts        domain logic that isn't a role, named for what it does
+    components/           every .tsx: rows, forms, sheets, buttons and pages
 components/               shared: shadcn ui/ (extended with taskhold variants, see apps/web/DESIGN.md), layout/
-                          (HouseholdShell with nav, AppShell for onboarding, PageHeading, Group, EmptyState),
-                          ThemeProvider and ThemeToggle, small app-wide pieces (AddRow, SharedWithLine,
-                          ConfirmDialog, UserAvatar, Wordmark, PageSkeleton)
-lib/                      shared: RPC client and errorMessage() (api.ts), dates (due groups and labels),
-                          theme context and useTheme(), offline changes and cache, feedback toasts
+                          (the shells with nav, headings, groups), and small app-wide pieces
+lib/                      shared, and usable by every feature: the RPC client (api.ts), dates, theme, offline
+                          changes and cache, live updates, the push device, feedback toasts
 ```
 
 - Server data that changes while a page is open (shopping lists, chores, to-dos) goes through React Query. Loaders call `context.queryClient.ensureQueryData(...)` with the feature's `queryOptions`, and components read the same query with `useSuspenseQuery`. Simpler, load-once data (the household) still comes straight from route loaders.
 - Writes to an area's data are **changes** (see [GLOSSARY.md](GLOSSARY.md)), declared in `<feature>.changes.ts` with `defineChange` from `lib/offline-changes.ts`. A change says what it sends, which query it shows in, and what that query looks like afterwards (`apply`), or, when only the API knows, how its answer goes in (`settle`). The module does the rest: shows it straight away, waits for a connection, survives a restart, rolls back with a `changeFailed` notice, and refetches the area after its last pending change, so an early response can't undo a later one.
-- Each feature's changes are registered once in `router.tsx` with `registerChanges`, so changes saved on the device can resume after a restart. A change's key (`[area, "change", name]`) and the shape of its variables are saved with it, so renaming one strands changes still waiting on people's phones.
+- Each area's changes are registered once in `router.tsx` with `registerAllChanges`, so changes saved on the device can resume after a restart. It takes one entry per area, so a new area can't be left out. The areas (`AREAS` in `lib/offline-changes.ts`) are checked against the API's live topics, and what's saved on the device and which live messages the app accepts are built from those two lists. A change's key (`[area, "change", name]`) and the shape of its variables are saved with it, so renaming one strands changes still waiting on people's phones.
 - Undo comes with the change: declare which change takes it back and with what (`undo`), and pass an `UndoOffer` when running it to show the notice. Changes marked `ordered` run one after another within their area, so an undo can't reach the API before what it undoes; a change and its undo must both be ordered.
 - Components run changes through their feature's hooks, which use `useChange`. Lint stops features importing `useMutation` or `mutationOptions`. Errors in forms and dialogs stay next to the form: forms use `runAsync`, and a change with `failure: false` leaves the notice to them.
 - Route files stay thin. They decide when a page shows and what data it gets, then render a page from a feature. Pages read route data with `getRouteApi("/path")`.
 - Features don't import each other. When a screen needs two features, its route composes them. For example, `routes/_household.tsx` puts the shopping feature's quick-add button, or the chores feature's add button on the chores page, into the shared household shell, and `routes/_household/household.tsx` passes the auth feature's sign-out button into the household page.
-- Inside a feature, imports are relative. A feature stays flat until it has about 10 files; then its components and pages move to `components/`, and nothing else nests.
+- Inside a feature, imports are relative. Every `.tsx` is in `components/` and every `.ts` at the feature's root, so a file's path follows from its name; nothing else nests.
 - Shared code (`components/`, `lib/`) never imports a feature or a route.
 
 ## Dates and times
@@ -146,10 +119,11 @@ Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/Ja
 `.oxlintrc.json` turns these rules into `no-restricted-imports` errors, so `pnpm check` fails when a file reaches across a boundary:
 
 - API routes and middleware can't import a repo, a table, the database client or `drizzle-orm`.
-- API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's repo.
+- API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's repo or routes. Routes can't import another feature's routes.
 - API repo files can't import services or routes. `lib/` and `env.ts` can't import features.
-- `chore-schedule.ts`, which the web app bundles, imports types only.
-- Web shared code can't import features or routes. Features can't import routes or other features, and can't nest folders more than one level deep.
+- The files the web app bundles from the API (`chore-schedule.ts`, `invite-code.ts`, `live-topics.ts`) import types only.
+- No import cycles, in either app.
+- Web shared code can't import features, routes or the router. Features can't import routes, the router or other features, keep `.tsx` files in `components/`, and can't nest folders more than one level deep.
 - Web features don't import `useMutation` or `mutationOptions`: writes are changes (`lib/offline-changes.ts`).
 - Web code imports icons from `components/icons.ts`, never from `@phosphor-icons/react`, so the icon library can be swapped in one file. Only `icons.ts` and the shadcn files in `components/ui/` import the library.
 - Default exports are errors everywhere except tool configs (`*.config.ts`).
