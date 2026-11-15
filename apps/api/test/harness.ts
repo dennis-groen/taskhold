@@ -35,7 +35,6 @@ export async function signUp(
   { googleId = randomUUID() }: { googleId?: string } = {},
 ): Promise<TestUser> {
   const id = randomUUID();
-  const token = randomUUID();
   const now = Temporal.Now.instant();
   await db.insert(user).values({
     id,
@@ -53,18 +52,30 @@ export async function signUp(
     createdAt: toDate(now),
     updatedAt: toDate(now),
   });
+  const cookie = await newSession(id);
+  return { id, name, cookie, api: clientFor({ cookie }) };
+}
+
+/** A new session for the user, the way Better Auth stores and signs one. Returns its cookie. */
+async function newSession(userId: string): Promise<string> {
+  const token = randomUUID();
+  const now = Temporal.Now.instant();
   await db.insert(session).values({
     id: randomUUID(),
     token,
-    userId: id,
+    userId,
     expiresAt: toDate(now.add({ hours: 1 })),
     createdAt: toDate(now),
     updatedAt: toDate(now),
   });
-
   const signature = createHmac("sha256", env.BETTER_AUTH_SECRET).update(token).digest("base64");
-  const cookie = `better-auth.session_token=${encodeURIComponent(`${token}.${signature}`)}`;
-  return { id, name, cookie, api: clientFor({ cookie }) };
+  return `better-auth.session_token=${encodeURIComponent(`${token}.${signature}`)}`;
+}
+
+/** The same person signed in on another device: a second session of their own */
+export async function signInAgain(person: TestUser): Promise<TestUser> {
+  const cookie = await newSession(person.id);
+  return { ...person, cookie, api: clientFor({ cookie }) };
 }
 
 /** A household with `owner` in it, plus `members` who joined with its invite code */

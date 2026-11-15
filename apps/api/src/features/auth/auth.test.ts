@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { app } from "../../app.ts";
-import { anonymous, errorCode, json, signUp } from "../../../test/harness.ts";
+import { anonymous, errorCode, json, signInAgain, signUp } from "../../../test/harness.ts";
 
 describe("response headers", () => {
   it("forbid API responses from loading anything or being framed", async () => {
@@ -29,6 +29,28 @@ describe("response headers", () => {
 });
 
 describe("sessions", () => {
+  it("can end every other session of the person, and only theirs", async () => {
+    const phone = await signUp();
+    const laptop = await signInAgain(phone);
+    const stranger = await signUp();
+
+    const ended = await phone.api.viewer["other-sessions"].$delete();
+    expect(await json(ended, 200)).toEqual({ ended: 1 });
+
+    expect((await json(await phone.api.viewer.$get(), 200)).user?.id).toBe(phone.id);
+    expect(await errorCode(await laptop.api.todos.$get(), 401)).toBe("UNAUTHORIZED");
+    expect((await json(await stranger.api.viewer.$get(), 200)).user?.id).toBe(stranger.id);
+  });
+
+  it("only ends other sessions when asked from the app itself", async () => {
+    const person = await signUp();
+    const response = await app.request("/api/viewer/other-sessions", {
+      method: "DELETE",
+      headers: { cookie: person.cookie, origin: "http://evil.localhost:5173" },
+    });
+    expect(await errorCode(response, 403)).toBe("CROSS_ORIGIN_REQUEST");
+  });
+
   it("tells signed-out visitors they aren't signed in, without an error", async () => {
     expect(await json(await anonymous.viewer.$get(), 200)).toEqual({ user: null, household: null });
   });

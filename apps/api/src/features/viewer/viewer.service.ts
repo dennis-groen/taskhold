@@ -2,7 +2,7 @@
 import { transaction } from "../../db/db.ts";
 import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
-import { deleteUser, getSession } from "../auth/auth.service.ts";
+import { deleteUser, endOtherSessions, getSession } from "../auth/auth.service.ts";
 import { findMembership, leaveAnyHousehold } from "../households/households.service.ts";
 
 export async function getViewer(headers: Headers) {
@@ -30,4 +30,14 @@ export async function deleteAccount(userId: string): Promise<void> {
     await announce({ userId, topic: "account" }, tx);
   });
   annotate("account", { deleted: true });
+}
+
+/**
+ * Signs the person out of every other device, for when one is lost. Those devices are refused at
+ * their next request; a live stream they have open ends within its usual lifetime.
+ */
+export async function signOutElsewhere(userId: string, sessionId: string): Promise<number> {
+  const ended = await endOtherSessions(userId, sessionId);
+  annotate("account", { sessions_ended: ended });
+  return ended;
 }

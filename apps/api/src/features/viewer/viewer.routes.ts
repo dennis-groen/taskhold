@@ -18,4 +18,8 @@ export const viewerRoutes = new Hono()
       c.header("set-cookie", cookie, { append: true });
     }
     return c.body(null, 204);
+  })
+  .delete("/other-sessions", requireSameOrigin, requireAuth, async (c) => {
+    const ended = await viewerService.signOutElsewhere(c.get("user").id, c.get("session").id);
+    return c.json({ ended }, 200);
   });

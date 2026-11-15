@@ -1,9 +1,9 @@
 // Data access for accounts. Better Auth reads and writes its own tables; this is only for what the
 // app does to them itself.
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 
 import { db, type Executor } from "../../db/db.ts";
-import { account, user } from "./auth.table.ts";
+import { account, session, user } from "./auth.table.ts";
 
 /**
  * Deletes the account. The database removes what belongs to the person alone (sessions, sign-in
@@ -27,4 +27,17 @@ export async function findFirstAccount(
     .orderBy(asc(account.createdAt))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/** Ends every session of the person except `keepSessionId`. Returns how many ended. */
+export async function deleteOtherSessions(
+  userId: string,
+  keepSessionId: string,
+  executor: Executor = db,
+): Promise<number> {
+  const rows = await executor
+    .delete(session)
+    .where(and(eq(session.userId, userId), ne(session.id, keepSessionId)))
+    .returning({ id: session.id });
+  return rows.length;
 }

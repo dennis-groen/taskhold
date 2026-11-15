@@ -24,3 +24,8 @@ export async function signInIdentityOf(userId: string, executor?: Executor): Pro
   const first = await authRepo.findFirstAccount(userId, executor);
   return first ? `${first.providerId}:${first.accountId}` : `user:${userId}`;
 }
+
+/** Signs the person out everywhere except the session that asked. Returns how many sessions ended. */
+export function endOtherSessions(userId: string, keepSessionId: string): Promise<number> {
+  return authRepo.deleteOtherSessions(userId, keepSessionId);
+}
