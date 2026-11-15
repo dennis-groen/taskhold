@@ -5,7 +5,7 @@ import { skip } from "@taskhold/api/chore-schedule";
 import { dueLabel, today } from "@/lib/dates.ts";
 import { useChange, type UndoOffer } from "@/lib/offline-changes.ts";
 
-import type { Chore } from "./chores.api.ts";
+import type { Chore, ChoreInput } from "./chores.api.ts";
 import { scheduleOf } from "./chore-dates.ts";
 import { choreChanges, markedDone } from "./chores.changes.ts";
 import { choresQuery } from "./chores.queries.ts";
@@ -66,4 +66,54 @@ export function usePutOff(viewer: Person) {
       );
     },
   };
+}
+
+type Assignee = NonNullable<Chore["assignee"]>;
+
+/** Who `assigneeId` is among the household's members, for showing it before the API answers */
+const assigneeOf = (assigneeId: string | null, members: Assignee[]) =>
+  members.find((member) => member.id === assigneeId) ?? null;
+
+/**
+ * Making, changing and removing chores. They show on screen straight away, wait for a connection,
+ * and survive a restart (see chores.changes.ts). `members` is who a chore can be assigned to.
+ */
+export function useManageChores(members: Assignee[]) {
+  const add = useChange(choreChanges.add);
+  const edit = useChange(choreChanges.edit);
+  const remove = useChange(choreChanges.remove);
+  const clearDone = useChange(choreChanges.clearDone);
+
+  return {
+    add: (input: ChoreInput) =>
+      add.run({
+        ...input,
+        id: crypto.randomUUID(),
+        assignee: assigneeOf(input.assigneeId, members),
+      }),
+    /** Resolves once saved, for the form that closes afterwards; rejects when saving failed */
+    save: async (chore: Chore, input: ChoreInput) => {
+      const changes = changedFields(chore, input);
+      if (Object.keys(changes).length === 0) return;
+      await edit.runAsync({
+        choreId: chore.id,
+        changes,
+        assignee: assigneeOf(input.assigneeId, members),
+      });
+    },
+    remove: (chore: Chore) => remove.run(chore.id),
+    clearDone: () => clearDone.run(null),
+  };
+}
+
+/** Only what's different from the chore, so an edit doesn't undo a housemate's change to the rest */
+function changedFields(chore: Chore, input: ChoreInput): Partial<ChoreInput> {
+  const changes: Partial<ChoreInput> = {};
+  if (input.name !== chore.name) changes.name = input.name;
+  if (input.dueOn !== chore.dueOn) changes.dueOn = input.dueOn;
+  if (input.assigneeId !== (chore.assignee?.id ?? null)) changes.assigneeId = input.assigneeId;
+  if (input.repeat?.every !== chore.repeat?.every || input.repeat?.unit !== chore.repeat?.unit) {
+    changes.repeat = input.repeat;
+  }
+  return changes;
 }

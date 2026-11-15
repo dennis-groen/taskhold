@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
@@ -14,13 +13,12 @@ import { DUE_GROUPS, dueGroup, dueLabel, today as todayOnDevice } from "@/lib/da
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { cn } from "cn";
 
-import { clearDoneChores, type Chore } from "../chores.api.ts";
-import { choreKeys } from "../chores.queries.ts";
+import type { Chore } from "../chores.api.ts";
 import type { Member } from "./ChoreForm.tsx";
 import { ChoreRow } from "./ChoreRow.tsx";
 import { ChoreSheet } from "./ChoreSheet.tsx";
 import { NewChoreDrawer } from "./NewChoreDrawer.tsx";
-import { useChores } from "../chores.hooks.ts";
+import { useChores, useManageChores } from "../chores.hooks.ts";
 
 type Filter = "all" | "mine" | "unassigned";
 
@@ -41,7 +39,7 @@ export function ChoresPage({
   otherMembers: Housemate[];
 }) {
   const { chores, complete, undo } = useChores(viewer);
-  const queryClient = useQueryClient();
+  const { clearDone } = useManageChores(members);
   const [filter, setFilter] = useState<Filter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const today = todayOnDevice();
@@ -83,12 +81,6 @@ export function ChoresPage({
     }));
     // Its old place and due date, but done, with this completion ("Done by you today")
     hold(chore, { ...chore, done: true, lastCompletion: after.lastCompletion });
-  }
-
-  // Errors stay in the confirm dialog, so people can retry or cancel
-  async function clearDone() {
-    await clearDoneChores();
-    await queryClient.invalidateQueries({ queryKey: choreKeys.list() });
   }
 
   const rowProps = (chore: Chore) => ({
@@ -189,7 +181,7 @@ export function ChoresPage({
               title="Clear done chores?"
               description="Done one-off chores are removed for everyone in the household. Repeating chores stay."
               confirmLabel="Clear done"
-              onConfirm={clearDone}
+              onConfirm={async () => clearDone()}
             />
           }
         >

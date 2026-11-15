@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
@@ -12,9 +12,9 @@ import { cn } from "cn";
 import { canPutOff, skip } from "@taskhold/api/chore-schedule";
 
 import { repeatLabel, scheduleOf } from "../chore-dates.ts";
-import { deleteChore, updateChore, type Chore, type ChoreInput } from "../chores.api.ts";
-import { usePutOff } from "../chores.hooks.ts";
-import { choreKeys, choreQuery } from "../chores.queries.ts";
+import type { Chore } from "../chores.api.ts";
+import { useManageChores, usePutOff } from "../chores.hooks.ts";
+import { choreQuery } from "../chores.queries.ts";
 import { ChoreForm, type Member } from "./ChoreForm.tsx";
 
 /**
@@ -72,27 +72,13 @@ function SheetBody({
   onUndo: (choreId: string) => void;
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
+  const { save, remove } = useManageChores(members);
   const { data: detail, isPending } = useQuery(choreQuery(chore.id));
   const history = detail?.history ?? [];
   // "2 days overdue · Every week": what putting it off is measured against
   const due = !chore.done && chore.dueOn ? chore.dueOn : null;
   const overdue = due !== null && daysBetween(today, due) < 0;
   const repeats = chore.repeat && repeatLabel(chore.repeat);
-
-  async function save(input: ChoreInput) {
-    const updated = await updateChore(chore.id, input);
-    queryClient.setQueryData(choreKeys.detail(chore.id), updated);
-    await queryClient.invalidateQueries({ queryKey: choreKeys.list() });
-    onClose();
-  }
-
-  async function remove() {
-    await deleteChore(chore.id);
-    queryClient.removeQueries({ queryKey: choreKeys.detail(chore.id) });
-    await queryClient.invalidateQueries({ queryKey: choreKeys.list() });
-    onClose();
-  }
 
   return (
     <>
@@ -130,7 +116,10 @@ function SheetBody({
           members={members}
           viewerId={viewer.id}
           submitLabel="Save changes"
-          onSubmit={save}
+          onSubmit={async (input) => {
+            await save(chore, input);
+            onClose();
+          }}
           footer={
             <ConfirmDialog
               trigger={
@@ -143,7 +132,11 @@ function SheetBody({
               description="It goes for everyone in the household, with its history."
               confirmLabel="Delete chore"
               destructive
-              onConfirm={remove}
+              onConfirm={async () => {
+                // Gone from the list straight away, and sent once there is a connection
+                remove(chore);
+                onClose();
+              }}
             />
           }
         />

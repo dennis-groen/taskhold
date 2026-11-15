@@ -55,7 +55,7 @@ export function ChoreForm({
   submitLabel: string;
   /** Gets focus when the form opens */
   nameRef?: RefObject<HTMLInputElement | null>;
-  onSubmit: (input: ChoreInput) => Promise<void>;
+  onSubmit: (input: ChoreInput) => void | Promise<void>;
   /** Extra actions next to the submit button, e.g. Delete */
   footer?: ReactNode;
 }) {

@@ -3,7 +3,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { offerUndo } from "@/lib/feedback.ts";
+import { changeFailed, offerUndo } from "@/lib/feedback.ts";
 import { registerChanges, runChange } from "@/lib/offline-changes.ts";
 
 import type { Chore } from "./chores.api.ts";
@@ -15,6 +15,9 @@ const api = vi.hoisted(() => ({
   skipChore: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   undoCompletion: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   updateChore: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  createChore: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  deleteChore: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  clearDoneChores: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 vi.mock("./chores.api.ts", () => ({ ...api, fetchChores: vi.fn(), fetchChore: vi.fn() }));
 vi.mock("@/lib/feedback.ts", () => ({ changeFailed: vi.fn(), offerUndo: vi.fn() }));
@@ -132,6 +135,127 @@ describe("putting a chore off", () => {
     answer.resolve(saved);
     await sent;
     expect(shown(queryClient)).toEqual({ ...bins, dueOn: "2026-11-16" });
+  });
+});
+
+describe("adding a chore", () => {
+  it("shows it straight away and sends it with the app's id", async () => {
+    const queryClient = appClient([]);
+    api.createChore.mockResolvedValue({});
+    const added = {
+      id: "new-chore",
+      name: "Water the plants",
+      repeat: null,
+      dueOn: "2026-11-12",
+      assigneeId: "me",
+      assignee: { id: "me", name: "Me", image: null },
+    };
+
+    await runChange(queryClient, choreChanges.add, added);
+
+    expect(shown(queryClient)).toMatchObject({
+      id: "new-chore",
+      name: "Water the plants",
+      assignee: { id: "me", name: "Me" },
+      lastCompletion: null,
+      done: false,
+    });
+    expect(api.createChore).toHaveBeenCalledExactlyOnceWith({
+      id: "new-chore",
+      name: "Water the plants",
+      repeat: null,
+      dueOn: "2026-11-12",
+      assigneeId: "me",
+    });
+  });
+});
+
+describe("editing a chore", () => {
+  it("shows the change, and sends only the fields that changed", async () => {
+    const queryClient = appClient();
+    api.updateChore.mockResolvedValue({});
+
+    await runChange(queryClient, choreChanges.edit, {
+      choreId: "bins",
+      changes: { name: "Bins and recycling", assigneeId: "me" },
+      assignee: { id: "me", name: "Me", image: null },
+    });
+
+    expect(shown(queryClient)).toMatchObject({
+      name: "Bins and recycling",
+      dueOn: "2026-11-09",
+      assignee: { id: "me" },
+    });
+    expect(api.updateChore).toHaveBeenCalledExactlyOnceWith("bins", {
+      name: "Bins and recycling",
+      assigneeId: "me",
+    });
+  });
+
+  it("starts a chore that stops repeating as not done, like the API does", async () => {
+    const withHistory: Chore = {
+      ...bins,
+      lastCompletion: {
+        id: "earlier",
+        completedBy: me,
+        completedOn: "2026-11-01",
+        skipped: false,
+        createdAt: "2026-11-01T08:00:00Z",
+      },
+    };
+    const queryClient = appClient([withHistory]);
+    api.updateChore.mockResolvedValue({});
+
+    await runChange(queryClient, choreChanges.edit, { choreId: "bins", changes: { repeat: null } });
+
+    expect(shown(queryClient)).toMatchObject({ repeat: null, lastCompletion: null, done: false });
+  });
+
+  it("leaves the error to the form", async () => {
+    const queryClient = appClient();
+    api.updateChore.mockRejectedValue(new Error("Nope"));
+
+    await expect(
+      runChange(queryClient, choreChanges.edit, { choreId: "bins", changes: { name: "x" } }),
+    ).rejects.toThrow("Nope");
+    expect(changeFailed).not.toHaveBeenCalled();
+    expect(shown(queryClient)?.name).toBe("Bins out");
+  });
+});
+
+describe("deleting chores", () => {
+  it("removes a chore straight away and sends the delete", async () => {
+    const queryClient = appClient();
+    api.deleteChore.mockResolvedValue({});
+
+    await runChange(queryClient, choreChanges.remove, "bins");
+
+    expect(shown(queryClient)).toBeUndefined();
+    expect(api.deleteChore).toHaveBeenCalledExactlyOnceWith("bins");
+  });
+
+  it("clears the chores that are done and leaves the rest", async () => {
+    const done: Chore = { ...bins, id: "tap", name: "Fix tap", repeat: null, done: true };
+    const queryClient = appClient([bins, done]);
+    api.clearDoneChores.mockResolvedValue({});
+
+    await runChange(queryClient, choreChanges.clearDone, null);
+
+    expect(queryClient.getQueryData(choresQuery().queryKey)?.map((chore) => chore.id)).toEqual([
+      "bins",
+    ]);
+    expect(api.clearDoneChores).toHaveBeenCalledOnce();
+  });
+
+  it("runs the writes in order with the other changes", () => {
+    for (const change of [
+      choreChanges.add,
+      choreChanges.edit,
+      choreChanges.remove,
+      choreChanges.clearDone,
+    ]) {
+      expect(change.ordered).toBe(true);
+    }
   });
 });
 

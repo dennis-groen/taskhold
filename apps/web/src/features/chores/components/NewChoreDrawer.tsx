@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type ReactElement } from "react";
 
 import { cn } from "cn";
@@ -6,8 +5,7 @@ import { cn } from "cn";
 import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
 import { Drawer, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
-import { createChore } from "../chores.api.ts";
-import { choreKeys } from "../chores.queries.ts";
+import { useManageChores } from "../chores.hooks.ts";
 import { ChoreForm, type Member } from "./ChoreForm.tsx";
 
 /** A sheet with an empty chore form, opened by `trigger` */
@@ -22,13 +20,7 @@ export function NewChoreDrawer({
 }) {
   const [open, setOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
-
-  async function create(input: Parameters<typeof createChore>[0]) {
-    await createChore(input);
-    await queryClient.invalidateQueries({ queryKey: choreKeys.list() });
-    setOpen(false);
-  }
+  const { add } = useManageChores(members);
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
@@ -48,7 +40,11 @@ export function NewChoreDrawer({
               viewerId={viewerId}
               submitLabel="Add chore"
               nameRef={nameRef}
-              onSubmit={create}
+              onSubmit={(input) => {
+                // Shows in the list straight away; a failure shows on the page
+                add(input);
+                setOpen(false);
+              }}
             />
           )}
         </div>

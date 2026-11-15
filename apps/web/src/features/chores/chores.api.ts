@@ -22,7 +22,7 @@ export async function fetchChore(choreId: string): Promise<ChoreDetail> {
     .chore;
 }
 
-export async function createChore(input: ChoreInput): Promise<ChoreDetail> {
+export async function createChore(input: ChoreInput & { id: string }): Promise<ChoreDetail> {
   return (await parseResponse(chores.$post({ json: input }))).chore;
 }
 

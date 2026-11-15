@@ -1,20 +1,25 @@
-// Marking chores done, putting them off, and taking either back (see lib/offline-changes.ts).
+// Every change to the household's chores: marking done, putting off and taking either back, and
+// adding, editing, deleting and clearing them (see lib/offline-changes.ts).
 // Everything a change needs travels in its variables, which are saved with it on the device; their
 // shape is part of what a phone may still have waiting, so change it only with care.
 //
 // All of them are ordered, so an undo can't reach the API before what it undoes.
-import { markDone, skip } from "@taskhold/api/chore-schedule";
+import { isDone, markDone, skip } from "@taskhold/api/chore-schedule";
 
 import { defineChange } from "@/lib/offline-changes.ts";
 
 import { scheduleOf } from "./chore-dates.ts";
 import {
+  clearDoneChores,
   completeChore,
+  createChore,
+  deleteChore,
   skipChore,
   undoCompletion,
   updateChore,
   type Chore,
   type ChoreDetail,
+  type ChoreInput,
 } from "./chores.api.ts";
 import { choresQuery } from "./chores.queries.ts";
 
@@ -24,6 +29,17 @@ export type CompleteChore = { choreId: string; on: string; by: Person };
 /** `by` is only for showing the skip before the API answers; changes saved before it lack it */
 export type SkipChore = { choreId: string; today: string; by: Person };
 export type MoveChore = { choreId: string; dueOn: string | null };
+
+type Assignee = NonNullable<Chore["assignee"]>;
+
+/** A new chore: the app picks the id; `assignee` is only for showing it before the API answers */
+export type NewChore = ChoreInput & { id: string; assignee: Assignee | null };
+/** `changes` holds only the fields the person changed; `assignee` is who `changes.assigneeId` is */
+export type EditChore = {
+  choreId: string;
+  changes: Partial<ChoreInput>;
+  assignee?: Assignee | null;
+};
 
 const theChores = () => choresQuery().queryKey;
 
@@ -114,6 +130,49 @@ export const choreChanges = {
   }),
 
   moveDueDate,
+
+  // The id comes from the app, so the API ignores a second copy
+  add: defineChange("chores", "add", {
+    idempotent: true,
+    ordered: true,
+    send: ({ id, name, repeat, dueOn, assigneeId }: NewChore) =>
+      createChore({ id, name, repeat, dueOn, assigneeId }),
+    target: theChores,
+    apply: (list, { id, name, repeat, dueOn, assignee }) => [
+      ...list,
+      { id, name, repeat, dueOn, assignee, lastCompletion: null, done: false },
+    ],
+  }),
+
+  // Sends only the fields that changed, so a housemate's edit to another one stays. A form shows
+  // its own error.
+  edit: defineChange("chores", "edit", {
+    idempotent: true,
+    ordered: true,
+    send: ({ choreId, changes }: EditChore) => updateChore(choreId, changes),
+    target: theChores,
+    apply: (list, edit) =>
+      list.map((item) => (item.id === edit.choreId ? edited(item, edit) : item)),
+    settle: withDetail,
+    failure: false,
+  }),
+
+  // A second delete does the same as the first, so this is kept across a restart
+  remove: defineChange("chores", "remove", {
+    idempotent: true,
+    ordered: true,
+    send: (choreId: string) => deleteChore(choreId),
+    target: theChores,
+    apply: (list, choreId) => list.filter((item) => item.id !== choreId),
+  }),
+
+  clearDone: defineChange("chores", "clear-done", {
+    idempotent: true,
+    ordered: true,
+    send: (_vars: null) => clearDoneChores(),
+    target: theChores,
+    apply: (list) => list.filter((item) => !item.done),
+  }),
 };
 
 /** The chore after `person` marks it done on `on`, by the API's own rules */
@@ -133,6 +192,19 @@ function skipped(chore: Chore, person: Person, on: string): Chore {
   const moved = skip(scheduleOf(chore), Temporal.PlainDate.from(on));
   if (moved.kind !== "moved") return chore;
   return { ...chore, dueOn: moved.dueOn.toString(), lastCompletion: shownEntry(person, on, true) };
+}
+
+/** The chore after an edit, by the API's own rules: a chore that stops repeating starts over */
+function edited(chore: Chore, { changes, assignee }: EditChore): Chore {
+  const { assigneeId, ...fields } = changes;
+  const next: Chore = {
+    ...chore,
+    ...fields,
+    ...(assigneeId !== undefined && { assignee: assignee ?? null }),
+  };
+  // Its history goes when it stops repeating (the API clears it), so it's not done
+  if (chore.repeat !== null && next.repeat === null) next.lastCompletion = null;
+  return { ...next, done: isDone(scheduleOf(next)) };
 }
 
 /** A history entry to show until the API's own arrives */
