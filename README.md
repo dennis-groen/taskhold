@@ -85,7 +85,7 @@ In VS Code, install the recommended Oxc extension to format and lint on save.
 
 ## Layout
 
-Signed-in pages that need a household share one frame (`components/layout/HouseholdShell.tsx`, layout taken from the Lovable prototype): a left rail on wide screens and a bottom bar on phones with the Shopping and Household tabs, plus the round + button for quick add. Pages are a heading over cards of rows (`components/layout/Group.tsx`). `/dashboard` redirects to `/lists`. Onboarding keeps the simpler `AppShell`.
+Signed-in pages that need a household share one frame (`components/layout/HouseholdShell.tsx`, layout taken from the Lovable prototype): a left rail on wide screens and a bottom bar on phones with the Shopping, Chores, Personal and Household tabs, plus the round + button for quick add. Pages are a heading over cards of rows (`components/layout/Group.tsx`). `/dashboard` redirects to `/lists`. Onboarding keeps the simpler `AppShell`.
 
 ## Households and onboarding
 
@@ -294,7 +294,7 @@ pnpm db:migrate
   - They use their own database, `taskhold_test`, in the same Docker Postgres. It's created and migrated automatically, and emptied at the start of each run, so dev data is never touched. Set `TEST_DATABASE_URL` to use another database, e.g. in CI. Its name must end in `_test`: the tests refuse to run otherwise, because they empty every table.
   - Test users get a real Better Auth session, so every request goes through the same sign-in and same-origin checks as in the app.
   - The tests cover who can see and change what: other households and other people get 404s, the owner-only actions, and the invite-guess limit. They also cover the chore due-date and undo rules, retries with client-chosen ids, and moving a to-do to chores.
-- **Web** (`apps/web/src/**/*.test.ts`): unit tests for the date helpers and shopping-list sorting. The date helpers run twice, on native Temporal and on `temporal-polyfill`, because browsers without Temporal use the polyfill.
+- **Web** (`apps/web/src/**/*.test.ts`): unit tests for the date helpers, offline changes and the copy kept on the device (`lib/`), each feature's changes (`features/*/*.changes.test.ts`), and shopping's quick-add parsing, categories, sorting and buy-again ranking. The date helpers run twice, on native Temporal and on `temporal-polyfill`, because browsers without Temporal use the polyfill.
 - Vitest is installed once, at the workspace root.
 
 ### CI
