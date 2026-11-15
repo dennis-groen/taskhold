@@ -1,6 +1,6 @@
 // Data access for private to-dos: the only place that queries the todo table.
 // Every query is scoped to the owner, so someone else's to-do id reads as missing.
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db, type Executor } from "../../db/db.ts";
 import type { Todo } from "./todos.schema.ts";
@@ -89,4 +89,9 @@ export async function deleteDoneTodos(userId: string, executor: Executor = db): 
     .where(and(eq(todo.userId, userId), isNotNull(todo.doneAt)))
     .returning({ id: todo.id });
   return rows.length;
+}
+
+export async function countTodos(userId: string, executor: Executor = db): Promise<number> {
+  const rows = await executor.select({ total: count() }).from(todo).where(eq(todo.userId, userId));
+  return rows[0]?.total ?? 0;
 }

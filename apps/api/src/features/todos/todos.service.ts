@@ -7,8 +7,11 @@ import { annotate } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
 import type { ChoreDetail } from "../chores/chores.schema.ts";
 import * as todosRepo from "./todos.repo.ts";
-import { todoIdTaken, todoNotFound } from "./todos.errors.ts";
+import { todoIdTaken, todoLimitReached, todoNotFound } from "./todos.errors.ts";
 import type { CreateTodoInput, Todo, UpdateTodoInput } from "./todos.schema.ts";
+
+// Far above what a person uses; it keeps one account from filling the shared database
+const MAX_TODOS = 500;
 
 // Names and notes are private, so the wide event only ever gets ids and counts
 
@@ -21,6 +24,9 @@ export async function getTodos(userId: string): Promise<Todo[]> {
 export async function createTodo(userId: string, input: CreateTodoInput): Promise<Todo> {
   const id = input.id ?? crypto.randomUUID();
   annotate("todos", { todo_id: id });
+  // A retry of an add that already got in must still succeed, so only a new to-do counts
+  const isNew = !(await todosRepo.findTodo({ userId, todoId: id }));
+  if (isNew && (await todosRepo.countTodos(userId)) >= MAX_TODOS) throw todoLimitReached();
   const inserted = await todosRepo.insertTodo({
     id,
     userId,

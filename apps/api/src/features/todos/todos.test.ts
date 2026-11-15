@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { db } from "../../db/db.ts";
 import { errorCode, householdWith, json, signUp, type TestUser } from "../../../test/harness.ts";
+import { todo as todoTable } from "./todos.table.ts";
 
 async function todoOf(
   person: TestUser,
@@ -153,5 +155,21 @@ describe("moving a to-do to the household's chores", () => {
     });
     expect(await errorCode(moved, 404)).toBe("NOT_IN_HOUSEHOLD");
     expect((await json(await loner.api.todos.$get(), 200)).todos).toHaveLength(1);
+  });
+});
+
+describe("limits", () => {
+  it("stop a person at 500 to-dos, but still accept a retry of an add that got in", async () => {
+    const owner = await signUp();
+    const last = randomUUID();
+    await db
+      .insert(todoTable)
+      .values(Array.from({ length: 499 }, (_, n) => ({ userId: owner.id, name: `To-do ${n}` })));
+    await json(await owner.api.todos.$post({ json: { id: last, name: "The 500th" } }), 201);
+
+    expect(await errorCode(await owner.api.todos.$post({ json: { name: "Too many" } }), 409)).toBe(
+      "TODO_LIMIT_REACHED",
+    );
+    await json(await owner.api.todos.$post({ json: { id: last, name: "The 500th" } }), 201);
   });
 });
