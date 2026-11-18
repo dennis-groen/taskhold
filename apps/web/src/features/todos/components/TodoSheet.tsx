@@ -18,7 +18,7 @@ export function TodoSheet({
 }: {
   /** The to-do to show; null keeps the sheet closed */
   todo: Todo | null;
-  onSave: (changes: TodoInput) => Promise<unknown>;
+  onSave: (changes: TodoInput) => void;
   onDelete: () => void;
   /** Makes the to-do a household chore */
   onMove: (todo: Todo) => void;
@@ -51,7 +51,7 @@ function SheetBody({
   onClose,
 }: {
   todo: Todo;
-  onSave: (changes: TodoInput) => Promise<unknown>;
+  onSave: (changes: TodoInput) => void;
   onDelete: () => void;
   onMove: (todo: Todo) => void;
   onClose: () => void;
@@ -67,8 +67,8 @@ function SheetBody({
         <TodoForm
           initial={{ name: todo.name, notes: todo.notes, dueOn: todo.dueOn }}
           submitLabel="Save changes"
-          onSubmit={async (input) => {
-            await onSave(input);
+          onSubmit={(input) => {
+            onSave(input);
             onClose();
           }}
           footer={

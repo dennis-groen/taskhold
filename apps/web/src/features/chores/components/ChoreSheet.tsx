@@ -116,8 +116,8 @@ function SheetBody({
           members={members}
           viewerId={viewer.id}
           submitLabel="Save changes"
-          onSubmit={async (input) => {
-            await save(chore, input);
+          onSubmit={(input) => {
+            save(chore, input);
             onClose();
           }}
           footer={

@@ -79,14 +79,14 @@ describe("to-do changes", () => {
     expect(api.updateTodo).toHaveBeenCalledExactlyOnceWith("post", { done: true });
   });
 
-  it("leaves a failed edit for its form to report", async () => {
+  it("rolls a failed edit back with a notice, as its sheet has closed", async () => {
     const queryClient = appClient();
     api.updateTodo.mockRejectedValue(new DetailedError("Too long", { statusCode: 400 }));
 
     await expect(
       runChange(queryClient, todoChanges.edit, { id: "post", name: "x".repeat(500) }),
     ).rejects.toThrow("Too long");
-    expect(changeFailed).not.toHaveBeenCalled();
+    expect(changeFailed).toHaveBeenCalledOnce();
     expect(queryClient.getQueryData(todosQuery().queryKey)).toEqual([post]);
   });
 

@@ -3,9 +3,7 @@ import { useId, useState, type FormEvent, type ReactNode, type RefObject } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { errorMessage } from "@/lib/api.ts";
 
 import type { TodoInput } from "../todos.api.ts";
 
@@ -26,7 +24,7 @@ export function TodoForm({
   submitLabel: string;
   /** Gets focus when the form opens */
   nameRef?: RefObject<HTMLInputElement | null>;
-  onSubmit: (input: TodoInput) => Promise<void> | void;
+  onSubmit: (input: TodoInput) => void;
   /** Extra actions under the submit button, e.g. Delete */
   footer?: ReactNode;
 }) {
@@ -34,29 +32,22 @@ export function TodoForm({
   const [name, setName] = useState(initial.name);
   const [dueOn, setDueOn] = useState(initial.dueOn ?? "");
   const [notes, setNotes] = useState(initial.notes ?? "");
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) {
       setError("Write what you need to do.");
       nameRef?.current?.focus();
       return;
     }
-    setPending(true);
     setError(null);
-    try {
-      await onSubmit({ name: name.trim(), notes: notes.trim() || null, dueOn: dueOn || null });
-    } catch (err) {
-      setError(errorMessage(err, "Couldn't save the to-do. Check your connection and try again."));
-    } finally {
-      setPending(false);
-    }
+    // Shows straight away; a failure shows as a notice (see todos.changes.ts)
+    onSubmit({ name: name.trim(), notes: notes.trim() || null, dueOn: dueOn || null });
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-6">
+    <form onSubmit={submit} className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Label htmlFor={ids.name}>To-do</Label>
         <Input
@@ -110,8 +101,7 @@ export function TodoForm({
         )}
       </div>
 
-      <Button type="submit" size="xl" disabled={pending}>
-        {pending && <Spinner />}
+      <Button type="submit" size="xl">
         {submitLabel}
       </Button>
       {footer}

@@ -22,8 +22,11 @@ export function useTodos() {
   return {
     todos,
     add: (input: TodoInput) => add.run({ ...input, id: crypto.randomUUID() }),
-    /** Resolves once saved, for forms that close afterwards; rejects when saving failed */
-    save: (id: string, changes: Partial<TodoInput>) => edit.runAsync({ id, ...changes }),
+    /**
+     * Shows the edit straight away and sends it once there is a connection, so the sheet can close
+     * at once. A failure rolls back with a notice.
+     */
+    save: (id: string, changes: Partial<TodoInput>) => edit.run({ id, ...changes }),
     setDone: (id: string, done: boolean) => update.run({ id, done }),
     remove: (id: string) => {
       const todo = todos.find((candidate) => candidate.id === id);

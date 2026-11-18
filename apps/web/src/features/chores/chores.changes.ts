@@ -144,8 +144,8 @@ export const choreChanges = {
     ],
   }),
 
-  // Sends only the fields that changed, so a housemate's edit to another one stays. A form shows
-  // its own error.
+  // Sends only the fields that changed, so a housemate's edit to another one stays. The sheet
+  // closes straight away, so a failure rolls back with a notice.
   edit: defineChange("chores", "edit", {
     idempotent: true,
     ordered: true,
@@ -154,7 +154,7 @@ export const choreChanges = {
     apply: (list, edit) =>
       list.map((item) => (item.id === edit.choreId ? edited(item, edit) : item)),
     settle: withDetail,
-    failure: false,
+    failure: "Couldn't save the chore. Check your connection and try again.",
   }),
 
   // A second delete does the same as the first, so this is kept across a restart

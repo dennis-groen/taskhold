@@ -91,11 +91,14 @@ export function useManageChores(members: Assignee[]) {
         id: crypto.randomUUID(),
         assignee: assigneeOf(input.assigneeId, members),
       }),
-    /** Resolves once saved, for the form that closes afterwards; rejects when saving failed */
-    save: async (chore: Chore, input: ChoreInput) => {
+    /**
+     * Shows the edit straight away and sends it once there is a connection, so the sheet can close
+     * at once. A failure rolls back with a notice.
+     */
+    save: (chore: Chore, input: ChoreInput) => {
       const changes = changedFields(chore, input);
       if (Object.keys(changes).length === 0) return;
-      await edit.runAsync({
+      edit.run({
         choreId: chore.id,
         changes,
         assignee: assigneeOf(input.assigneeId, members),

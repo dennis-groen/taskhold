@@ -66,8 +66,12 @@ export const todoChanges = {
   }),
 
   update: defineChange("todos", "update", update),
-  // Edits come from a form that shows its own error
-  edit: defineChange("todos", "edit", { ...update, failure: false }),
+  // Edits from the to-do's sheet, which closes straight away. Its own change, with its own
+  // notice; the key is kept, as phones may still have edits waiting under it.
+  edit: defineChange("todos", "edit", {
+    ...update,
+    failure: "Couldn't save the to-do. Check your connection and try again.",
+  }),
 
   // A second delete fails, as the to-do is gone
   remove: defineChange("todos", "remove", {

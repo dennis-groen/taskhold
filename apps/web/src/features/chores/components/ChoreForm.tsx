@@ -4,8 +4,6 @@ import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
-import { errorMessage } from "@/lib/api.ts";
 import { today } from "@/lib/dates.ts";
 import { firstName } from "@/lib/shared-with.ts";
 
@@ -55,7 +53,7 @@ export function ChoreForm({
   submitLabel: string;
   /** Gets focus when the form opens */
   nameRef?: RefObject<HTMLInputElement | null>;
-  onSubmit: (input: ChoreInput) => void | Promise<void>;
+  onSubmit: (input: ChoreInput) => void;
   /** Extra actions next to the submit button, e.g. Delete */
   footer?: ReactNode;
 }) {
@@ -66,7 +64,6 @@ export function ChoreForm({
   const [unit, setUnit] = useState<Repeat["unit"]>(initial.repeat?.unit ?? "week");
   const [dueOn, setDueOn] = useState(initial.dueOn ?? (initial.repeat ? today() : ""));
   const [assigneeId, setAssigneeId] = useState(initial.assigneeId);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const repeat: Repeat | null =
@@ -84,7 +81,7 @@ export function ChoreForm({
     if (next !== "once" && !dueOn) setDueOn(today());
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) {
       setError("Give the chore a name.");
@@ -100,19 +97,13 @@ export function ChoreForm({
       setError(`Repeat at least every 1 ${repeat.unit}.`);
       return;
     }
-    setPending(true);
     setError(null);
-    try {
-      await onSubmit({ name: name.trim(), repeat, dueOn: dueOn || null, assigneeId });
-    } catch (err) {
-      setError(errorMessage(err, "Couldn't save the chore. Check your connection and try again."));
-    } finally {
-      setPending(false);
-    }
+    // Shows straight away; a failure shows as a notice (see chores.changes.ts)
+    onSubmit({ name: name.trim(), repeat, dueOn: dueOn || null, assigneeId });
   }
 
   return (
-    <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-6">
+    <form noValidate onSubmit={submit} className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Label htmlFor={ids.name}>Chore</Label>
         <Input
@@ -219,8 +210,7 @@ export function ChoreForm({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="xl" disabled={pending} className="flex-1">
-          {pending && <Spinner />}
+        <Button type="submit" size="xl" className="flex-1">
           {submitLabel}
         </Button>
         {footer}

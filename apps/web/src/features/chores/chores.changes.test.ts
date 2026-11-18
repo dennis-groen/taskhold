@@ -211,14 +211,14 @@ describe("editing a chore", () => {
     expect(shown(queryClient)).toMatchObject({ repeat: null, lastCompletion: null, done: false });
   });
 
-  it("leaves the error to the form", async () => {
+  it("rolls a failed edit back with a notice, as its sheet has closed", async () => {
     const queryClient = appClient();
     api.updateChore.mockRejectedValue(new Error("Nope"));
 
     await expect(
       runChange(queryClient, choreChanges.edit, { choreId: "bins", changes: { name: "x" } }),
     ).rejects.toThrow("Nope");
-    expect(changeFailed).not.toHaveBeenCalled();
+    expect(changeFailed).toHaveBeenCalledOnce();
     expect(shown(queryClient)?.name).toBe("Bins out");
   });
 });

@@ -214,7 +214,8 @@ export function runChange<Vars>(
 
 /**
  * runChange for components. `run` returns at once; `runAsync` resolves once the API has the change
- * and rejects when it fails, for forms that close afterwards.
+ * and rejects when it fails, for what has to follow the API (refetching another area). Without a
+ * connection it waits until there is one, so don't keep a form open on it.
  */
 export function useChange<Vars>(change: Change<Vars>): {
   run: (vars: Vars, undo?: UndoOffer) => void;
