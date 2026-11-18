@@ -2,7 +2,14 @@
 import { validate } from "../../lib/validation.ts";
 import { protectedRouter } from "../auth/auth.middleware.ts";
 import * as shoppingService from "./shopping.service.ts";
-import { addItemBody, itemParam, listBody, listParam, updateItemBody } from "./shopping.schema.ts";
+import {
+  addItemBody,
+  createListBody,
+  itemParam,
+  listBody,
+  listParam,
+  updateItemBody,
+} from "./shopping.schema.ts";
 
 export const shoppingRoutes = protectedRouter()
   // What the household has bought, for "buy again" suggestions
@@ -14,9 +21,8 @@ export const shoppingRoutes = protectedRouter()
     const lists = await shoppingService.getLists(c.get("user").id);
     return c.json({ lists }, 200);
   })
-  .post("/lists", validate("json", listBody), async (c) => {
-    const { name } = c.req.valid("json");
-    const list = await shoppingService.createList(c.get("user").id, name);
+  .post("/lists", validate("json", createListBody), async (c) => {
+    const list = await shoppingService.createList(c.get("user").id, c.req.valid("json"));
     return c.json({ list }, 201);
   })
   .get("/lists/:listId", validate("param", listParam), async (c) => {

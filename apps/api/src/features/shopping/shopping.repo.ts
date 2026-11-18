@@ -47,16 +47,17 @@ export async function findList(
   return rows[0] ?? null;
 }
 
+/** Returns false when a list with that id already exists, e.g. a retried request */
 export async function insertList(
-  values: Pick<typeof shoppingList.$inferInsert, "householdId" | "name">,
+  values: Pick<typeof shoppingList.$inferInsert, "id" | "householdId" | "name">,
   executor: Executor = db,
-): Promise<{ id: string }> {
+): Promise<boolean> {
   const rows = await executor
     .insert(shoppingList)
     .values(values)
+    .onConflictDoNothing({ target: shoppingList.id })
     .returning({ id: shoppingList.id });
-  // An insert without a conflict target always returns its row
-  return rows[0];
+  return rows.length > 0;
 }
 
 /** Returns false when the household has no list with that id */

@@ -83,7 +83,6 @@ describe("shopping lists", () => {
     const attempts = [
       lists.$get({ param }),
       lists.$patch({ param, json: { name: "Mine now" } }),
-      lists.$delete({ param }),
       lists.items.$post({ param, json: { name: "Sneaky" } }),
       lists.items[":itemId"].$patch({ param: itemParam, json: { checked: true } }),
       lists.items[":itemId"].$delete({ param: itemParam }),
@@ -92,6 +91,8 @@ describe("shopping lists", () => {
     for (const attempt of await Promise.all(attempts)) {
       expect(await errorCode(attempt, 404)).toBe("LIST_NOT_FOUND");
     }
+    // Deleting another household's list does nothing, like deleting one that's already gone
+    expect((await lists.$delete({ param })).status).toBe(204);
     expect((await json(await outsider.api.shopping.lists.$get(), 200)).lists).toEqual([]);
 
     // Nothing changed for the owner
@@ -103,6 +104,54 @@ describe("shopping lists", () => {
       name: "Groceries",
       items: [{ name: "Bread", checked: false }],
     });
+  });
+
+  it("answer the same when a list is deleted twice, or never existed", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const list = await listOf(owner);
+    const lists = owner.api.shopping.lists[":listId"];
+
+    expect((await lists.$delete({ param: { listId: list.id } })).status).toBe(204);
+    expect((await lists.$delete({ param: { listId: list.id } })).status).toBe(204);
+    expect((await lists.$delete({ param: { listId: randomUUID() } })).status).toBe(204);
+  });
+
+  it("are made once with the id they were given, however many times it's sent", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const id = randomUUID();
+    const create = () => owner.api.shopping.lists.$post({ json: { id, name: "Market" } });
+
+    const { list: first } = await json(await create(), 201);
+    expect(first).toEqual({ id, name: "Market", items: [] });
+    await owner.api.shopping.lists[":listId"].items.$post({
+      param: { listId: id },
+      json: { name: "Bread" },
+    });
+
+    // A retry answers with the list as it is now
+    const { list: again } = await json(await create(), 201);
+    expect(again).toMatchObject({ id, name: "Market", items: [{ name: "Bread" }] });
+    expect((await json(await owner.api.shopping.lists.$get(), 200)).lists).toHaveLength(1);
+
+    const invalid = await owner.api.shopping.lists.$post({ json: { id: "nope", name: "Market" } });
+    expect(await errorCode(invalid, 400)).toBe("INVALID_REQUEST");
+  });
+
+  it("can't take over another household's list by reusing its id", async () => {
+    const owner = await signUp();
+    const other = await signUp();
+    await householdWith(owner);
+    await householdWith(other);
+    const id = randomUUID();
+    await json(await owner.api.shopping.lists.$post({ json: { id, name: "Mine" } }), 201);
+
+    const reuse = await other.api.shopping.lists.$post({ json: { id, name: "Overwritten" } });
+    expect(await errorCode(reuse, 409)).toBe("LIST_ID_TAKEN");
+    const { lists } = await json(await owner.api.shopping.lists.$get(), 200);
+    expect(lists.map((list) => list.name)).toEqual(["Mine"]);
+    expect((await json(await other.api.shopping.lists.$get(), 200)).lists).toEqual([]);
   });
 
   it("add an item once when the same add is retried with its id", async () => {
@@ -355,6 +404,23 @@ describe("limits", () => {
         Array.from({ length: 50 }, (_, n) => ({ householdId: household.id, name: `List ${n}` })),
       );
 
+    const oneMore = await owner.api.shopping.lists.$post({ json: { name: "One more" } });
+    expect(await errorCode(oneMore, 409)).toBe("LIST_LIMIT_REACHED");
+  });
+
+  it("still accept a retry of a list that got in when the household is at its limit", async () => {
+    const owner = await signUp();
+    const household = await householdWith(owner);
+    const id = randomUUID();
+    await json(await owner.api.shopping.lists.$post({ json: { id, name: "The 50th" } }), 201);
+    await db
+      .insert(shoppingList)
+      .values(
+        Array.from({ length: 49 }, (_, n) => ({ householdId: household.id, name: `List ${n}` })),
+      );
+
+    const retry = await owner.api.shopping.lists.$post({ json: { id, name: "The 50th" } });
+    expect(retry.status).toBe(201);
     const oneMore = await owner.api.shopping.lists.$post({ json: { name: "One more" } });
     expect(await errorCode(oneMore, 409)).toBe("LIST_LIMIT_REACHED");
   });

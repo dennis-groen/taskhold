@@ -9,12 +9,14 @@ import {
   itemIdTaken,
   itemLimitReached,
   itemNotFound,
+  listIdTaken,
   listLimitReached,
   listNotFound,
 } from "./shopping.errors.ts";
 import type {
   AddItemInput,
   BoughtItem,
+  CreateListInput,
   ShoppingItem,
   ShoppingList,
   ShoppingListSummary,
@@ -30,13 +32,32 @@ export async function getLists(userId: string): Promise<ShoppingListSummary[]> {
   return shoppingRepo.findListsByHousehold(household.id);
 }
 
-export async function createList(userId: string, name: string): Promise<ShoppingList> {
+export async function createList(userId: string, input: CreateListInput): Promise<ShoppingList> {
   const household = await householdsService.getMembershipOf(userId);
-  if ((await shoppingRepo.countLists(household.id)) >= MAX_LISTS) throw listLimitReached();
-  const { id } = await shoppingRepo.insertList({ householdId: household.id, name });
+  const id = input.id ?? crypto.randomUUID();
   annotate("shopping", { list_id: id });
-  await changed(household.id);
-  return { id, name, items: [] };
+
+  // A retry of a create that already got in answers with that list, whatever has changed since
+  if (input.id && (await shoppingRepo.findList({ householdId: household.id, listId: id }))) {
+    annotate("shopping", { retried: true });
+    return getList(userId, id);
+  }
+
+  if ((await shoppingRepo.countLists(household.id)) >= MAX_LISTS) throw listLimitReached();
+  const inserted = await shoppingRepo.insertList({
+    id,
+    householdId: household.id,
+    name: input.name,
+  });
+  if (inserted) {
+    await changed(household.id);
+    return { id, name: input.name, items: [] };
+  }
+  // Not inserted: a retry that raced its twin, or an id that belongs to another household
+  if (await shoppingRepo.findList({ householdId: household.id, listId: id })) {
+    return getList(userId, id);
+  }
+  throw listIdTaken();
 }
 
 export async function getList(userId: string, listId: string): Promise<ShoppingList> {
@@ -54,12 +75,15 @@ export async function renameList(userId: string, listId: string, name: string): 
   await changed(household.id);
 }
 
+/**
+ * Deleting a list that's already gone, or isn't the household's, does nothing, so a delete sent
+ * twice answers the same both times
+ */
 export async function deleteList(userId: string, listId: string): Promise<void> {
   annotate("shopping", { list_id: listId });
   const household = await householdsService.getMembershipOf(userId);
   const deleted = await shoppingRepo.deleteList({ householdId: household.id, listId });
-  if (!deleted) throw listNotFound();
-  await changed(household.id);
+  if (deleted) await changed(household.id);
 }
 
 export async function addItem(

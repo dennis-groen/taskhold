@@ -20,7 +20,7 @@ const quantity = (schema: z.ZodString) =>
     .max(20, "Keep the quantity under 20 characters.")
     .transform((value) => value || null);
 
-const listFields = { name: listName };
+const listFields = { id: (schema: z.ZodString) => schema.pipe(z.uuid()), name: listName };
 const itemFields = {
   id: (schema: z.ZodString) => schema.pipe(z.uuid()),
   name: itemName,
@@ -36,6 +36,11 @@ export const itemParam = listParam.extend({
 });
 
 export const listBody = createInsertSchema(shoppingList, listFields).pick({ name: true });
+
+// The id is optional: the app may choose it, so a list it makes keeps its identity
+export const createListBody = createInsertSchema(shoppingList, listFields)
+  .pick({ id: true, name: true })
+  .partial({ id: true });
 
 export const addItemBody = createInsertSchema(shoppingItem, itemFields)
   .pick({
@@ -54,7 +59,7 @@ export const updateItemBody = z
     message: "Nothing to change.",
   });
 
-export type CreateListInput = z.output<typeof listBody>;
+export type CreateListInput = z.output<typeof createListBody>;
 export type AddItemInput = z.output<typeof addItemBody>;
 export type UpdateItemInput = z.output<typeof updateItemBody>;
 
