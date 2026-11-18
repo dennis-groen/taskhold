@@ -21,8 +21,9 @@ export async function fetchList(listId: string): Promise<ShoppingList> {
     .list;
 }
 
-export async function createList(name: string): Promise<ShoppingList> {
-  return (await parseResponse(lists.$post({ json: { name } }))).list;
+/** `id` is chosen by the app, so a create sent twice makes one list */
+export async function createList(list: { id: string; name: string }): Promise<ShoppingList> {
+  return (await parseResponse(lists.$post({ json: list }))).list;
 }
 
 export async function renameList(listId: string, name: string): Promise<void> {

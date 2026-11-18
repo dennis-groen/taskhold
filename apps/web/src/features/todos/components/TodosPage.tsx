@@ -20,7 +20,7 @@ import type { Todo } from "../todos.api.ts";
 
 /** The viewer's private to-dos, grouped by when they're due */
 export function TodosPage() {
-  const { todos, add, save, setDone, remove, clearDone } = useTodos();
+  const { todos, add, save, setDone, remove, clearDone, moveToChores } = useTodos();
   const [openId, setOpenId] = useState<string | null>(null);
   const navigate = useNavigate();
   const today = todayOnDevice();
@@ -104,11 +104,12 @@ export function TodosPage() {
         todo={todos.find((todo) => todo.id === openId) ?? null}
         onSave={(changes) => save(openId ?? "", changes)}
         onDelete={() => openId && remove(openId)}
-        onMoved={(name) =>
-          toast(`${name} is now a household chore`, {
+        onMove={(todo) => {
+          moveToChores(todo.id);
+          toast(`${todo.name} is now a household chore`, {
             action: { label: "View", onClick: () => void navigate({ to: "/chores" }) },
-          })
-        }
+          });
+        }}
         onClose={() => setOpenId(null)}
       />
     </>

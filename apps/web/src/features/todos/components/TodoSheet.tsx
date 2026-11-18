@@ -1,17 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-
 import { cn } from "cn";
 
 import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
 import { HouseIcon, TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import { Spinner } from "@/components/ui/spinner";
-import { errorMessage } from "@/lib/api.ts";
 
-import { moveToChores, type Todo, type TodoInput } from "../todos.api.ts";
-import { todoKeys } from "../todos.queries.ts";
+import type { Todo, TodoInput } from "../todos.api.ts";
 import { TodoForm } from "./TodoForm.tsx";
 
 /** A to-do's details: change it, move it to the household's chores, or delete it */
@@ -19,15 +13,15 @@ export function TodoSheet({
   todo,
   onSave,
   onDelete,
-  onMoved,
+  onMove,
   onClose,
 }: {
   /** The to-do to show; null keeps the sheet closed */
   todo: Todo | null;
   onSave: (changes: TodoInput) => Promise<unknown>;
   onDelete: () => void;
-  /** After the to-do became a household chore */
-  onMoved: (name: string) => void;
+  /** Makes the to-do a household chore */
+  onMove: (todo: Todo) => void;
   onClose: () => void;
 }) {
   return (
@@ -40,7 +34,7 @@ export function TodoSheet({
             todo={todo}
             onSave={onSave}
             onDelete={onDelete}
-            onMoved={onMoved}
+            onMove={onMove}
             onClose={onClose}
           />
         )}
@@ -53,34 +47,15 @@ function SheetBody({
   todo,
   onSave,
   onDelete,
-  onMoved,
+  onMove,
   onClose,
 }: {
   todo: Todo;
   onSave: (changes: TodoInput) => Promise<unknown>;
   onDelete: () => void;
-  onMoved: (name: string) => void;
+  onMove: (todo: Todo) => void;
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
-  const [moving, setMoving] = useState(false);
-  const [moveError, setMoveError] = useState<string | null>(null);
-
-  async function move() {
-    setMoving(true);
-    setMoveError(null);
-    try {
-      await moveToChores(todo.id);
-      await queryClient.invalidateQueries({ queryKey: todoKeys.all });
-      onMoved(todo.name);
-      onClose();
-    } catch (err) {
-      setMoveError(errorMessage(err, "Couldn't move it to chores. Try again."));
-    } finally {
-      setMoving(false);
-    }
-  }
-
   return (
     <>
       <SheetHeader>
@@ -107,11 +82,14 @@ function SheetBody({
                   type="button"
                   variant="outline"
                   size="xl"
-                  disabled={moving}
                   className="flex-1"
-                  onClick={() => void move()}
+                  onClick={() => {
+                    // Gone from the to-dos straight away, and sent once there is a connection
+                    onMove(todo);
+                    onClose();
+                  }}
                 >
-                  {moving ? <Spinner /> : <HouseIcon />}
+                  <HouseIcon />
                   Move to household chores
                 </Button>
                 <Button
@@ -127,11 +105,6 @@ function SheetBody({
                   Delete
                 </Button>
               </div>
-              {moveError && (
-                <p role="alert" className="text-sm text-destructive">
-                  {moveError}
-                </p>
-              )}
             </div>
           }
         />

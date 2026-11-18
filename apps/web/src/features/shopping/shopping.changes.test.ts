@@ -8,9 +8,12 @@ import { registerChanges, runChange } from "@/lib/offline-changes.ts";
 
 import type { ShoppingList } from "./shopping.api.ts";
 import { shoppingChanges } from "./shopping.changes.ts";
-import { listQuery } from "./shopping.queries.ts";
+import { listQuery, listsQuery } from "./shopping.queries.ts";
 
 const api = vi.hoisted(() => ({
+  createList: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  renameList: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  deleteList: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   addItem: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   updateItem: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   deleteItem: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -49,7 +52,14 @@ function appClient() {
   const queryClient = new QueryClient();
   registerChanges(queryClient, shoppingChanges);
   queryClient.setQueryData(listQuery("list").queryKey, list);
+  queryClient.setQueryData(listsQuery().queryKey, [
+    { id: "list", name: "Groceries", itemCount: 2, openCount: 1 },
+  ]);
   return queryClient;
+}
+
+function listNames(queryClient: QueryClient) {
+  return queryClient.getQueryData(listsQuery().queryKey)?.map((summary) => summary.name);
 }
 
 function shown(queryClient: QueryClient) {
@@ -58,6 +68,9 @@ function shown(queryClient: QueryClient) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  api.createList.mockResolvedValue({});
+  api.renameList.mockResolvedValue(undefined);
+  api.deleteList.mockResolvedValue(undefined);
   api.addItem.mockResolvedValue({});
   api.updateItem.mockResolvedValue({});
   api.deleteItem.mockResolvedValue({});
@@ -156,6 +169,51 @@ describe("shopping changes", () => {
       { message: "Cleared" },
     );
     expect(offerUndo).not.toHaveBeenCalled();
+  });
+
+  it("shows a new list straight away, made with the app's id, before the items added to it", async () => {
+    const queryClient = appClient();
+    const made = runChange(queryClient, shoppingChanges.createList, { id: "new", name: "Market" });
+    const added = runChange(queryClient, shoppingChanges.add, {
+      listId: "new",
+      id: "eggs",
+      name: "Eggs",
+      quantity: null,
+      by: me,
+    });
+    await vi.waitFor(() => expect(listNames(queryClient)).toEqual(["Groceries", "Market"]));
+
+    await Promise.all([made, added]);
+    expect(api.createList).toHaveBeenCalledExactlyOnceWith({ id: "new", name: "Market" });
+    expect(api.createList.mock.invocationCallOrder[0]).toBeLessThan(
+      api.addItem.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it("takes a new list back off the overview when the API turns it down", async () => {
+    const queryClient = appClient();
+    api.createList.mockRejectedValueOnce(new Error("LIST_LIMIT_REACHED"));
+    await expect(
+      runChange(queryClient, shoppingChanges.createList, { id: "new", name: "Market" }),
+    ).rejects.toThrow();
+    expect(listNames(queryClient)).toEqual(["Groceries"]);
+  });
+
+  it("shows a list's new name straight away", async () => {
+    const queryClient = appClient();
+    await runChange(queryClient, shoppingChanges.renameList, { listId: "list", name: "Market" });
+
+    expect(queryClient.getQueryData(listQuery("list").queryKey)?.name).toBe("Market");
+    expect(api.renameList).toHaveBeenCalledExactlyOnceWith("list", "Market");
+  });
+
+  it("takes a deleted list off the overview, and keeps the delete across a restart", async () => {
+    const queryClient = appClient();
+    await runChange(queryClient, shoppingChanges.deleteList, { listId: "list" });
+
+    expect(listNames(queryClient)).toEqual([]);
+    expect(api.deleteList).toHaveBeenCalledExactlyOnceWith("list");
+    expect(shoppingChanges.deleteList.options(queryClient).meta.idempotent).toBe(true);
   });
 
   it("still sends a tick that an earlier version of the app saved on the device", async () => {

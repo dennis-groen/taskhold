@@ -3,10 +3,10 @@ import { useState } from "react";
 import { useChange } from "@/lib/offline-changes.ts";
 
 import { findWaiting, parseEntry, type Entry } from "./item-entry.ts";
-import type { ShoppingItem } from "./shopping.api.ts";
+import type { ShoppingItem, ShoppingListSummary } from "./shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
 import { suggestBuyAgain } from "./buy-again.ts";
-import { historyQuery, isListGone, listQuery } from "./shopping.queries.ts";
+import { historyQuery, isListGone, listQuery, listsQuery } from "./shopping.queries.ts";
 
 type Person = { id: string; name: string };
 
@@ -44,6 +44,40 @@ export function useShoppingList(listId: string, viewer: Person) {
       const count = list.items.filter((item) => item.checked).length;
       if (count === 0) return;
       clearChecked.run({ listId }, { message: cleared(count) });
+    },
+  };
+}
+
+/**
+ * Making, renaming and deleting lists. They show straight away, wait for a connection and survive
+ * a restart (see shopping.changes.ts); a failure rolls back with a notice.
+ */
+export function useManageLists() {
+  const queryClient = useQueryClient();
+  const createList = useChange(shoppingChanges.createList);
+  const renameList = useChange(shoppingChanges.renameList);
+  const deleteList = useChange(shoppingChanges.deleteList);
+
+  return {
+    /** Returns the new list's id, so it can be opened straight away */
+    create: (name: string) => {
+      const id = crypto.randomUUID();
+      // The new list opens before the API has it, offline too
+      queryClient.setQueryData(listQuery(id).queryKey, { id, name, items: [] });
+      createList.run({ id, name });
+      return id;
+    },
+    rename: (listId: string, name: string) => {
+      renameList.run({ listId, name });
+      // The overview shows the name too; the refetch after the change puts it right if it fails
+      queryClient.setQueryData(listsQuery().queryKey, (lists: ShoppingListSummary[] | undefined) =>
+        lists?.map((list) => (list.id === listId ? { ...list, name } : list)),
+      );
+    },
+    /** Call once the list's page has been left, so it doesn't look for a list that's gone */
+    remove: (listId: string) => {
+      deleteList.run({ listId });
+      queryClient.removeQueries({ queryKey: listQuery(listId).queryKey });
     },
   };
 }

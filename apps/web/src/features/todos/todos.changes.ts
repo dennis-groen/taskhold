@@ -7,6 +7,7 @@ import {
   clearDoneTodos,
   createTodo,
   deleteTodo,
+  moveToChores,
   updateTodo,
   type Todo,
   type TodoInput,
@@ -82,6 +83,17 @@ export const todoChanges = {
         return todo ? [todo] : null;
       },
     },
+  }),
+
+  // Makes it a one-off household chore. A second move fails, as the to-do is gone. The chore shows
+  // once the API has it: only the API knows the chore it makes.
+  moveToChores: defineChange("todos", "move-to-chores", {
+    idempotent: false,
+    ordered: true,
+    send: (id: string) => moveToChores(id),
+    target: theTodos,
+    apply: (list, id) => list.filter((todo) => todo.id !== id),
+    failure: "Couldn't move it to chores. Try again.",
   }),
 
   clearDone: defineChange("todos", "clear-done", {

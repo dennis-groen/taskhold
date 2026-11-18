@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   createTodo: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   updateTodo: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   deleteTodo: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  moveToChores: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 vi.mock("./todos.api.ts", () => ({ ...api, clearDoneTodos: vi.fn(), fetchTodos: vi.fn() }));
 vi.mock("@/lib/feedback.ts", () => ({ changeFailed: vi.fn(), offerUndo: vi.fn() }));
@@ -41,6 +42,7 @@ beforeEach(() => {
   api.createTodo.mockResolvedValue({});
   api.updateTodo.mockResolvedValue({});
   api.deleteTodo.mockResolvedValue({});
+  api.moveToChores.mockResolvedValue({});
 });
 
 describe("to-do changes", () => {
@@ -86,5 +88,17 @@ describe("to-do changes", () => {
     ).rejects.toThrow("Too long");
     expect(changeFailed).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(todosQuery().queryKey)).toEqual([post]);
+  });
+
+  it("takes a to-do off the list as it moves to chores, and brings it back if that fails", async () => {
+    const queryClient = appClient();
+    await runChange(queryClient, todoChanges.moveToChores, "post");
+    expect(queryClient.getQueryData(todosQuery().queryKey)).toEqual([]);
+    expect(api.moveToChores).toHaveBeenCalledExactlyOnceWith("post");
+
+    const again = appClient();
+    api.moveToChores.mockRejectedValueOnce(new Error("NOT_IN_HOUSEHOLD"));
+    await expect(runChange(again, todoChanges.moveToChores, "post")).rejects.toThrow();
+    expect(again.getQueryData(todosQuery().queryKey)).toEqual([post]);
   });
 });

@@ -1,16 +1,15 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { TrashIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 
-import { deleteList, type ShoppingList } from "../shopping.api.ts";
-import { shoppingKeys } from "../shopping.queries.ts";
+import type { ShoppingList } from "../shopping.api.ts";
+import { useManageLists } from "../shopping.hooks.ts";
 
 export function DeleteListButton({ list }: { list: ShoppingList }) {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { remove } = useManageLists();
   const count = list.items.length;
 
   return (
@@ -30,11 +29,10 @@ export function DeleteListButton({ list }: { list: ShoppingList }) {
       confirmLabel="Delete list"
       destructive
       onConfirm={async () => {
-        await deleteList(list.id);
-        // Leave first, so the open list doesn't poll for something that's gone
+        // Leave first, so the open list doesn't look for something that's gone. Gone from the
+        // overview straight away, and sent once there is a connection.
         await navigate({ to: "/lists" });
-        queryClient.removeQueries({ queryKey: shoppingKeys.list(list.id) });
-        await queryClient.invalidateQueries({ queryKey: shoppingKeys.lists() });
+        remove(list.id);
       }}
     />
   );

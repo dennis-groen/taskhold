@@ -1,4 +1,4 @@
-// Every change people make to a list's items (see lib/offline-changes.ts). Everything a change
+// Every change people make to the household's lists and their items (see lib/offline-changes.ts). Everything a change
 // needs travels in its variables, which are saved with it on the device; their shape is part of
 // what a phone may still have waiting, so change it only with care.
 import { defineChange } from "@/lib/offline-changes.ts";
@@ -6,12 +6,16 @@ import { defineChange } from "@/lib/offline-changes.ts";
 import {
   addItem,
   clearCheckedItems,
+  createList,
   deleteItem,
+  deleteList,
+  renameList,
   updateItem,
   type ShoppingItem,
   type ShoppingList,
+  type ShoppingListSummary,
 } from "./shopping.api.ts";
-import { listQuery } from "./shopping.queries.ts";
+import { listQuery, listsQuery } from "./shopping.queries.ts";
 
 type Person = { id: string; name: string };
 
@@ -26,9 +30,14 @@ export type NewItem = {
   by: Person;
 };
 type ItemRef = { listId: string; itemId: string };
+export type NewList = { id: string; name: string };
+export type RenameList = { listId: string; name: string };
 type RestoreItems = { listId: string; items: ShoppingItem[] };
 
-/** Every change shows on the list it's on */
+/** The household's lists, where making and deleting one shows */
+const theLists = () => listsQuery().queryKey;
+
+/** Every change to an item shows on the list it's on */
 const onList = ({ listId }: { listId: string }) => listQuery(listId).queryKey;
 
 /** Changes a list's items, leaving the rest of the list as it is */
@@ -54,6 +63,38 @@ const restore = defineChange("shopping", "restore", {
 });
 
 export const shoppingChanges = {
+  // The id comes from the app, so the API ignores a second copy. Ordered, so the list is there
+  // before the items added to it straight after.
+  createList: defineChange("shopping", "create-list", {
+    idempotent: true,
+    ordered: true,
+    send: ({ id, name }: NewList) => createList({ id, name }),
+    target: theLists,
+    apply: (current: ShoppingListSummary[], { id, name }) => [
+      ...current,
+      { id, name, itemCount: 0, openCount: 0 },
+    ],
+  }),
+
+  // Renaming to the same name twice does the same as once
+  renameList: defineChange("shopping", "rename-list", {
+    idempotent: true,
+    ordered: true,
+    send: ({ listId, name }: RenameList) => renameList(listId, name),
+    target: onList,
+    apply: (current, { name }) => ({ ...current, name }),
+  }),
+
+  // A second delete does the same as the first, so this is kept across a restart. Ordered, so
+  // changes made to the list before it went don't arrive after.
+  deleteList: defineChange("shopping", "delete-list", {
+    idempotent: true,
+    ordered: true,
+    send: ({ listId }: { listId: string }) => deleteList(listId),
+    target: theLists,
+    apply: (current, { listId }) => current.filter((list) => list.id !== listId),
+  }),
+
   // Ordered, so a tick and its untick arrive as they were made, and never before the item's add
   toggle: defineChange("shopping", "toggle", {
     idempotent: true,

@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 
 import { cn } from "cn";
@@ -9,11 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
-import { errorMessage } from "@/lib/api.ts";
 
-import { renameList, type ShoppingList } from "../shopping.api.ts";
-import { shoppingKeys } from "../shopping.queries.ts";
+import type { ShoppingList } from "../shopping.api.ts";
+import { useManageLists } from "../shopping.hooks.ts";
 
 /** Opens a sheet to change the list's name, for everyone in the household */
 export function RenameListButton({ list }: { list: ShoppingList }) {
@@ -42,45 +39,25 @@ export function RenameListButton({ list }: { list: ShoppingList }) {
 }
 
 function RenameForm({ list, onDone }: { list: ShoppingList; onDone: () => void }) {
-  const queryClient = useQueryClient();
+  const { rename } = useManageLists();
   const nameId = useId();
   const [name, setName] = useState(list.name);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
       setError("Give the list a name.");
       return;
     }
-    if (trimmed === list.name) {
-      onDone();
-      return;
-    }
-    setPending(true);
-    setError(null);
-    try {
-      await renameList(list.id, trimmed);
-      queryClient.setQueryData(
-        shoppingKeys.list(list.id),
-        (current: ShoppingList | undefined) => current && { ...current, name: trimmed },
-      );
-      void queryClient.invalidateQueries({ queryKey: shoppingKeys.lists() });
-      onDone();
-    } catch (err) {
-      setError(errorMessage(err, "Couldn't rename the list. Check your connection and try again."));
-    } finally {
-      setPending(false);
-    }
+    // Shows straight away and is sent once there is a connection; a failure shows a notice
+    if (trimmed !== list.name) rename(list.id, trimmed);
+    onDone();
   }
 
   return (
-    <form
-      onSubmit={(event) => void submit(event)}
-      className={cn("flex flex-col gap-6", SHEET_BODY)}
-    >
+    <form onSubmit={submit} className={cn("flex flex-col gap-6", SHEET_BODY)}>
       <div className="flex flex-col gap-2">
         <Label htmlFor={nameId}>Name</Label>
         <Input
@@ -98,8 +75,7 @@ function RenameForm({ list, onDone }: { list: ShoppingList; onDone: () => void }
           </p>
         )}
       </div>
-      <Button type="submit" size="xl" disabled={pending}>
-        {pending && <Spinner />}
+      <Button type="submit" size="xl">
         Save name
       </Button>
     </form>

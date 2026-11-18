@@ -273,6 +273,53 @@
       }
     },
     {
+      // Components of the areas whose writes are changes (AREAS in lib/offline-changes.ts). The
+      // same rules as the block above (an override replaces it), plus: no API calls, types only,
+      // so every write goes through a change in the feature's *.changes.ts
+      "files": [
+        "apps/web/src/features/shopping/components/*.tsx",
+        "apps/web/src/features/chores/components/*.tsx",
+        "apps/web/src/features/todos/components/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@tanstack/react-query",
+                "importNames": ["useMutation", "mutationOptions"],
+                "message": "Declare a change with defineChange (lib/offline-changes.ts), so it shows straight away, waits for a connection and survives a restart."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/routes/**", "@/router.tsx", "@/main.tsx"],
+                "message": "Features can't import routes or the router. Read route data with getRouteApi(), and the query client with useQueryClient()."
+              },
+              {
+                "group": ["@/features/**"],
+                "message": "Features don't import each other. Compose features in a route instead."
+              },
+              {
+                "regex": "^\\.\\./\\.\\./",
+                "message": "Relative imports stay inside the feature. Use @/components or @/lib for shared code."
+              },
+              {
+                "regex": "^@phosphor-icons/",
+                "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
+              },
+              {
+                "regex": "^\\.\\./[a-z-]+\\.api(\\.ts)?$",
+                "allowTypeImports": true,
+                "message": "Write through the feature's hooks, which run its changes (*.changes.ts), so a write shows straight away, waits for a connection and survives a restart. Read through its queries."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       // Components have one place, so nobody has to decide or guess. Any import trips this.
       "files": ["apps/web/src/features/*/*.tsx"],
       "rules": {
