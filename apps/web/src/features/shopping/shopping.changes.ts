@@ -70,6 +70,7 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ id, name }: NewList) => createList({ id, name }),
     target: theLists,
+    describe: ({ name }) => `Made ${name}`,
     apply: (current: ShoppingListSummary[], { id, name }) => [
       ...current,
       { id, name, itemCount: 0, openCount: 0 },
@@ -82,6 +83,7 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ listId, name }: RenameList) => renameList(listId, name),
     target: onList,
+    describe: ({ name }) => `Renamed a list to ${name}`,
     apply: (current, { name }) => ({ ...current, name }),
   }),
 
@@ -92,6 +94,7 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ listId }: { listId: string }) => deleteList(listId),
     target: theLists,
+    describe: () => "Deleted a list",
     apply: (current, { listId }) => current.filter((list) => list.id !== listId),
   }),
 
@@ -101,6 +104,8 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ listId, itemId, checked }: ToggleItem) => updateItem(listId, itemId, { checked }),
     target: onList,
+    describe: ({ itemId, checked }, list) =>
+      `${checked ? "Ticked" : "Unticked"} ${list?.items.find((item) => item.id === itemId)?.name ?? "an item"}`,
     apply: onItems((current, { itemId, checked, by }) =>
       current.map((item) =>
         item.id === itemId
@@ -122,6 +127,8 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ listId, itemId, changes }: EditItem) => updateItem(listId, itemId, changes),
     target: onList,
+    describe: ({ itemId }, list) =>
+      `Changed ${list?.items.find((item) => item.id === itemId)?.name ?? "an item"}`,
     apply: onItems((current, { itemId, changes }) =>
       current.map((item) => (item.id === itemId ? { ...item, ...changes } : item)),
     ),
@@ -134,6 +141,7 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ listId, id, name, quantity }: NewItem) => addItem(listId, { id, name, quantity }),
     target: onList,
+    describe: ({ name }) => `Added ${name}`,
     apply: onItems((current, { id, name, quantity, by }) => [
       {
         id,
@@ -155,6 +163,7 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ listId, itemId }: ItemRef) => deleteItem(listId, itemId),
     target: onList,
+    describe: () => "Removed an item",
     apply: onItems((current, { itemId }) => current.filter((item) => item.id !== itemId)),
     undo: {
       by: restore,
@@ -170,6 +179,7 @@ export const shoppingChanges = {
     ordered: true,
     send: ({ listId }: { listId: string }) => clearCheckedItems(listId),
     target: onList,
+    describe: () => "Cleared ticked items",
     apply: onItems((current) => current.filter((item) => !item.checked)),
     undo: {
       by: restore,

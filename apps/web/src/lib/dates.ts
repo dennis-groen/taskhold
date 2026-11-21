@@ -29,7 +29,7 @@ export const DUE_GROUPS: { group: DueGroup; label: string }[] = [
   { group: "today", label: "Today" },
   { group: "week", label: "This week" },
   { group: "later", label: "Later" },
-  { group: "anytime", label: "Anytime" },
+  { group: "anytime", label: "No date" },
 ];
 
 export function dueGroup(dueOn: string | null, on: string): DueGroup {
@@ -56,4 +56,26 @@ export function pastDateLabel(date: string, on: string): string {
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
   return Temporal.PlainDate.from(date).toLocaleString("en", { day: "numeric", month: "short" });
+}
+
+/** "Sat 21 Nov": a date with its weekday, as rows show it */
+export function shortDate(date: string): string {
+  return Temporal.PlainDate.from(date).toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/**
+ * When something is due, said as briefly as a row allows: "Yesterday" or "3 days late" when it's
+ * late, nothing for today (its group says so), "Tomorrow", then "Sat 21 Nov"
+ */
+export function rowDueLabel(dueOn: string, on: string): string | null {
+  const days = daysBetween(on, dueOn);
+  if (days === -1) return "Yesterday";
+  if (days < 0) return `${-days} days late`;
+  if (days === 0) return null;
+  if (days === 1) return "Tomorrow";
+  return shortDate(dueOn);
 }

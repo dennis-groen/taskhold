@@ -1,13 +1,16 @@
 import { useId } from "react";
 
-import { NoteIcon } from "@/components/icons.ts";
+import { CalendarBlankIcon } from "@/components/icons.ts";
 import { Checkbox } from "@/components/ui/checkbox";
-import { daysBetween, dueLabel } from "@/lib/dates.ts";
+import { daysBetween, rowDueLabel } from "@/lib/dates.ts";
 import { cn } from "cn";
 
 import type { Todo } from "../todos.api.ts";
 
-/** One to-do: tick the circle to mark it done, tap the rest to see and change it */
+/**
+ * One to-do: the square box on the right ticks it off (square, as it's yours alone); tapping the
+ * rest opens it. The first line of its notes shows under the name.
+ */
 export function TodoRow({
   todo,
   today,
@@ -23,52 +26,62 @@ export function TodoRow({
   onOpen: () => void;
 }) {
   const nameId = useId();
+  const detailId = useId();
   const overdue = !todo.done && todo.dueOn !== null && daysBetween(today, todo.dueOn) < 0;
+  const note = todo.notes?.split("\n").find((line) => line.trim() !== "");
+  // Today's say nothing: their group says it
+  const due = todo.dueOn !== null && !todo.done ? rowDueLabel(todo.dueOn, today) : null;
+  const showDue = due !== null;
+  const oneLine = !note && !showDue;
 
   return (
     <li
       data-settling={settling ? (todo.done ? "checked" : "open") : undefined}
-      className="flex min-h-14 items-stretch overflow-hidden"
+      className={cn(
+        "relative flex gap-1 pr-[11px] pl-5 ticks-left:flex-row-reverse ticks-left:pr-5 ticks-left:pl-[11px] before:absolute before:top-0 before:right-0 before:left-5 before:h-px before:bg-border first:before:hidden",
+        oneLine ? "min-h-14 items-center" : "items-start",
+      )}
     >
-      <span className="flex items-center py-3 pr-1 pl-4">
-        <Checkbox
-          aria-labelledby={nameId}
-          checked={todo.done}
-          onCheckedChange={(checked) => onDone(checked)}
-          variant="tick"
-        />
-      </span>
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 pl-2 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/80 focus-visible:ring-inset active:bg-muted/70"
+        aria-haspopup="dialog"
+        className={cn(
+          "min-w-0 flex-1 self-stretch rounded-lg text-left outline-none transition-opacity duration-150 focus-visible:ring-3 focus-visible:ring-ring/80 focus-visible:ring-inset active:opacity-60",
+          oneLine ? "py-2" : "py-3",
+        )}
       >
-        <span className="min-w-0 flex-1">
-          <span id={nameId} className="block text-base break-words">
-            <span className="tick-label" data-done={todo.done || undefined}>
-              {todo.name}
-            </span>
+        <span id={nameId} className="block truncate text-[1.0625rem] font-[550]">
+          <span className="tick-label" data-done={todo.done || undefined}>
+            {todo.name}
           </span>
-          {todo.dueOn && !todo.done && (
+        </span>
+        <span id={detailId}>
+          {note && (
+            <span className="mt-0.5 block truncate text-sm text-muted-foreground">{note}</span>
+          )}
+          {showDue && (
             <span
               className={cn(
-                "mt-0.5 inline-block text-[0.8125rem] tabular-nums",
-                overdue
-                  ? "-ml-0.5 rounded-full bg-destructive/10 px-1.5 font-semibold text-destructive"
-                  : "text-muted-foreground",
+                "mt-[3px] inline-flex items-center gap-[5px] text-[0.8125rem] font-[650] tabular-nums",
+                overdue ? "text-destructive" : "text-muted-foreground",
               )}
             >
-              {dueLabel(todo.dueOn, today)}
+              <CalendarBlankIcon aria-hidden weight="bold" className="size-3.5" />
+              {due}
             </span>
           )}
         </span>
-        {todo.notes && (
-          <span title="Has notes" className="shrink-0 text-muted-foreground/80">
-            <NoteIcon className="size-5" aria-hidden />
-            <span className="sr-only">Has notes</span>
-          </span>
-        )}
       </button>
+      <span className={cn("grid size-11 shrink-0 place-items-center", !oneLine && "mt-1")}>
+        <Checkbox
+          aria-labelledby={nameId}
+          aria-describedby={oneLine ? undefined : detailId}
+          checked={todo.done}
+          onCheckedChange={(checked) => onDone(checked)}
+          variant="square"
+        />
+      </span>
     </li>
   );
 }

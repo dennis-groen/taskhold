@@ -12,9 +12,13 @@ export function NewInviteCodeButton({ onReplaced }: { onReplaced: () => void }) 
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-          <ArrowsClockwiseIcon />
-          Get a new code
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-my-2 -mr-2 min-h-11 font-[750] text-area-fg hover:text-area-fg"
+        >
+          <ArrowsClockwiseIcon weight="bold" />
+          New code
         </Button>
       }
       title="Get a new invite code?"

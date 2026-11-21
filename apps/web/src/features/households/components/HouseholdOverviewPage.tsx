@@ -1,13 +1,14 @@
-import { Link, getRouteApi } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { CaretRightIcon, UserPlusIcon } from "@/components/icons.ts";
+import { AreaHeader, Count } from "@/components/layout/AreaHeader.tsx";
 import { Group, GroupHeading } from "@/components/layout/Group.tsx";
-import { PageHeading } from "@/components/layout/PageHeading.tsx";
 import { ThemeToggle } from "@/components/ThemeToggle.tsx";
+import { LeftHandedRow } from "@/components/LeftHandedRow.tsx";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 
 import { HouseholdMembers } from "./HouseholdMembers.tsx";
+import { InviteCodeCard } from "./InviteCodeCard.tsx";
 import { LeaveHouseholdButton } from "./LeaveHouseholdButton.tsx";
 import { NeedsConnection } from "./NeedsConnection.tsx";
 import { RemoveMemberButton } from "./RemoveMemberButton.tsx";
@@ -49,26 +50,17 @@ function Overview({
 
   return (
     <>
-      <PageHeading title="Household">{household.name}</PageHeading>
+      <AreaHeader
+        title={household.name}
+        meta={
+          <Count value={household.members.length}>
+            {household.members.length === 1 ? "person" : "people"}
+          </Count>
+        }
+      />
 
-      <GroupHeading className="mt-2">Members</GroupHeading>
+      <GroupHeading>Members</GroupHeading>
       <Group>
-        <Link
-          to="/invite"
-          className="group/invite flex min-h-15 items-center gap-3 px-4 py-3 text-primary-soft-foreground outline-none transition-colors hover:bg-primary-soft/35 focus-visible:bg-primary-soft/35 focus-visible:ring-2 focus-visible:ring-ring/80 focus-visible:ring-inset active:bg-primary-soft/50"
-        >
-          <span
-            aria-hidden
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft"
-          >
-            <UserPlusIcon className="size-4.5" weight="bold" />
-          </span>
-          <span className="flex-1 text-base font-semibold">Invite people</span>
-          <CaretRightIcon
-            weight="bold"
-            className="size-4 text-muted-foreground/70 transition-transform duration-200 ease-out group-hover/invite:translate-x-0.5"
-          />
-        </Link>
         <HouseholdMembers
           members={household.members}
           currentUserId={user.id}
@@ -80,10 +72,19 @@ function Overview({
         />
       </Group>
 
+      <GroupHeading>Invite someone</GroupHeading>
+      <InviteCodeCard household={household} viewerId={user.id} />
+
+      <GroupHeading>On this phone</GroupHeading>
+      <Group>
+        {reminders}
+        <LeftHandedRow />
+      </Group>
+
       <GroupHeading>Account</GroupHeading>
       <Group>
-        <div className="flex min-h-15 items-center gap-3 px-4 py-2.5">
-          <UserAvatar name={user.name} image={user.image} />
+        <div className="flex min-h-15 items-center gap-3 py-2.5 pr-1 pl-4">
+          <UserAvatar name={user.name} image={user.image} size="lg" />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-base font-semibold">{user.name}</span>
             <span className="block truncate text-sm text-muted-foreground">{user.email}</span>
@@ -92,14 +93,12 @@ function Overview({
         </div>
       </Group>
 
-      {reminders}
-
       <GroupHeading>Appearance</GroupHeading>
-      <Group className="p-1.5">
+      <Group className="py-1.5 pr-4 pl-5 sm:pr-5 sm:pl-6 lg:px-0">
         <ThemeToggle />
       </Group>
 
-      <div className="mt-10 flex flex-wrap gap-2 border-t border-border/70 pt-5">
+      <div className="mt-10 flex flex-wrap gap-2 border-t border-border pt-5">
         <LeaveHouseholdButton household={household} currentUserId={user.id} />
         {deleteAccount?.(household, user.id)}
       </div>

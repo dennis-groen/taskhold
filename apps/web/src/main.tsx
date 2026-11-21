@@ -8,7 +8,10 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { ThemeProvider } from "@/components/ThemeProvider.tsx";
+import { applyTickSide } from "@/lib/tick-side.ts";
 import { queryClient, router } from "@/router.tsx";
+
+applyTickSide();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

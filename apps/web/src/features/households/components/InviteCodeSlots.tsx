@@ -33,7 +33,8 @@ export function InviteCodeSlots({
       index={index}
       aria-invalid={invalid || undefined}
       className={cn(
-        "size-[2.125rem] text-lg font-semibold min-[360px]:size-9 min-[400px]:size-10 sm:size-12 sm:text-xl",
+        // Eight separate cells, in the wide cut, so a code reads across a room
+        "h-14 w-auto min-w-0 flex-1 rounded-[10px] border-2 border-transparent bg-muted text-[1.75rem] font-[800] tabular-nums [font-stretch:125%] first:rounded-l-[10px] first:border-l-2 last:rounded-r-[10px] dark:bg-muted sm:h-16",
         reveal &&
           "animate-in duration-500 ease-out fade-in fill-mode-both slide-in-from-bottom-2 motion-reduce:animate-none",
       )}
@@ -53,10 +54,11 @@ export function InviteCodeSlots({
       inputMode="text"
       autoCapitalize="characters"
       autoComplete="off"
+      containerClassName="flex w-full max-w-[26rem] items-center gap-1.5"
     >
-      <InputOTPGroup>{[0, 1, 2, 3].map(slot)}</InputOTPGroup>
-      <InputOTPSeparator className="text-muted-foreground" />
-      <InputOTPGroup>{[4, 5, 6, 7].map(slot)}</InputOTPGroup>
+      <InputOTPGroup className="flex-1 gap-1.5">{[0, 1, 2, 3].map(slot)}</InputOTPGroup>
+      <InputOTPSeparator className="w-1.5 [&_svg]:hidden" />
+      <InputOTPGroup className="flex-1 gap-1.5">{[4, 5, 6, 7].map(slot)}</InputOTPGroup>
     </InputOTP>
   );
 }

@@ -24,6 +24,10 @@ const update = {
   ordered: true,
   send: ({ id, ...changes }: TodoChanges) => updateTodo(id, changes),
   target: theTodos,
+  describe: ({ id, done }: TodoChanges, todos: Todo[] | undefined) => {
+    const name = todos?.find((todo) => todo.id === id)?.name ?? "a to-do";
+    return done === undefined ? `Changed ${name}` : `${done ? "Ticked" : "Unticked"} ${name}`;
+  },
   apply: (list: Todo[], { id, ...changes }: TodoChanges) =>
     list.map((todo) =>
       todo.id === id
@@ -59,6 +63,7 @@ export const todoChanges = {
     ordered: true,
     send: (input: TodoInput & { id: string }) => createTodo(input),
     target: theTodos,
+    describe: ({ name }) => `Added ${name}`,
     apply: (list, input) => [
       ...list,
       { ...input, done: false, doneAt: null, createdAt: Temporal.Now.instant().toString() },
@@ -79,6 +84,7 @@ export const todoChanges = {
     ordered: true,
     send: (id: string) => deleteTodo(id),
     target: theTodos,
+    describe: () => "Deleted a to-do",
     apply: (list, id) => list.filter((todo) => todo.id !== id),
     undo: {
       by: restore,
@@ -96,6 +102,8 @@ export const todoChanges = {
     ordered: true,
     send: (id: string) => moveToChores(id),
     target: theTodos,
+    describe: (id, todos) =>
+      `Moved ${todos?.find((todo) => todo.id === id)?.name ?? "a to-do"} to Chores`,
     apply: (list, id) => list.filter((todo) => todo.id !== id),
     failure: "Couldn't move it to chores. Try again.",
   }),
@@ -105,6 +113,7 @@ export const todoChanges = {
     ordered: true,
     send: (_vars: null) => clearDoneTodos(),
     target: theTodos,
+    describe: () => "Cleared done to-dos",
     apply: (list) => list.filter((todo) => !todo.done),
     undo: {
       by: restore,

@@ -1,33 +1,29 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toneFor } from "@/lib/member-tone.ts";
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? (parts.at(-1)?.[0] ?? "") : "";
-  return (first + last).toUpperCase();
-}
-
-/** One of six calm tones (globals.css, --tone-*), the same for a name on every device */
-function toneFor(name: string) {
-  let hash = 0;
-  for (const char of name) hash = (hash * 31 + char.codePointAt(0)!) | 0;
-  return (Math.abs(hash) % 6) + 1;
+/** One letter reads at 24px; two letters at that size don't */
+function initial(name: string) {
+  return (name.trim()[0] ?? "?").toUpperCase();
 }
 
 export function UserAvatar({
   name,
   image,
   size,
+  className,
 }: {
   name: string;
   image: string | null;
   size?: "default" | "sm" | "lg";
+  className?: string;
 }) {
   return (
-    <Avatar size={size} data-tone={toneFor(name)}>
-      {/* Decorative: the name is always shown next to it */}
+    <Avatar size={size} data-tone={toneFor(name)} className={className}>
+      {/* Decorative: the name is always shown or read next to it */}
       {image && <AvatarImage src={image} alt="" referrerPolicy="no-referrer" />}
-      <AvatarFallback>{initials(name)}</AvatarFallback>
+      <AvatarFallback className="text-xs font-[750] group-data-[size=lg]/avatar:text-base group-data-[size=sm]/avatar:text-xs">
+        {initial(name)}
+      </AvatarFallback>
     </Avatar>
   );
 }

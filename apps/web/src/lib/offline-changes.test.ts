@@ -249,7 +249,11 @@ describe("undo", () => {
     const onUndo = vi.fn();
 
     await runChange(queryClient, changes.remove, "milk", { message: "Milk removed", onUndo });
-    expect(offerUndo).toHaveBeenCalledExactlyOnceWith("Milk removed", expect.any(Function));
+    expect(offerUndo).toHaveBeenCalledExactlyOnceWith(
+      "Milk removed",
+      expect.any(Function),
+      undefined,
+    );
 
     tapUndo();
     expect(onUndo).toHaveBeenCalledOnce();

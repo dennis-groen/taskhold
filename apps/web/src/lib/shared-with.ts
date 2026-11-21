@@ -12,14 +12,15 @@ export function otherHousemates(people: Housemate[], viewerId: string): Housemat
     .map(({ id, name, image }) => ({ id, name, image }));
 }
 
+/** "Noor", "Noor and Alex", "Noor, Alex and Jules", "Noor, Alex and 3 others" */
+export function namesList(names: string[]): string {
+  // Past three names the line stops being readable at a glance
+  if (names.length > 3) return `${names.slice(0, 2).join(", ")} and ${names.length - 2} others`;
+  return new Intl.ListFormat("en-GB", { type: "conjunction" }).format(names);
+}
+
 /** "Shared with Sam" / "Shared with Sam and Bo" / "Just you so far", for headings of shared things */
 export function sharedWith(otherNames: string[]): string {
   if (otherNames.length === 0) return "Just you so far";
-  // Past three names the line stops being readable at a glance
-  if (otherNames.length > 3) {
-    const rest = otherNames.length - 2;
-    return `Shared with ${otherNames.slice(0, 2).join(", ")} and ${rest} others`;
-  }
-  const names = new Intl.ListFormat("en", { type: "conjunction" }).format(otherNames);
-  return `Shared with ${names}`;
+  return `Shared with ${namesList(otherNames)}`;
 }

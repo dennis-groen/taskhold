@@ -19,3 +19,26 @@ export function useTheme(): ThemeContextValue {
   if (!context) throw new Error("useTheme must be used inside ThemeProvider");
   return context;
 }
+
+/** The parts of the app with their own colour (styles/globals.css, data-area) */
+export type Area = "shop" | "chores" | "todos" | "home";
+
+/**
+ * Paints the phone's status bar the colour at the top of the screen: the area's slab inside a
+ * household, the canvas elsewhere. Reads --status-bar after the theme and area are applied.
+ */
+export function syncStatusBar() {
+  const color = getComputedStyle(document.documentElement).getPropertyValue("--status-bar").trim();
+  if (!color) return;
+  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    meta.content = color;
+  }
+}
+
+/** Colours the app for an area, or for none (sign-in, onboarding) */
+export function applyArea(area: Area | null) {
+  const root = document.documentElement;
+  if (area) root.dataset.area = area;
+  else delete root.dataset.area;
+  syncStatusBar();
+}

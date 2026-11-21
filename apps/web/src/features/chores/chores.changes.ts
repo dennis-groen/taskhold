@@ -84,6 +84,8 @@ export const choreChanges = {
     ordered: true,
     send: ({ choreId, on }: CompleteChore) => completeChore(choreId, on),
     target: theChores,
+    describe: ({ choreId }, chores) =>
+      `Marked ${chores?.find((chore) => chore.id === choreId)?.name ?? "a chore"} done`,
     apply: (list, { choreId, on, by }) =>
       list.map((item) => (item.id === choreId ? markedDone(item, by, on) : item)),
     failure: "Couldn't mark that done. Check your connection and try again.",
@@ -105,6 +107,8 @@ export const choreChanges = {
     ordered: true,
     send: ({ choreId, today }: SkipChore) => skipChore(choreId, today),
     target: theChores,
+    describe: ({ choreId }, chores) =>
+      `Skipped ${chores?.find((chore) => chore.id === choreId)?.name ?? "a chore"}`,
     apply: (list, { choreId, today, by }) =>
       list.map((item) => (item.id === choreId ? skipped(item, by, today) : item)),
     settle: withDetail,
@@ -118,6 +122,8 @@ export const choreChanges = {
     ordered: true,
     send: ({ choreId, dueOn }: MoveChore) => updateChore(choreId, { dueOn }),
     target: theChores,
+    describe: ({ choreId }, chores) =>
+      `Put off ${chores?.find((chore) => chore.id === choreId)?.name ?? "a chore"}`,
     apply: withDueOn,
     failure: MOVE_FAILED,
     undo: {
@@ -138,6 +144,7 @@ export const choreChanges = {
     send: ({ id, name, repeat, dueOn, assigneeId }: NewChore) =>
       createChore({ id, name, repeat, dueOn, assigneeId }),
     target: theChores,
+    describe: ({ name }) => `Added ${name}`,
     apply: (list, { id, name, repeat, dueOn, assignee }) => [
       ...list,
       { id, name, repeat, dueOn, assignee, lastCompletion: null, done: false },
@@ -151,6 +158,8 @@ export const choreChanges = {
     ordered: true,
     send: ({ choreId, changes }: EditChore) => updateChore(choreId, changes),
     target: theChores,
+    describe: ({ choreId }, chores) =>
+      `Changed ${chores?.find((chore) => chore.id === choreId)?.name ?? "a chore"}`,
     apply: (list, edit) =>
       list.map((item) => (item.id === edit.choreId ? edited(item, edit) : item)),
     settle: withDetail,
@@ -163,6 +172,7 @@ export const choreChanges = {
     ordered: true,
     send: (choreId: string) => deleteChore(choreId),
     target: theChores,
+    describe: () => "Deleted a chore",
     apply: (list, choreId) => list.filter((item) => item.id !== choreId),
   }),
 
@@ -171,6 +181,7 @@ export const choreChanges = {
     ordered: true,
     send: (_vars: null) => clearDoneChores(),
     target: theChores,
+    describe: () => "Cleared done chores",
     apply: (list) => list.filter((item) => !item.done),
   }),
 };

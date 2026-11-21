@@ -2,7 +2,6 @@ import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 
 import { choresQuery } from "@/features/chores/chores.queries.ts";
 import { ChoresPage } from "@/features/chores/components/ChoresPage.tsx";
-import { otherHousemates } from "@/lib/shared-with.ts";
 
 const householdRoute = getRouteApi("/_household");
 
@@ -14,11 +13,5 @@ export const Route = createFileRoute("/_household/chores/")({
 function ChoresRoute() {
   const household = householdRoute.useLoaderData();
   const { user } = householdRoute.useRouteContext();
-  return (
-    <ChoresPage
-      viewer={user}
-      members={household.members}
-      otherMembers={otherHousemates(household.members, user.id)}
-    />
-  );
+  return <ChoresPage viewer={user} members={household.members} />;
 }

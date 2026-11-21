@@ -41,9 +41,12 @@ export function useShoppingList(listId: string, viewer: Person) {
       remove.run({ listId, itemId }, { message: `${item.name} removed` });
     },
     clearChecked: () => {
-      const count = list.items.filter((item) => item.checked).length;
-      if (count === 0) return;
-      clearChecked.run({ listId }, { message: cleared(count) });
+      const ticked = list.items.filter((item) => item.checked);
+      if (ticked.length === 0) return;
+      clearChecked.run(
+        { listId },
+        { message: cleared(ticked.length), detail: namesOf(ticked.map((item) => item.name)) },
+      );
     },
   };
 }
@@ -142,5 +145,11 @@ function person({ id, name }: Person): Person {
 }
 
 function cleared(count: number): string {
-  return count === 1 ? "1 item cleared" : `${count} items cleared`;
+  return count === 1 ? "Cleared 1 ticked item" : `Cleared ${count} ticked items`;
+}
+
+/** "Bananas, Lemons, Oat milk and 2 more" */
+export function namesOf(names: string[], shown = 3): string {
+  if (names.length <= shown) return names.join(", ");
+  return `${names.slice(0, shown).join(", ")} and ${names.length - shown} more`;
 }

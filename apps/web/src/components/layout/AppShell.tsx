@@ -15,7 +15,7 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-dvh bg-canvas">
-      <header className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-5 sm:px-8">
+      <header className="mx-auto flex h-16 max-w-md items-center justify-between gap-4 px-5 pt-[env(safe-area-inset-top)] sm:px-0">
         <Wordmark />
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar name={user.name} image={user.image} size="sm" />
@@ -25,9 +25,7 @@ export function AppShell({
           {actions}
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-5 pt-[min(10vh,5rem)] pb-16 sm:px-8">
-        <div className="max-w-md">{children}</div>
-      </main>
+      <main className="mx-auto max-w-md px-5 pt-[min(6vh,3rem)] pb-16 sm:px-0">{children}</main>
     </div>
   );
 }

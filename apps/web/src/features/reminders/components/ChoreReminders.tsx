@@ -1,41 +1,54 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
-import { BellRingingIcon } from "@/components/icons.ts";
-import { Group, GroupHeading } from "@/components/layout/Group.tsx";
+import {
+  BellIcon,
+  BellSlashIcon,
+  ClockIcon,
+  ExportIcon,
+  PaperPlaneTiltIcon,
+  PlusSquareIcon,
+} from "@/components/icons.ts";
+import { SettingButton, SettingRow } from "@/components/layout/SettingRow.tsx";
+import { SHEET_BODY, SheetContent, SheetEyebrow } from "@/components/layout/Sheet.tsx";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { errorMessage } from "@/lib/api.ts";
+import { cn } from "cn";
 
-import { useDeviceReminders, type DeviceState } from "../reminders.hooks.ts";
+import { useDeviceReminders } from "../reminders.hooks.ts";
 import { sendTestReminder, updateRemindAt } from "../reminders.api.ts";
 import { reminderKeys, reminderStatusQuery } from "../reminders.queries.ts";
 
-// Why the switch can't be used on this device
-const UNAVAILABLE: Partial<Record<DeviceState, string>> = {
-  "needs-install":
-    "On iPhone and iPad, reminders only work in the installed app. Tap Share, then Add to Home Screen, and turn them on from there.",
-  blocked:
-    "Notifications are blocked for taskhold in this browser. Allow them in the site settings, then come back here.",
-  unsupported: "This browser can't show notifications from taskhold.",
-};
+/** What today's reminder would say, from what's due now. The route works it out. */
+export type ReminderPreview = { title: string; body: string };
 
-/** The daily summary of chores and to-dos: on or off for this device, and when it comes */
-export function ChoreReminders() {
+/**
+ * The daily reminder's rows under "On this phone": the switch, the time, and Send a test. Turning
+ * it on the first time explains it with a sample before the phone asks; on an iPhone outside the
+ * Home Screen it explains how to install first.
+ */
+export function ChoreReminders({ preview }: { preview: ReminderPreview | null }) {
   const { data: status } = useQuery(reminderStatusQuery());
   // The server has no push keys: nothing to offer
   if (!status?.available) return null;
-  return <ReminderSettings publicKey={status.publicKey} settings={status.settings} />;
+  return (
+    <ReminderSettings publicKey={status.publicKey} settings={status.settings} preview={preview} />
+  );
 }
+
+type Sheet = "install" | "ask" | null;
 
 function ReminderSettings({
   publicKey,
   settings,
+  preview,
 }: {
   publicKey: string | null;
   settings: { remindAt: string; timeZone: string } | null;
+  preview: ReminderPreview | null;
 }) {
   const queryClient = useQueryClient();
   const device = useDeviceReminders(publicKey);
@@ -44,6 +57,8 @@ function ReminderSettings({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const time = settings?.remindAt ?? "8:00";
 
   async function run(action: () => Promise<unknown>, fallback: string) {
     setPending(true);
@@ -64,102 +79,228 @@ function ReminderSettings({
     }, "Couldn't change the time. Try again.");
   }
 
-  const unavailable = UNAVAILABLE[device.state];
+  function turnOn() {
+    void run(device.turnOn, "Couldn't turn reminders on. Try again.");
+  }
+
+  function flip(checked: boolean) {
+    if (!checked) {
+      void run(device.turnOff, "Couldn't turn reminders off.");
+      return;
+    }
+    if (device.state === "needs-install") return setSheet("install");
+    // Explained once, before the phone's own question, which can't be asked twice
+    if (Notification.permission === "default") return setSheet("ask");
+    turnOn();
+  }
+
   const on = device.state === "on";
+  const blocked = device.state === "blocked";
+
+  if (device.state === "unsupported") {
+    return (
+      <SettingRow
+        icon={BellSlashIcon}
+        tone="muted"
+        title="Daily reminder"
+        sub="This browser can't show notifications from taskhold."
+      />
+    );
+  }
 
   return (
     <>
-      <GroupHeading>Reminders</GroupHeading>
-      <Group>
-        <div className="flex min-h-14 items-start gap-3 px-4 py-3">
-          <BellRingingIcon
-            className="mt-0.5 size-5 shrink-0 text-primary-soft-foreground"
-            weight="duotone"
-          />
-          <div className="min-w-0 flex-1">
-            <label htmlFor={switchId} className="block text-base font-semibold">
-              Remind me on this device
-            </label>
-            <p className="mt-0.5 text-sm text-pretty text-muted-foreground">
-              {unavailable ??
-                "Once a day, a summary of what is due or overdue: your chores, the ones nobody is assigned to, and your own to-dos."}
-            </p>
-          </div>
-          {!unavailable &&
-            (device.state === "loading" ? (
-              <Spinner className="mt-1" />
-            ) : (
-              <Switch
-                id={switchId}
-                className="mt-1"
-                checked={on}
-                disabled={pending}
-                onCheckedChange={(checked) =>
-                  void run(
-                    checked ? device.turnOn : device.turnOff,
-                    checked
-                      ? "Couldn't turn reminders on. Try again."
-                      : "Couldn't turn reminders off.",
-                  )
-                }
-              />
-            ))}
-        </div>
+      <SettingRow
+        icon={blocked ? BellSlashIcon : BellIcon}
+        tone={blocked ? "muted" : undefined}
+        title="Daily reminder"
+        sub={
+          blocked
+            ? "Blocked in your phone's Settings"
+            : on
+              ? "Your chores, Anyone's, and your to-dos"
+              : `${time}, when chores or to-dos are due`
+        }
+        htmlFor={switchId}
+        end={
+          device.state === "loading" ? (
+            <Spinner />
+          ) : (
+            <Switch
+              id={switchId}
+              checked={on}
+              disabled={pending || blocked}
+              onCheckedChange={flip}
+            />
+          )
+        }
+      />
 
-        {on && settings && (
-          <>
-            <div className="flex min-h-14 items-center gap-3 px-4 py-2.5">
-              <label htmlFor={timeId} className="min-w-0 flex-1">
-                <span className="block text-base font-semibold">Time</span>
-                <span className="block text-sm text-muted-foreground">
-                  Every day, {settings.timeZone.replaceAll("_", " ")} time
-                </span>
-              </label>
-              <Input
+      {blocked && (
+        <div className="mx-4 my-2 rounded-2xl bg-destructive/8 px-4 py-3 text-sm">
+          <b className="block font-[700]">Notifications are blocked for taskhold</b>
+          <p className="mt-1 text-pretty text-muted-foreground">
+            Your phone said no when we asked, so taskhold can't ask again. Allow notifications for
+            taskhold in your phone's or browser's settings, then come back here.
+          </p>
+        </div>
+      )}
+
+      {on && settings && (
+        <>
+          <SettingRow
+            icon={ClockIcon}
+            title="Reminder time"
+            sub="Same on all your devices"
+            htmlFor={timeId}
+            end={
+              <input
                 id={timeId}
                 key={settings.remindAt}
                 type="time"
                 required
                 defaultValue={settings.remindAt}
                 disabled={pending}
-                className="w-28"
+                className="h-11 rounded-xl bg-muted px-3 text-base font-[650] tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/80"
                 onBlur={(event) => void saveTime(event.currentTarget.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void saveTime(event.currentTarget.value);
                 }}
               />
-            </div>
-            <div className="flex min-h-13 items-center gap-3 px-4 py-2">
-              <span className="min-w-0 flex-1 text-sm text-muted-foreground" aria-live="polite">
-                {testResult ?? "Check that notifications come through."}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  void run(async () => {
-                    const sent = await sendTestReminder();
-                    setTestResult(
-                      sent === 0
-                        ? "Nothing arrived. Turn reminders off and on again."
-                        : `Sent to ${sent === 1 ? "1 device" : `${sent} devices`}.`,
-                    );
-                  }, "Couldn't send a test. Try again.")
-                }
-              >
-                Send a test
-              </Button>
-            </div>
-          </>
-        )}
+            }
+          />
+          <SettingButton
+            icon={PaperPlaneTiltIcon}
+            title="Send a test"
+            sub={testResult ?? "Arrives on every phone with the reminder on"}
+            disabled={pending}
+            onClick={() =>
+              void run(async () => {
+                const sent = await sendTestReminder();
+                setTestResult(
+                  sent === 0
+                    ? "Nothing arrived. Turn the reminder off and on again."
+                    : `Sent to ${sent === 1 ? "1 phone" : `${sent} phones`}`,
+                );
+              }, "Couldn't send a test. Try again.")
+            }
+          />
+        </>
+      )}
 
-        {error && (
-          <p role="alert" className="px-4 py-3 text-sm text-destructive">
-            {error}
-          </p>
-        )}
-      </Group>
+      {error && (
+        <p role="alert" className="px-4 py-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
+      <Drawer open={sheet !== null} onOpenChange={(open) => !open && setSheet(null)}>
+        <SheetContent>
+          <SheetEyebrow icon={BellIcon}>Daily reminder</SheetEyebrow>
+          {sheet === "install" ? (
+            <InstallFirst />
+          ) : (
+            <AskFirst
+              time={time}
+              preview={preview}
+              onTurnOn={() => {
+                setSheet(null);
+                turnOn();
+              }}
+              onNotNow={() => setSheet(null)}
+            />
+          )}
+        </SheetContent>
+      </Drawer>
     </>
+  );
+}
+
+const TITLE = "text-[1.75rem] leading-[1.08] font-[850] tracking-[-0.02em] [font-stretch:118%]";
+
+/** iPhone and iPad only notify from the Home Screen: three steps to get there */
+function InstallFirst() {
+  const steps = [
+    <>
+      Tap <b>Share</b>{" "}
+      <ExportIcon aria-hidden weight="bold" className="inline size-4.5 align-[-3px]" /> in Safari's
+      bar.
+    </>,
+    <>
+      Choose <b>Add to Home Screen</b>{" "}
+      <PlusSquareIcon aria-hidden weight="bold" className="inline size-4.5 align-[-3px]" />
+    </>,
+    <>Open taskhold from your Home Screen and turn on the reminder here.</>,
+  ];
+  return (
+    <div className={cn(SHEET_BODY, "pt-1")}>
+      <DrawerTitle className={TITLE}>Add taskhold to your Home Screen first</DrawerTitle>
+      <DrawerDescription className="mt-2 text-[0.9375rem] text-muted-foreground">
+        iPhone only sends notifications to web apps on the Home Screen. It takes three taps.
+      </DrawerDescription>
+      <ol className="mt-4 divide-y divide-border border-t border-border">
+        {steps.map((step, index) => (
+          <li key={index} className="flex items-start gap-3 py-3.5 text-[1.0625rem]">
+            <span
+              aria-hidden
+              className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-sm font-[750]"
+            >
+              {index + 1}
+            </span>
+            <span className="pt-0.5">{step}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** Shows what the reminder looks like before the phone's own one-time question */
+function AskFirst({
+  time,
+  preview,
+  onTurnOn,
+  onNotNow,
+}: {
+  time: string;
+  preview: ReminderPreview | null;
+  onTurnOn: () => void;
+  onNotNow: () => void;
+}) {
+  return (
+    <div className={cn(SHEET_BODY, "pt-1")}>
+      <DrawerTitle className={TITLE}>One reminder a day, only when something's due</DrawerTitle>
+      <div aria-hidden className="mt-4 flex gap-3 rounded-[20px] bg-muted p-3.5">
+        <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-card shadow-card">
+          <BellIcon weight="fill" className="size-5 text-area-fg" />
+        </span>
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="flex items-baseline justify-between gap-2">
+            <b className="font-[700]">{preview?.title ?? "2 due today"}</b>
+            <span className="text-xs text-muted-foreground tabular-nums">{time}</span>
+          </span>
+          <span className="block text-pretty text-muted-foreground">
+            {preview?.body ?? "Your chores and to-dos that are due, by name"}
+          </span>
+        </span>
+      </div>
+      <DrawerDescription className="mt-3 text-[0.9375rem] text-pretty text-muted-foreground">
+        At {time}, when your chores, Anyone's chores or your to-dos are due or late. Nothing on days
+        with nothing due. You can change the time.
+      </DrawerDescription>
+      <Button
+        size="xl"
+        onClick={onTurnOn}
+        className="mt-5 w-full rounded-2xl bg-foreground text-background hover:bg-foreground/90"
+      >
+        Turn on reminders
+      </Button>
+      <Button size="xl" variant="secondary" onClick={onNotNow} className="mt-2 w-full rounded-2xl">
+        Not now
+      </Button>
+      <p className="mt-3 text-center text-[0.8125rem] text-muted-foreground">
+        Next, your phone asks to allow notifications.
+      </p>
+    </div>
   );
 }

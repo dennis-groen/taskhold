@@ -1,15 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
 
-import { SHEET_BODY, SheetContent, SheetHeader } from "@/components/layout/Sheet.tsx";
+import {
+  SHEET_BODY,
+  SHEET_ICON_BUTTON,
+  SheetContent,
+  SheetEyebrow,
+} from "@/components/layout/Sheet.tsx";
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
-import { SkipForwardIcon, SunHorizonIcon, TrashIcon } from "@/components/icons.ts";
+import { BroomIcon, CheckIcon, PencilSimpleIcon } from "@/components/icons.ts";
+import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
-import { daysBetween, dueLabel, pastDateLabel } from "@/lib/dates.ts";
+import { daysBetween, pastDateLabel, rowDueLabel, shortDate } from "@/lib/dates.ts";
+import { firstName } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
-import { canPutOff, skip } from "@taskhold/api/chore-schedule";
+import { canPutOff, markDone, skip } from "@taskhold/api/chore-schedule";
 
 import { repeatLabel, scheduleOf } from "../chore-dates.ts";
 import type { Chore } from "../chores.api.ts";
@@ -17,15 +25,20 @@ import { useManageChores, usePutOff } from "../chores.hooks.ts";
 import { choreQuery } from "../chores.queries.ts";
 import { ChoreForm, type Member } from "./ChoreForm.tsx";
 
+/** The newest time can be taken back for a day; after that the history stands */
+const UNDO_WITHIN = Temporal.Duration.from({ hours: 24 });
+
 /**
- * A chore's details: put it off, change it, see who did it lately, take back the last time, or
- * delete it
+ * A chore, read first: when it's due, how it repeats, whose it is and when it was last done, with
+ * Mark done under the thumb, Skip and Put off beside each other, and the history below. The
+ * pencil turns the sheet into the form to change it.
  */
 export function ChoreSheet({
   chore,
   members,
   viewer,
   today,
+  onComplete,
   onUndo,
   onClose,
 }: {
@@ -34,6 +47,7 @@ export function ChoreSheet({
   members: Member[];
   viewer: Viewer;
   today: string;
+  onComplete: (chore: Chore) => void;
   onUndo: (choreId: string) => void;
   onClose: () => void;
 }) {
@@ -42,12 +56,13 @@ export function ChoreSheet({
       <SheetContent>
         {chore && (
           <SheetBody
-            // Fresh form state for each chore
+            // Fresh state for each chore
             key={chore.id}
             chore={chore}
             members={members}
             viewer={viewer}
             today={today}
+            onComplete={onComplete}
             onUndo={onUndo}
             onClose={onClose}
           />
@@ -57,11 +72,15 @@ export function ChoreSheet({
   );
 }
 
+/** The person looking, as their skips are shown before the API answers */
+type Viewer = { id: string; name: string };
+
 function SheetBody({
   chore,
   members,
   viewer,
   today,
+  onComplete,
   onUndo,
   onClose,
 }: {
@@ -69,168 +88,325 @@ function SheetBody({
   members: Member[];
   viewer: Viewer;
   today: string;
+  onComplete: (chore: Chore) => void;
   onUndo: (choreId: string) => void;
   onClose: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const { save, remove } = useManageChores(members);
-  const { data: detail, isPending } = useQuery(choreQuery(chore.id));
-  const history = detail?.history ?? [];
-  // "2 days overdue · Every week": what putting it off is measured against
-  const due = !chore.done && chore.dueOn ? chore.dueOn : null;
-  const overdue = due !== null && daysBetween(today, due) < 0;
-  const repeats = chore.repeat && repeatLabel(chore.repeat);
 
   return (
     <>
-      <SheetHeader>
-        <DrawerTitle className="break-words">{chore.name}</DrawerTitle>
-        <DrawerDescription className={cn(!due && !repeats && "sr-only")}>
-          {due || repeats ? (
-            <>
-              {due && (
-                <span className={cn(overdue && "font-semibold text-destructive")}>
-                  {dueLabel(due, today)}
-                </span>
-              )}
-              {due && repeats && " · "}
-              {repeats}
-            </>
-          ) : (
-            "Change the chore, see who did it lately, or delete it."
-          )}
-        </DrawerDescription>
-      </SheetHeader>
+      <SheetEyebrow
+        icon={BroomIcon}
+        actions={
+          !editing && (
+            <button
+              type="button"
+              aria-label={`Change ${chore.name}`}
+              onClick={() => setEditing(true)}
+              className={SHEET_ICON_BUTTON}
+            >
+              <PencilSimpleIcon weight="bold" className="size-5" />
+            </button>
+          )
+        }
+      >
+        {editing ? "Change chore" : "Chore · shared"}
+      </SheetEyebrow>
 
-      <div className={cn("overflow-y-auto", SHEET_BODY)}>
-        <PutOff chore={chore} viewer={viewer} today={today} onDone={onClose} />
-
-        <ChoreForm
-          // Starts over when an undo moves the due date, so saving can't put the old one back
-          key={`${chore.dueOn}|${chore.lastCompletion?.id}`}
-          initial={{
-            name: chore.name,
-            repeat: chore.repeat,
-            dueOn: chore.dueOn,
-            assigneeId: chore.assignee?.id ?? null,
-          }}
-          members={members}
-          viewerId={viewer.id}
-          submitLabel="Save changes"
-          onSubmit={(input) => {
-            save(chore, input);
-            onClose();
-          }}
-          footer={
-            <ConfirmDialog
-              trigger={
-                <Button variant="destructive" size="xl">
-                  <TrashIcon />
-                  Delete
-                </Button>
-              }
-              title={`Delete ${chore.name}?`}
-              description="It goes for everyone in the household, with its history."
-              confirmLabel="Delete chore"
-              destructive
-              onConfirm={async () => {
-                // Gone from the list straight away, and sent once there is a connection
-                remove(chore);
-                onClose();
-              }}
-            />
-          }
+      {editing ? (
+        <div className={cn("overflow-y-auto", SHEET_BODY)}>
+          <DrawerTitle className="sr-only">Change {chore.name}</DrawerTitle>
+          <DrawerDescription className="sr-only">
+            Everyone in the household sees the change.
+          </DrawerDescription>
+          <ChoreForm
+            initial={{
+              name: chore.name,
+              repeat: chore.repeat,
+              dueOn: chore.dueOn,
+              assigneeId: chore.assignee?.id ?? null,
+            }}
+            members={members}
+            viewerId={viewer.id}
+            submitLabel="Save changes"
+            onSubmit={(input) => {
+              save(chore, input);
+              setEditing(false);
+            }}
+            footer={
+              <ConfirmDialog
+                trigger={
+                  <Button variant="secondary" size="xl">
+                    Delete chore
+                  </Button>
+                }
+                title={`Delete ${chore.name}?`}
+                description="It goes for everyone in the household, with its history."
+                confirmLabel="Delete chore"
+                destructive
+                onConfirm={async () => {
+                  // Gone from the list straight away, and sent once there is a connection
+                  remove(chore);
+                  onClose();
+                }}
+              />
+            }
+          />
+        </div>
+      ) : (
+        <ReadView
+          chore={chore}
+          viewer={viewer}
+          today={today}
+          onComplete={() => onComplete(chore)}
+          onUndo={() => onUndo(chore.id)}
+          onClose={onClose}
         />
-
-        <section className="mt-8" aria-label="History">
-          <h3 className="text-sm font-semibold">History</h3>
-          {isPending ? (
-            <div className="flex justify-center py-6">
-              <Spinner />
-            </div>
-          ) : history.length === 0 ? (
-            <p className="py-3 text-sm text-muted-foreground">Not done yet.</p>
-          ) : (
-            <ul className="mt-2 divide-y divide-border/80 overflow-hidden rounded-xl bg-card shadow-card">
-              {history.map((completion, index) => (
-                <li key={completion.id} className="flex min-h-12 items-center gap-3 px-4 py-2">
-                  <span className="min-w-0 flex-1 text-sm">
-                    {completion.completedBy
-                      ? completion.completedBy.id === viewer.id
-                        ? "You"
-                        : completion.completedBy.name
-                      : "Someone who left"}
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {completion.skipped && "skipped "}
-                      {pastDateLabel(completion.completedOn, today)}
-                    </span>
-                  </span>
-                  {/* Only the most recent time can be taken back */}
-                  {index === 0 && (
-                    <Button variant="soft" size="sm" onClick={() => onUndo(chore.id)}>
-                      Undo
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+      )}
     </>
   );
 }
 
-type PutOffHow = "tomorrow" | "skip";
-
-/** The person looking, as their skips are shown before the API answers */
-type Viewer = { id: string; name: string };
-
-/**
- * For a chore that can't be done now. Tomorrow (once it's due) moves the date and nothing else.
- * Skip this time (repeating chores) moves it one interval on and says so in the history, so
- * nobody has to tick it off when it wasn't done. Either one closes the sheet and offers Undo, and
- * waits on the device when there's no connection.
- */
-function PutOff({
+function ReadView({
   chore,
   viewer,
   today,
-  onDone,
+  onComplete,
+  onUndo,
+  onClose,
 }: {
   chore: Chore;
   viewer: Viewer;
   today: string;
-  onDone: () => void;
+  onComplete: () => void;
+  onUndo: () => void;
+  onClose: () => void;
 }) {
   const putOff = usePutOff(viewer);
-
+  const { data: detail, isPending } = useQuery(choreQuery(chore.id));
+  const history = detail?.history ?? [];
   const schedule = scheduleOf(chore);
   const day = Temporal.PlainDate.from(today);
+  const marking = markDone(schedule, day);
+  const skipping = skip(schedule, day);
   const canTomorrow = canPutOff(schedule, day);
-  // Not when skipped already today: a second skip would change nothing, and Undo is in the history
-  const canSkip = skip(schedule, day).kind === "moved";
-  if (!canTomorrow && !canSkip) return null;
-
-  const button = (how: PutOffHow, Icon: typeof SkipForwardIcon, label: string) => (
-    <Button
-      variant="outline"
-      size="lg"
-      onClick={() => {
-        putOff[how](chore, today);
-        onDone();
-      }}
-    >
-      <Icon aria-hidden />
-      {label}
-    </Button>
-  );
+  const due = !chore.done && chore.dueOn ? chore.dueOn : null;
+  const late = due !== null && daysBetween(today, due) < 0;
+  const last = chore.lastCompletion;
+  const who = (person: { id: string; name: string } | null | undefined) =>
+    person ? (person.id === viewer.id ? "You" : firstName(person.name)) : "Someone who left";
 
   return (
-    <fieldset className="mb-6 grid grid-cols-2 gap-2">
-      <legend className="sr-only">Put it off</legend>
-      {canTomorrow && button("tomorrow", SunHorizonIcon, "Tomorrow")}
-      {canSkip && button("skip", SkipForwardIcon, "Skip this time")}
-    </fieldset>
+    <div className={cn("overflow-y-auto", SHEET_BODY, "pt-1")}>
+      <DrawerTitle className="text-[2rem] leading-[1.05] break-words">{chore.name}</DrawerTitle>
+      <DrawerDescription className="sr-only">
+        When it's due, who it's for, and who did it lately.
+      </DrawerDescription>
+
+      <dl className="mt-5 grid grid-cols-2 gap-2">
+        <Fact label="Due">
+          {chore.done ? (
+            "Done"
+          ) : due ? (
+            <span className={cn(late && "text-destructive")}>
+              {rowDueLabel(due, today) ?? "Today"}
+            </span>
+          ) : (
+            "No date"
+          )}
+        </Fact>
+        <Fact label="Repeat">{chore.repeat ? repeatLabel(chore.repeat) : "Once"}</Fact>
+        <Fact label="Assigned to">
+          {chore.assignee ? (
+            <span className="flex items-center gap-2">
+              <UserAvatar
+                name={chore.assignee.name}
+                image={chore.assignee.image}
+                size="sm"
+                className="data-[size=sm]:size-6"
+              />
+              <span className="truncate">{who(chore.assignee)}</span>
+            </span>
+          ) : (
+            "Anyone"
+          )}
+        </Fact>
+        <Fact label="Last done">
+          {last && !last.skipped ? (
+            <span className="first-letter:uppercase">{pastDateLabel(last.completedOn, today)}</span>
+          ) : (
+            "Not yet"
+          )}
+        </Fact>
+      </dl>
+
+      <div className="mt-5">
+        {marking.kind === "done" ? (
+          <Button
+            size="xl"
+            className="h-auto min-h-16 w-full flex-col gap-0 rounded-2xl py-2.5"
+            onClick={() => {
+              onComplete();
+              onClose();
+            }}
+          >
+            <span className="flex items-center gap-2 text-[1.0625rem] font-[750]">
+              <CheckIcon weight="bold" aria-hidden className="size-5" />
+              Mark done
+            </span>
+            {marking.dueOn && (
+              <span className="text-[0.8125rem] font-medium opacity-80">
+                Next due {shortDate(marking.dueOn.toString())}
+              </span>
+            )}
+          </Button>
+        ) : (
+          <div className="flex min-h-16 flex-col items-center justify-center rounded-2xl bg-area-tint px-4 py-2.5 text-center">
+            <span className="flex items-center gap-2 font-[750] text-area-fg">
+              <CheckIcon weight="bold" aria-hidden className="size-5" />
+              Done today
+            </span>
+            <span className="text-[0.8125rem] text-muted-foreground">
+              Marking it again changes nothing
+            </span>
+          </div>
+        )}
+
+        {(skipping.kind === "moved" || canTomorrow) && (
+          <>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {skipping.kind === "moved" && (
+                <TwoLineButton
+                  title="Skip this time"
+                  sub={`Next due ${shortDate(skipping.dueOn.toString())}`}
+                  onClick={() => {
+                    putOff.skip(chore, today);
+                    onClose();
+                  }}
+                />
+              )}
+              {canTomorrow && (
+                <TwoLineButton
+                  title="Put off"
+                  sub="Due tomorrow"
+                  onClick={() => {
+                    putOff.tomorrow(chore, today);
+                    onClose();
+                  }}
+                />
+              )}
+            </div>
+            <p className="mt-2 px-1 text-[0.8125rem] text-muted-foreground">
+              {skipping.kind === "moved" &&
+                "Skipping goes in the history, so nobody has to tick it. "}
+              {canTomorrow && "Putting off only moves the date."}
+            </p>
+          </>
+        )}
+      </div>
+
+      <section className="mt-7" aria-labelledby="chore-history">
+        <div className="flex items-baseline justify-between">
+          <h3 id="chore-history" className="text-sm font-[750]">
+            History
+          </h3>
+          {history.length > 1 && (
+            <span className="text-[0.8125rem] text-muted-foreground">Newest first</span>
+          )}
+        </div>
+        {isPending ? (
+          <div className="flex justify-center py-6">
+            <Spinner />
+          </div>
+        ) : history.length === 0 ? (
+          <p className="py-3 text-sm text-muted-foreground">Not done yet.</p>
+        ) : (
+          <ul className="mt-1">
+            {history.map((completion, index) => {
+              const at = Temporal.Instant.from(completion.createdAt);
+              const undoable =
+                index === 0 &&
+                Temporal.Duration.compare(Temporal.Now.instant().since(at), UNDO_WITHIN) < 0;
+              return (
+                <li
+                  key={completion.id}
+                  className="flex min-h-14 items-center gap-3 border-b border-border py-2 last:border-b-0"
+                >
+                  {completion.completedBy ? (
+                    <UserAvatar
+                      name={completion.completedBy.name}
+                      image={null}
+                      size="sm"
+                      className="data-[size=sm]:size-7"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className="size-7 shrink-0 rounded-full border-[1.5px] border-dashed border-line-strong"
+                    />
+                  )}
+                  <span className="min-w-0 flex-1 text-sm">
+                    <span className="block font-[650]">
+                      {who(completion.completedBy)}{" "}
+                      {completion.skipped ? "skipped it." : "marked it done."}
+                    </span>
+                    <span className="block text-[0.8125rem] text-muted-foreground">
+                      {whenDone(at, completion.completedOn, today)}
+                    </span>
+                  </span>
+                  {undoable && (
+                    <Button variant="secondary" size="sm" onClick={onUndo}>
+                      Undo
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
   );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-muted px-3.5 py-2.5">
+      <dt className="text-xs font-[650] text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 truncate text-[1.0625rem] font-[750]">{children}</dd>
+    </div>
+  );
+}
+
+function TwoLineButton({
+  title,
+  sub,
+  onClick,
+}: {
+  title: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      variant="secondary"
+      onClick={onClick}
+      className="h-auto min-h-14 flex-col gap-0 rounded-2xl py-2"
+    >
+      <span className="text-[0.9375rem] font-[700]">{title}</span>
+      <span className="text-xs font-medium text-muted-foreground">{sub}</span>
+    </Button>
+  );
+}
+
+/** "Today, 08:14", "Yesterday, 19:02", "Sat 14 Nov, 10:30" */
+function whenDone(at: Temporal.Instant, completedOn: string, today: string): string {
+  const time = at
+    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+    .toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const days = daysBetween(completedOn, today);
+  const date = days <= 0 ? "Today" : days === 1 ? "Yesterday" : shortDate(completedOn);
+  return `${date}, ${time}`;
 }

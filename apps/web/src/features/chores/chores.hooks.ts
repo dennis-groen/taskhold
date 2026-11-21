@@ -1,8 +1,8 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 
 import { skip } from "@taskhold/api/chore-schedule";
 
-import { dueLabel, today } from "@/lib/dates.ts";
+import { dueGroup, dueLabel, today } from "@/lib/dates.ts";
 import { useChange, type UndoOffer } from "@/lib/offline-changes.ts";
 
 import type { Chore, ChoreInput } from "./chores.api.ts";
@@ -37,6 +37,13 @@ export function useChores(viewer: Person) {
     },
     undo: (choreId: string) => undo.run(choreId),
   };
+}
+
+/** How many chores are late, for the badge on the Chores tab. Zero until they've loaded. */
+export function useOverdueCount(): number {
+  const { data: chores = [] } = useQuery(choresQuery());
+  const on = today();
+  return chores.filter((chore) => !chore.done && dueGroup(chore.dueOn, on) === "overdue").length;
 }
 
 /**

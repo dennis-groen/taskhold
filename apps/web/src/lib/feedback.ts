@@ -6,8 +6,12 @@ import { errorMessage } from "./api.ts";
 const UNDO_MS = 6_000;
 
 /** A brief notice after a change that can be taken back, e.g. "Milk removed" */
-export function offerUndo(message: string, onUndo: () => void): void {
-  toast(message, { duration: UNDO_MS, action: { label: "Undo", onClick: onUndo } });
+export function offerUndo(message: string, onUndo: () => void, detail?: string): void {
+  toast(message, {
+    description: detail,
+    duration: UNDO_MS,
+    action: { label: "Undo", onClick: onUndo },
+  });
 }
 
 /**

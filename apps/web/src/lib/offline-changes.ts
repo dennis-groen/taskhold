@@ -4,6 +4,7 @@
 // answered is sent again instead, when sending it twice is safe). Features declare
 // their changes here with defineChange; this module does the rest.
 import {
+  useMutationState,
   useQueryClient,
   type DataTag,
   type QueryClient,
@@ -64,6 +65,11 @@ type ChangeSpec<Vars, Data, Response, UndoVars> = {
   };
   /** The notice when the API turns it down; false when the caller shows the error itself */
   failure?: string | false;
+  /**
+   * What it is, for the list of changes waiting to sync: "Ticked Bananas". `data` is the target as
+   * it is now, after the change, so look names up there (or in `vars`).
+   */
+  describe?: (vars: Vars, data: Data | undefined) => string;
 };
 
 /** A change as declared with defineChange. Run it with useChange; register it with registerChanges. */
@@ -74,6 +80,8 @@ export type Change<Vars> = {
   readonly options: (queryClient: QueryClient) => ChangeOptions<Vars>;
   /** Sends what takes it back. Judged before the change is applied; null when there's nothing. */
   readonly undoFor: (queryClient: QueryClient, vars: Vars) => (() => Promise<unknown>) | null;
+  /** "Ticked Bananas", or null when the change doesn't say */
+  readonly describe: (queryClient: QueryClient, vars: Vars) => string | null;
 };
 
 type ChangeOptions<Vars> = {
@@ -149,6 +157,8 @@ export function defineChange<Vars, Data, Response = unknown, UndoVars = never>(
       },
       onSettled: () => refetchAfterLastChange(queryClient, area),
     }),
+    describe: (queryClient, vars) =>
+      spec.describe?.(vars, queryClient.getQueryData(spec.target(vars))) ?? null,
     undoFor: (queryClient, vars) => {
       if (!spec.undo) return null;
       const { by, vars: undoVars } = spec.undo;
@@ -170,7 +180,63 @@ export function registerChanges(
 ): void {
   for (const change of Object.values(changes)) {
     queryClient.setMutationDefaults(change.key, change.options(queryClient));
+    registered.set(change.key.join("/"), change);
   }
+}
+
+/** Every change by its key, so one waiting to sync can say what it is */
+const registered = new Map<string, Change<never>>();
+
+const AREA_NAMES: Record<Area, string> = {
+  shopping: "Shopping",
+  chores: "Chores",
+  todos: "To-dos",
+};
+
+function isArea(value: unknown): value is Area {
+  return AREAS.some((area) => area === value);
+}
+
+/** A change saved on this device that the API doesn't have yet */
+export type WaitingChange = {
+  id: number;
+  /** "Ticked Bananas"; a plain "A change" when it doesn't say */
+  what: string;
+  area: string;
+  /** When it was made, in epoch milliseconds */
+  at: number;
+};
+
+/** The changes still waiting for the API, oldest first, for the Offline sheet */
+export function useWaitingChanges(): WaitingChange[] {
+  const queryClient = useQueryClient();
+  return useMutationState({
+    filters: { status: "pending" },
+    select: (mutation) => {
+      const key = mutation.options.mutationKey ?? [];
+      const change = registered.get(key.join("/"));
+      const [area] = key;
+      return {
+        id: mutation.mutationId,
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- saved by this change
+        what: change?.describe(queryClient, mutation.state.variables as never) ?? "A change",
+        area: isArea(area) ? AREA_NAMES[area] : "taskhold",
+        at: mutation.state.submittedAt,
+      };
+    },
+  });
+}
+
+/**
+ * The variables of `change` while it's waiting to sync, e.g. the ticks not yet saved, so their
+ * rows can say so
+ */
+export function useWaitingVars<Vars>(change: Change<Vars>): Vars[] {
+  return useMutationState({
+    filters: { mutationKey: change.key, status: "pending" },
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- saved by this change
+    select: (mutation) => mutation.state.variables as Vars,
+  });
 }
 
 /** Registers every area's changes at startup. Typed by area, so a new area can't be left out. */
@@ -184,6 +250,8 @@ export function registerAllChanges(
 /** Offered after a change that can be taken back, e.g. "Milk removed" with an Undo button */
 export type UndoOffer = {
   message: string;
+  /** A second, quieter line: "Next due tomorrow, Fri 20 Nov" */
+  detail?: string;
   /** Runs before the undo is sent, e.g. to let go of a row held in place */
   onUndo?: () => void;
 };
@@ -204,10 +272,14 @@ export function runChange<Vars>(
   const undo = offer ? change.undoFor(queryClient, vars) : null;
   const sent = execute(queryClient, change, vars);
   if (offer && undo) {
-    offerUndo(offer.message, () => {
-      offer.onUndo?.();
-      undo().catch(() => {});
-    });
+    offerUndo(
+      offer.message,
+      () => {
+        offer.onUndo?.();
+        undo().catch(() => {});
+      },
+      offer.detail,
+    );
   }
   return sent;
 }

@@ -1,12 +1,10 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
-import { ThemeContext, type Theme, type ThemeChoice } from "@/lib/theme.ts";
+import { syncStatusBar, ThemeContext, type Theme, type ThemeChoice } from "@/lib/theme.ts";
 
 // Must match the inline script in index.html, which applies the theme before the first paint
 const STORAGE_KEY = "taskhold-theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-// The canvas color of each theme (--canvas in styles/globals.css), for the phone's status bar
-const STATUS_BAR = { light: "#f7f4ef", dark: "#181411" } satisfies Record<Theme, string>;
 
 /**
  * Light or dark. Follows the system setting, live, until the person picks one; their pick is
@@ -62,7 +60,5 @@ function applyTheme(theme: Theme) {
   // Native controls (date pickers, scrollbars) follow too
   root.style.colorScheme = theme;
   // index.html picks the status bar color from the system setting; a choice made here wins
-  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
-    meta.content = STATUS_BAR[theme];
-  }
+  syncStatusBar();
 }

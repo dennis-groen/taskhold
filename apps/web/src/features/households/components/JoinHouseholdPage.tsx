@@ -1,8 +1,8 @@
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
 import { BackLink } from "@/components/BackLink.tsx";
-import { PageHeading } from "@/components/layout/PageHeading.tsx";
+import { ClipboardTextIcon, PencilSimpleIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,7 +11,7 @@ import { errorMessage } from "@/lib/api.ts";
 
 import { InviteCodeSlots } from "./InviteCodeSlots.tsx";
 import { acceptInvite, lookUpInvite, type InvitePreview } from "../households.api.ts";
-import { INVITE_CODE_LENGTH } from "../invite-code.ts";
+import { INVITE_CODE_LENGTH, extractInviteCode } from "../invite-code.ts";
 
 const routeApi = getRouteApi("/onboarding/join");
 
@@ -55,14 +55,29 @@ export function JoinHouseholdPage() {
 
   const invite = lookup.status === "found" ? lookup.invite : null;
 
+  async function paste() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const pasted = extractInviteCode(text);
+      if (pasted) await changeCode(pasted.toUpperCase());
+    } catch {
+      // Reading the clipboard was refused; the field still takes a paste
+    }
+  }
+
   return (
     <>
       <BackLink to="/onboarding" />
-      <PageHeading title="Join a household">
-        Enter the code someone in your home shared with you, or paste their invite link.
-      </PageHeading>
+      <header className="mt-2 rounded-[1.75rem] bg-(--home-slab) px-5 pt-5 pb-6 text-(--home-on)">
+        <h1 className="text-[2rem] leading-none font-[850] tracking-[-0.02em] [font-stretch:125%]">
+          Your household
+        </h1>
+        <p className="mt-2 text-[0.9375rem] text-pretty opacity-85">
+          Join with a code from someone you live with, or start a new one.
+        </p>
+      </header>
 
-      <Field className="mt-8" data-invalid={lookup.status === "error" ? true : undefined}>
+      <Field className="mt-6" data-invalid={lookup.status === "error" ? true : undefined}>
         <FieldLabel htmlFor="invite-code">Invite code</FieldLabel>
         <InviteCodeSlots
           id="invite-code"
@@ -70,7 +85,24 @@ export function JoinHouseholdPage() {
           onChange={(next) => void changeCode(next)}
           invalid={lookup.status === "error"}
         />
-        {lookup.status === "error" && <FieldError>{lookup.message}</FieldError>}
+        {lookup.status === "error" && (
+          <>
+            <FieldError>{lookup.message}</FieldError>
+            <div className="flex gap-2">
+              <Button variant="secondary" size="lg" onClick={() => void changeCode("")}>
+                <PencilSimpleIcon />
+                Edit code
+              </Button>
+              <Button variant="secondary" size="lg" onClick={() => void paste()}>
+                <ClipboardTextIcon />
+                Paste
+              </Button>
+            </div>
+          </>
+        )}
+        {lookup.status === "idle" && (
+          <FieldDescription>It's on the Household tab of anyone already in it.</FieldDescription>
+        )}
         {lookup.status === "loading" && (
           <FieldDescription className="flex items-center gap-2">
             <Spinner className="size-3.5" />
@@ -82,7 +114,7 @@ export function JoinHouseholdPage() {
       {invite && (
         <section
           aria-live="polite"
-          className="mt-6 animate-in rounded-xl bg-card p-4 shadow-card duration-300 ease-out fade-in slide-in-from-top-1 motion-reduce:animate-none sm:p-5"
+          className="mt-6 rounded-[1.375rem] bg-card p-4 shadow-card transition-[opacity,translate] duration-300 ease-(--ease-out) starting:translate-y-1 starting:opacity-0 motion-reduce:transition-none sm:p-5"
         >
           <h2 className="font-heading text-xl font-bold tracking-[-0.02em]">
             {invite.householdName}
@@ -99,10 +131,10 @@ export function JoinHouseholdPage() {
       )}
 
       <Button
-        size="lg"
+        size="xl"
         disabled={!invite || joining}
         onClick={() => void join()}
-        className="mt-6 max-w-full"
+        className="mt-6 w-full bg-foreground text-background hover:bg-foreground/90"
       >
         {joining && <Spinner />}
         <span className="truncate">
@@ -114,6 +146,12 @@ export function JoinHouseholdPage() {
           {joinError}
         </p>
       )}
+      <Link
+        to="/onboarding/create"
+        className="mt-3 flex min-h-11 items-center justify-center rounded-xl text-[0.9375rem] font-[650] text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/80 active:opacity-60"
+      >
+        Start a new household instead
+      </Link>
     </>
   );
 }

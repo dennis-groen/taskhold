@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useRef, useState, type FormEvent, type RefObject } from "react";
+import { useRef, useState, type FormEvent, type ReactElement, type RefObject } from "react";
 
 import { cn } from "cn";
 
 import { SHEET_BODY, SheetContent } from "@/components/layout/Sheet.tsx";
-import { CheckIcon, PlusIcon } from "@/components/icons.ts";
+import { CheckIcon } from "@/components/icons.ts";
+import { JotButton } from "@/components/JotButton.tsx";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -26,22 +27,29 @@ import { BuyAgain } from "./BuyAgain.tsx";
 import { NewListForm } from "./NewListForm.tsx";
 
 /**
- * The round + button and the sheet it opens: add items to any list from anywhere in the app.
- * Adds to the list that's open, or the first list, unless you pick another.
+ * The add field in the dock and the sheet it opens: add items to any list from anywhere in the
+ * app. Adds to the list that's open, or the first list, unless you pick another.
  */
-export function QuickAdd({ viewer }: { viewer: { id: string; name: string } }) {
+export function QuickAdd({
+  viewer,
+  trigger,
+}: {
+  viewer: { id: string; name: string };
+  /** What opens the sheet; the dock's add field when left out */
+  trigger?: ReactElement;
+}) {
   const [open, setOpen] = useState(false);
   // Loaded before the sheet opens, so the field is there to take focus straight away
   const { data: lists } = useQuery(listsQuery());
+  const openListId = useParams({ strict: false }).listId;
   const nameRef = useRef<HTMLInputElement>(null);
+  const target = lists?.find((list) => list.id === openListId) ?? lists?.[0];
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger
-        render={<Button aria-label="Add to a shopping list" variant="fab" size="fab" />}
-      >
-        <PlusIcon weight="bold" />
-      </DrawerTrigger>
+        render={trigger ?? <JotButton label={target ? `Add to ${target.name}` : "Add to a list"} />}
+      />
       <SheetContent initialFocus={nameRef}>
         <DrawerHeader className="sr-only">
           <DrawerTitle>Add to a shopping list</DrawerTitle>

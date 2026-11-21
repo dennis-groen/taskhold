@@ -1,18 +1,30 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/figtree";
-@import "@fontsource-variable/bricolage-grotesque/opsz.css";
+/* Archivo carries everything; its wide cut (font-stretch 125%) sets titles and counts */
+@import "@fontsource-variable/archivo/standard.css";
 /* Sonner also adds these styles itself with an inline <style>, which the Content Security Policy
    blocks in a build (content-security-policy.ts); without them toasts land off screen */
 @import "sonner/dist/styles.css";
 
 @custom-variant dark (&:is(.dark *));
+/* "Left-handed layout", a setting on each phone (lib/tick-side.ts) */
+@custom-variant ticks-left (&:is([data-ticks="left"] *));
 
 @theme inline {
-  /* Figtree carries the interface; Bricolage Grotesque (optical sizes) only the page titles */
-  --font-sans: "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Bricolage Grotesque Variable", var(--font-sans);
+  /* One family: Archivo at normal width for reading, its wide cut for titles and counts */
+  --font-sans: "Archivo Variable", "Archivo Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --color-area: var(--area-slab);
+  --color-area-on: var(--area-on);
+  --color-area-fg: var(--area-fg);
+  --color-area-tint: var(--area-tint);
+  --color-area-tab: var(--area-tab);
+  --color-area-tab-on: var(--area-tab-on);
+  --color-sheet: var(--popover);
+  --color-line-strong: var(--line-strong);
+  --color-dock: var(--dock-bg);
+  --color-dock-field: var(--dock-field);
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-foreground: var(--primary-soft-foreground);
   --color-canvas: var(--canvas);
@@ -20,6 +32,11 @@
   --shadow-raised: var(--shadow-raised);
   --shadow-fab: var(--shadow-fab);
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Emil Kowalski's curves: a strong ease-out for things that respond, iOS's sheet curve, and an
+     ease-in-out for things that move while on screen */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -28,11 +45,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -60,134 +72,236 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* A metric-matched stand-in, so rows don't reflow if Archivo is slow or missing */
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Helvetica Neue"), local("Arial");
+  size-adjust: 103%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
 /*
- * taskhold's palette: warm linen neutrals with a basil-green accent. Ink is a warm espresso
- * rather than black and the dark theme is a warm charcoal, so neither theme glares.
- * Accent is for actions, the current tab and ticked-off state only.
+ * taskhold's palette (design/revamp/FINAL.html). Warm neutrals and one colour per area: basil for
+ * shopping, cobalt for chores, yolk for the household. To-dos are graphite, because colour means
+ * shared and graphite means only you. The shell sets data-area on <html>; --primary and friends
+ * follow it, so every button, tick and sheet takes the area's colour, portals included.
  */
 :root {
-  /* The ground everything sits on; cards are a step lighter */
-  --canvas: oklch(0.968 0.007 78);
-  --background: oklch(0.968 0.007 78);
-  --foreground: oklch(0.255 0.014 55);
-  --card: oklch(0.996 0.002 80);
-  --card-foreground: oklch(0.255 0.014 55);
-  --popover: oklch(0.996 0.002 80);
-  --popover-foreground: oklch(0.255 0.014 55);
-  --primary: oklch(0.5 0.095 152);
-  --primary-foreground: oklch(0.985 0.012 150);
-  /* Tinted surfaces for selected chips, the active tab and soft buttons */
-  --primary-soft: oklch(0.935 0.04 148);
-  --primary-soft-foreground: oklch(0.36 0.08 152);
-  --secondary: oklch(0.935 0.01 78);
-  --secondary-foreground: oklch(0.255 0.014 55);
-  --muted: oklch(0.94 0.009 78);
-  --muted-foreground: oklch(0.495 0.017 60);
-  --accent: oklch(0.935 0.04 148);
-  --accent-foreground: oklch(0.36 0.08 152);
-  --destructive: oklch(0.54 0.175 32);
-  --border: oklch(0.905 0.01 75);
-  --input: oklch(0.82 0.014 75);
-  /* Focus rings: dark enough to stay 3:1 against cards even at 80% (ring-ring/80) */
-  --ring: oklch(0.54 0.1 152);
-  --chart-1: oklch(0.845 0.143 164.978);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.596 0.145 163.225);
-  --chart-4: oklch(0.508 0.118 165.612);
-  --chart-5: oklch(0.432 0.095 166.913);
-  --radius: 0.75rem;
-  /* The rail on wide screens: one step deeper than the canvas */
-  --sidebar: oklch(0.948 0.009 76);
-  --sidebar-foreground: oklch(0.255 0.014 55);
-  --sidebar-primary: oklch(0.5 0.095 152);
-  --sidebar-primary-foreground: oklch(0.985 0.012 150);
-  --sidebar-accent: oklch(0.935 0.04 148);
-  --sidebar-accent-foreground: oklch(0.36 0.08 152);
-  --sidebar-border: oklch(0.905 0.01 75);
-  --sidebar-ring: oklch(0.54 0.1 152);
+  --canvas: #f6f5f2;
+  --background: #f6f5f2;
+  --foreground: #18191c;
+  --card: #ffffff;
+  --card-foreground: #18191c;
+  /* Sheets and menus */
+  --popover: #ffffff;
+  --popover-foreground: #18191c;
+  --secondary: #ecebe5;
+  --secondary-foreground: #18191c;
+  --muted: #ecebe5;
+  --muted-foreground: #5c5e64;
+  --destructive: #c42b1f;
+  --border: #e2e0da;
+  /* Unticked rings and field outlines: 3:1 against the canvas */
+  --line-strong: #8a8984;
+  --input: #8a8984;
+  --warn: #7f5c00;
+  --warn-tint: #fbf2dc;
+  --radius: 0.875rem;
 
-  /* Depth: warm-tinted, offset and soft; never a colored halo */
-  --shadow-card:
-    0 0 0 1px oklch(0.4 0.03 60 / 0.06), 0 1px 2px oklch(0.4 0.03 60 / 0.05),
-    0 6px 16px -8px oklch(0.4 0.03 60 / 0.12);
-  --shadow-raised:
-    0 0 0 1px oklch(0.4 0.03 60 / 0.06), 0 12px 32px -12px oklch(0.35 0.03 60 / 0.28);
-  --shadow-fab: 0 1px 2px oklch(0.3 0.05 150 / 0.2), 0 8px 20px -6px oklch(0.4 0.09 150 / 0.45);
+  /* The dock under the thumb: frosted light, with a hairline */
+  --dock-bg: rgb(251 250 247 / 0.84);
+  --dock-line: rgb(24 25 28 / 0.1);
+  --dock-field: #ecebe5;
+  --dock-shadow: 0 14px 34px -16px rgb(45 35 15 / 0.3);
+  --toast-bg: #1e2024;
+  --toast-fg: #f2f2f0;
+  --toast-act: #a9b6ff;
 
-  /* Housemates' initials: one calm tone each, picked from their name */
-  --tone-1: oklch(0.92 0.045 55);
-  --tone-1-fg: oklch(0.42 0.09 50);
-  --tone-2: oklch(0.92 0.05 150);
-  --tone-2-fg: oklch(0.4 0.08 152);
-  --tone-3: oklch(0.92 0.04 240);
-  --tone-3-fg: oklch(0.42 0.08 245);
-  --tone-4: oklch(0.92 0.05 85);
-  --tone-4-fg: oklch(0.43 0.08 75);
-  --tone-5: oklch(0.92 0.04 330);
-  --tone-5-fg: oklch(0.44 0.09 340);
-  --tone-6: oklch(0.92 0.035 195);
-  --tone-6-fg: oklch(0.41 0.07 200);
+  /* Areas. slab: the block behind a title. on: text on it. fg: the colour as text on the canvas.
+     tint: a soft fill. btn: filled buttons. tab: the active tab's pill. */
+  --shop-slab: #0b7f4b;
+  --shop-on: #ffffff;
+  --shop-fg: #0b7f4b;
+  --shop-tint: #e2f0e7;
+  --shop-btn: #0b7f4b;
+  --shop-btn-on: #ffffff;
+  --shop-tab: #0b7f4b;
+  --shop-tab-on: #ffffff;
+  --cho-slab: #2f4cf2;
+  --cho-on: #ffffff;
+  --cho-fg: #2f4cf2;
+  --cho-tint: #e7eafd;
+  --cho-btn: #2f4cf2;
+  --cho-btn-on: #ffffff;
+  --cho-tab: #2f4cf2;
+  --cho-tab-on: #ffffff;
+  --todo-slab: #1e2024;
+  --todo-on: #ffffff;
+  --todo-fg: #18191c;
+  --todo-tint: #e9e8e4;
+  --todo-btn: #18191c;
+  --todo-btn-on: #ffffff;
+  --todo-tab: #1e2024;
+  --todo-tab-on: #ffffff;
+  --home-slab: #ffc21a;
+  --home-on: #18191c;
+  --home-fg: #7f5c00;
+  --home-tint: #fcefc7;
+  --home-btn: #18191c;
+  --home-btn-on: #ffffff;
+  --home-tab: #ffc21a;
+  --home-tab-on: #18191c;
+
+  /* Housemates: one chroma level (OKLCH L 0.80, C 0.10), clear of the area hues and of red.
+     Always paired with a name or initial, and ink text on top. */
+  --member-1: #69cee6;
+  --member-2: #d9a9e8;
+  --member-3: #b3c87f;
+  --member-4: #f0a3c4;
+  --member-5: #f3b489;
+  --member-6: #9fc3f5;
+  --member-ink: #18191c;
+
+  --shadow-card: 0 0 0 1px var(--border);
+  --shadow-raised: 0 0 0 1px rgb(24 25 28 / 0.06), 0 18px 40px -12px rgb(0 0 0 / 0.3);
+  --shadow-fab: 0 8px 20px -8px rgb(0 0 0 / 0.35);
 }
 
 .dark {
-  --canvas: oklch(0.195 0.008 65);
-  --background: oklch(0.195 0.008 65);
-  --foreground: oklch(0.935 0.01 80);
-  --card: oklch(0.235 0.009 65);
-  --card-foreground: oklch(0.935 0.01 80);
-  --popover: oklch(0.25 0.01 65);
-  --popover-foreground: oklch(0.935 0.01 80);
-  /* Lighter than the light theme's green, so it reads as text on dark cards; buttons get dark text */
-  --primary: oklch(0.77 0.115 150);
-  --primary-foreground: oklch(0.22 0.045 152);
-  --primary-soft: oklch(0.32 0.05 152);
-  --primary-soft-foreground: oklch(0.87 0.09 150);
-  --secondary: oklch(0.29 0.01 65);
-  --secondary-foreground: oklch(0.935 0.01 80);
-  --muted: oklch(0.28 0.01 65);
-  --muted-foreground: oklch(0.73 0.014 75);
-  --accent: oklch(0.32 0.05 152);
-  --accent-foreground: oklch(0.87 0.09 150);
-  --destructive: oklch(0.72 0.15 30);
-  --border: oklch(1 0.01 80 / 8%);
-  --input: oklch(1 0.01 80 / 18%);
-  --ring: oklch(0.72 0.1 150);
-  --sidebar: oklch(0.175 0.008 65);
-  --sidebar-foreground: oklch(0.935 0.01 80);
-  --sidebar-primary: oklch(0.77 0.115 150);
-  --sidebar-primary-foreground: oklch(0.22 0.045 152);
-  --sidebar-accent: oklch(0.32 0.05 152);
-  --sidebar-accent-foreground: oklch(0.87 0.09 150);
-  --sidebar-border: oklch(1 0.01 80 / 8%);
-  --sidebar-ring: oklch(0.72 0.1 150);
+  --canvas: #0d0e10;
+  --background: #0d0e10;
+  --foreground: #f2f2f0;
+  --card: #17191c;
+  --card-foreground: #f2f2f0;
+  --popover: #1a1c20;
+  --popover-foreground: #f2f2f0;
+  --secondary: #24262b;
+  --secondary-foreground: #f2f2f0;
+  --muted: #24262b;
+  --muted-foreground: #a3a6ad;
+  --destructive: #ff7b6e;
+  --border: #26282d;
+  --line-strong: #71747b;
+  --input: #71747b;
+  --warn: #f0c454;
+  --warn-tint: #241e10;
 
-  --shadow-card:
-    0 0 0 1px oklch(1 0.01 80 / 0.06), 0 1px 2px oklch(0 0 0 / 0.3),
-    0 8px 20px -10px oklch(0 0 0 / 0.5);
-  --shadow-raised: 0 0 0 1px oklch(1 0.01 80 / 0.08), 0 16px 40px -12px oklch(0 0 0 / 0.7);
-  --shadow-fab: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 22px -6px oklch(0.5 0.1 150 / 0.4);
+  --dock-bg: rgb(28 30 34 / 0.9);
+  --dock-line: rgb(255 255 255 / 0.08);
+  --dock-field: #2a2c32;
+  --dock-shadow: 0 16px 36px -12px rgb(0 0 0 / 0.8);
+  --toast-bg: #2a2c32;
 
-  --tone-1: oklch(0.36 0.06 50);
-  --tone-1-fg: oklch(0.88 0.06 55);
-  --tone-2: oklch(0.35 0.06 152);
-  --tone-2-fg: oklch(0.88 0.07 150);
-  --tone-3: oklch(0.36 0.06 245);
-  --tone-3-fg: oklch(0.88 0.05 240);
-  --tone-4: oklch(0.37 0.06 80);
-  --tone-4-fg: oklch(0.9 0.07 85);
-  --tone-5: oklch(0.36 0.06 340);
-  --tone-5-fg: oklch(0.89 0.05 330);
-  --tone-6: oklch(0.35 0.05 200);
-  --tone-6-fg: oklch(0.88 0.05 195);
+  /* Slabs lose about 30% chroma at night; the brightness moves to text, ticks and the meter */
+  --shop-slab: #1f5c41;
+  --shop-fg: #4fd18e;
+  --shop-tint: #13261c;
+  --shop-btn: #2a7a55;
+  --shop-tab: #4fd18e;
+  --shop-tab-on: #0d0e10;
+  --cho-slab: #3a4cb0;
+  --cho-fg: #93a3ff;
+  --cho-tint: #181c36;
+  --cho-btn: #4b5ed0;
+  --cho-tab: #93a3ff;
+  --cho-tab-on: #0d0e10;
+  --todo-slab: #303237;
+  --todo-fg: #f2f2f0;
+  --todo-tint: #202226;
+  --todo-btn: #f2f2f0;
+  --todo-btn-on: #0d0e10;
+  --todo-tab: #f2f2f0;
+  --todo-tab-on: #0d0e10;
+  --home-slab: #d49a1e;
+  --home-fg: #f0c454;
+  --home-tint: #2a2312;
+  --home-btn: #f2f2f0;
+  --home-btn-on: #0d0e10;
+  --home-tab: #f0c454;
+
+  --shadow-card: 0 0 0 1px var(--border);
+  --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.07), 0 18px 40px -12px rgb(0 0 0 / 0.7);
 }
 
-/* Where toasts sit: above the bottom tab bar and its + button wherever that bar shows */
+/* The current area. Shopping is the default, as the app opens on it. */
+:root,
+:root[data-area="shop"] {
+  --area-slab: var(--shop-slab);
+  --area-on: var(--shop-on);
+  --area-fg: var(--shop-fg);
+  --area-tint: var(--shop-tint);
+  --area-btn: var(--shop-btn);
+  --area-btn-on: var(--shop-btn-on);
+  --area-tab: var(--shop-tab);
+  --area-tab-on: var(--shop-tab-on);
+}
+:root[data-area="chores"] {
+  --area-slab: var(--cho-slab);
+  --area-on: var(--cho-on);
+  --area-fg: var(--cho-fg);
+  --area-tint: var(--cho-tint);
+  --area-btn: var(--cho-btn);
+  --area-btn-on: var(--cho-btn-on);
+  --area-tab: var(--cho-tab);
+  --area-tab-on: var(--cho-tab-on);
+}
+:root[data-area="todos"] {
+  --area-slab: var(--todo-slab);
+  --area-on: var(--todo-on);
+  --area-fg: var(--todo-fg);
+  --area-tint: var(--todo-tint);
+  --area-btn: var(--todo-btn);
+  --area-btn-on: var(--todo-btn-on);
+  --area-tab: var(--todo-tab);
+  --area-tab-on: var(--todo-tab-on);
+}
+:root[data-area="home"] {
+  --area-slab: var(--home-slab);
+  --area-on: var(--home-on);
+  --area-fg: var(--home-fg);
+  --area-tint: var(--home-tint);
+  --area-btn: var(--home-btn);
+  --area-btn-on: var(--home-btn-on);
+  --area-tab: var(--home-tab);
+  --area-tab-on: var(--home-tab-on);
+}
+
+/* The phone's status bar: the slab inside a household, the canvas elsewhere (lib/theme.ts) */
+:root {
+  --status-bar: var(--canvas);
+}
+:root[data-area] {
+  --status-bar: var(--area-slab);
+}
+
+/* shadcn's names, pointed at the area, so primitives need no changes */
+:root {
+  --primary: var(--area-btn);
+  --primary-foreground: var(--area-btn-on);
+  --primary-soft: var(--area-tint);
+  --primary-soft-foreground: var(--area-fg);
+  --accent: var(--area-tint);
+  --accent-foreground: var(--area-fg);
+  --ring: var(--area-fg);
+  --sidebar: var(--canvas);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--area-btn);
+  --sidebar-primary-foreground: var(--area-btn-on);
+  --sidebar-accent: var(--area-tint);
+  --sidebar-accent-foreground: var(--area-fg);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--area-fg);
+}
+
+/* Where toasts sit: just above the dock wherever it shows (components/layout/HouseholdShell.tsx) */
 :root {
   --toast-bottom: 1.5rem;
 }
 @media (width < 64rem) {
   :root:has([data-bottom-nav]) {
-    --toast-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+    --toast-bottom: calc(8.25rem + max(0.75rem, calc(env(safe-area-inset-bottom) - 0.75rem)));
   }
 }
 
@@ -223,6 +337,11 @@
   h3 {
     text-wrap: balance;
   }
+  /* Sheet and dialog titles use the display face: the wide cut, a touch narrower than a page title */
+  .font-heading {
+    font-stretch: 118%;
+    letter-spacing: -0.025em;
+  }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -251,14 +370,24 @@
   }
 }
 
-/* Page titles: the one place the display face speaks */
+/* Titles and counts: Archivo's wide, heavy cut. Everything else stays at normal width. */
 @utility text-title {
   font-family: var(--font-heading);
-  font-size: 2rem;
-  line-height: 1.08;
-  font-weight: 680;
-  letter-spacing: -0.028em;
-  font-variation-settings: "opsz" 48;
+  font-size: 2.5rem;
+  line-height: 1;
+  font-weight: 820;
+  font-stretch: 125%;
+  letter-spacing: -0.03em;
+}
+@utility font-wide {
+  font-stretch: 125%;
+  letter-spacing: -0.02em;
+}
+@utility text-count {
+  font-stretch: 125%;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -322,49 +451,56 @@
   }
 }
 
-/* Which of the --tone-* pairs a person's initials use (components/UserAvatar.tsx) */
+/* Which housemate colour a person's initials and marks use (components/UserAvatar.tsx) */
 [data-tone="1"] {
-  --tone-bg: var(--tone-1);
-  --tone-fg: var(--tone-1-fg);
+  --tone-bg: var(--member-1);
+  --tone-fg: var(--member-ink);
 }
 [data-tone="2"] {
-  --tone-bg: var(--tone-2);
-  --tone-fg: var(--tone-2-fg);
+  --tone-bg: var(--member-2);
+  --tone-fg: var(--member-ink);
 }
 [data-tone="3"] {
-  --tone-bg: var(--tone-3);
-  --tone-fg: var(--tone-3-fg);
+  --tone-bg: var(--member-3);
+  --tone-fg: var(--member-ink);
 }
 [data-tone="4"] {
-  --tone-bg: var(--tone-4);
-  --tone-fg: var(--tone-4-fg);
+  --tone-bg: var(--member-4);
+  --tone-fg: var(--member-ink);
 }
 [data-tone="5"] {
-  --tone-bg: var(--tone-5);
-  --tone-fg: var(--tone-5-fg);
+  --tone-bg: var(--member-5);
+  --tone-fg: var(--member-ink);
 }
 [data-tone="6"] {
-  --tone-bg: var(--tone-6);
-  --tone-fg: var(--tone-6-fg);
+  --tone-bg: var(--member-6);
+  --tone-fg: var(--member-ink);
 }
 
-/* Toasts: the app's raised surface and type instead of Sonner's defaults */
+/* Toasts: a dark slip that sits just above the dock, the same in both themes. The action (Undo)
+   is the way back from a slip, so it gets a full 44px target. */
 [data-sonner-toaster] [data-sonner-toast].cn-toast {
   font-family: var(--font-sans);
   font-size: 0.9375rem;
-  border-radius: 1rem;
+  border-radius: 1.125rem;
   border: 0;
-  box-shadow: var(--shadow-raised);
-  padding: 0.875rem 1rem;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  box-shadow: 0 12px 28px -14px rgb(0 0 0 / 0.45);
+  padding: 0.375rem 0.375rem 0.375rem 1rem;
+  min-height: 3.5rem;
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast [data-description] {
+  color: color-mix(in srgb, var(--toast-fg) 78%, transparent);
 }
 [data-sonner-toaster] [data-sonner-toast].cn-toast [data-button] {
-  /* The undo button is the way back from a slip, so it gets a full-size target */
-  height: 2.5rem;
+  height: 2.75rem;
   border-radius: 0.75rem;
-  padding-inline: 0.75rem;
-  font-weight: 600;
-  background: var(--primary-soft);
-  color: var(--primary-soft-foreground);
+  padding-inline: 0.875rem;
+  font-weight: 750;
+  font-size: 0.9375rem;
+  background: transparent;
+  color: var(--toast-act);
 }
 
 /*

@@ -111,6 +111,18 @@ export function findWaiting<Item extends { name: string; checked: boolean }>(
   return items.find((item) => !item.checked && itemKey(item.name) === wanted);
 }
 
+/**
+ * The item on the list that's the same thing as `name`, ticked or not, preferring one still
+ * waiting: the dock offers to untick a ticked one instead of adding a second row
+ */
+export function findOnList<Item extends { name: string; checked: boolean }>(
+  items: readonly Item[],
+  name: string,
+): Item | undefined {
+  const wanted = itemKey(name);
+  return findWaiting(items, name) ?? items.find((item) => itemKey(item.name) === wanted);
+}
+
 /** "Crème fraîche " and "creme fraiche" are the same thing */
 export function foldName(text: string): string {
   return text

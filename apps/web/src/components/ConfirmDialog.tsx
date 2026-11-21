@@ -25,16 +25,25 @@ export function ConfirmDialog({
   confirmLabel,
   destructive = false,
   onConfirm,
+  open: openProp,
+  onOpenChange,
 }: {
-  /** The button that opens the dialog */
-  trigger: ReactElement;
+  /** The button that opens the dialog; leave it out to open it with `open` (from a menu) */
+  trigger?: ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description: ReactNode;
   confirmLabel: string;
   destructive?: boolean;
   onConfirm: () => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +68,7 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={changeOpen}>
-      <AlertDialogTrigger render={trigger} />
+      {trigger && <AlertDialogTrigger render={trigger} />}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

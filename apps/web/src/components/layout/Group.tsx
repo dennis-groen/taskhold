@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 
 import { cn } from "cn";
 
-/** A card of rows, divided by hairlines: the building block of every household screen */
+/** Rows on the canvas, divided by hairlines and running edge to edge on phones */
 export function Group({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        "divide-y divide-border/80 overflow-hidden rounded-xl bg-card text-card-foreground shadow-card",
+        "-mx-4 divide-y divide-border px-1 sm:-mx-6 sm:px-2 lg:mx-0 lg:px-0",
         className,
       )}
     >
@@ -21,7 +21,7 @@ export function GroupHeading({ children, className }: { children: ReactNode; cla
   return (
     <h2
       className={cn(
-        "flex items-center gap-1.5 px-1 pt-7 pb-2.5 text-[0.9375rem] leading-5 font-semibold tracking-[-0.005em] text-foreground/85",
+        "flex items-center gap-1.5 px-1 pt-6 pb-1 text-sm leading-5 font-[750]",
         className,
       )}
     >
