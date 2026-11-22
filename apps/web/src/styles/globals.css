@@ -304,6 +304,10 @@
     --toast-bottom: calc(8.25rem + max(0.75rem, calc(env(safe-area-inset-bottom) - 0.75rem)));
   }
 }
+/* Lift toasts above a sheet's Done footer when a drawer is open */
+:root:has([data-slot="drawer-popup"][data-open]) {
+  --toast-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+}
 
 @layer base {
   * {
@@ -414,6 +418,24 @@
   }
 }
 
+/*
+ * A card's header that sticks to the top of a scrolling sheet. It's solid, so rows sliding under
+ * it never show through; its .sticky-card-rule hairline fades in only while it's stuck. Browsers
+ * without scroll-state queries keep the solid header and skip the hairline.
+ */
+.sticky-card-head {
+  container-type: scroll-state;
+}
+.sticky-card-rule {
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+@container scroll-state(stuck: top) {
+  .sticky-card-rule {
+    opacity: 1;
+  }
+}
+
 /* The check mark pops in when a circle is ticked */
 @keyframes check-pop {
   0% {
@@ -480,6 +502,7 @@
 /* Toasts: a dark slip that sits just above the dock, the same in both themes. The action (Undo)
    is the way back from a slip, so it gets a full 44px target. */
 [data-sonner-toaster] [data-sonner-toast].cn-toast {
+  pointer-events: auto;
   font-family: var(--font-sans);
   font-size: 0.9375rem;
   border-radius: 1.125rem;

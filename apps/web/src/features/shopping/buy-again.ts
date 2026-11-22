@@ -1,5 +1,7 @@
-// "Buy again": which of the household's past buys to offer as one-tap chips. Ranked here, not in
-// the API, so suggestions follow what's on the list and what's being typed, offline too.
+// "Buy again": which of the household's past buys to offer as one-tap chips, and how to organize
+// the full purchase history for the Restock sheet. Ranked here, not in the API, so suggestions
+// follow what's on the list and what's being typed, offline too.
+import { CATEGORIES, categorize, type Category } from "./categories.ts";
 import { foldName as fold, itemKey } from "./item-entry.ts";
 import type { BoughtItem } from "./shopping.api.ts";
 
@@ -9,6 +11,14 @@ const MATCHES_LIMIT = 8;
 
 /** A regular bought within this share of its usual gap is probably still in the cupboard */
 const JUST_BOUGHT = 0.25;
+
+/**
+ * "Running low" in the Buy again sheet (and its "Add N due" and the dock's count) is a promise,
+ * so it waits until most of the usual gap has passed. Chips can suggest earlier than that.
+ */
+const RUNNING_LOW = 0.8;
+/** Something often bought with what's on the list joins "Running low" from half its usual gap */
+const PAIRED_RUNNING_LOW = 0.5;
 
 /** Overdue urgency plateaus here, then tapers off so abandoned or seasonal items don't linger */
 const PEAK_LATENESS = 1.5;
@@ -284,6 +294,280 @@ function typingScore(trips: number, lateness: number | null): number {
     Math.log2(1 + trips) *
     (lateness === null ? TYPING_FLOOR : Math.max(urgency(lateness), TYPING_FLOOR))
   );
+}
+
+export type BuyAgainCatalogItem = {
+  name: string;
+  quantity: string | null;
+  variants: string[];
+  trips: number;
+  lastBoughtAt: string;
+  /** Approximate usual cycle in whole days, or null for one-offs */
+  usualDays: number | null;
+  /** True when due/running low or boosted by an item currently in the basket */
+  due: boolean;
+  /** True when boosted because an item it's often bought with is already waiting on the list */
+  paired: boolean;
+  /** True when currently waiting (unchecked) on the target list */
+  onList: boolean;
+  /** True when currently ticked on the target list */
+  checked: boolean;
+  /** True when bought on this list or has no list affinity yet */
+  forThisList: boolean;
+  /** How the filter matched it: 0 the name's start, 1 a word's start, 2 inside a word; null unfiltered */
+  match: 0 | 1 | 2 | null;
+};
+
+export type BuyAgainCatalog = {
+  /** Due regulars and basket-paired items for this list (empty while filtering by search) */
+  due: BuyAgainCatalogItem[];
+  /** Remaining past buys grouped by supermarket aisle in walking order */
+  sections: { category: Category; items: BuyAgainCatalogItem[] }[];
+  /** True when the household also has past buys tied exclusively to other lists */
+  hasOtherLists: boolean;
+  /** Total visible items across due + aisle sections */
+  total: number;
+};
+
+/**
+ * Full purchase history organized for the Buy again sheet: a "Running low" group at the top (when
+ * not searching), followed by every remaining past buy grouped by supermarket aisle.
+ */
+export function browseBuyAgain(
+  history: BoughtItem[],
+  {
+    now,
+    listId,
+    query = "",
+    includeOtherLists = false,
+    onList = [],
+    inBasket,
+    checkedOnList = [],
+    stickyDueOrder,
+  }: {
+    now: Temporal.Instant;
+    listId?: string;
+    query?: string;
+    includeOtherLists?: boolean;
+    onList?: readonly string[];
+    inBasket?: readonly string[];
+    checkedOnList?: readonly string[];
+    /** Frozen itemKey order for "Running low" so rows never jump sections while tapping */
+    stickyDueOrder?: readonly string[];
+  },
+): BuyAgainCatalog {
+  const merged = mergeVariants(history);
+  const waiting = new Set(onList.map(itemKey));
+  const basket = new Set((inBasket ?? onList).map(itemKey));
+  const checked = new Set(checkedOnList.map(itemKey));
+  const foldedQuery = fold(query);
+  const searching = foldedQuery !== "";
+  const stickyRank = stickyDueOrder
+    ? new Map(stickyDueOrder.map((key, index) => [key, index]))
+    : null;
+
+  const belongsToOtherList = (item: MergedBoughtItem) =>
+    Boolean(listId && item.listIds.length > 0 && !item.listIds.includes(listId));
+
+  const hasOtherLists = merged.some(belongsToOtherList);
+
+  const enriched = merged.map((item) => {
+    const key = itemKey(item.name);
+    const isOnList = waiting.has(key);
+    const isChecked = checked.has(key);
+    const otherList = belongsToOtherList(item);
+    const lateness = isChecked ? 0 : due(item, now);
+    const pairMatches =
+      isChecked || isOnList
+        ? 0
+        : item.pairedWith.filter((other) => basket.has(itemKey(other))).length;
+    const isDue = stickyRank
+      ? stickyRank.has(key) && !otherList
+      : !isChecked &&
+        !otherList &&
+        ((lateness !== null && urgency(lateness) >= RUNNING_LOW) ||
+          (pairMatches > 0 && (lateness === null || lateness >= PAIRED_RUNNING_LOW)));
+    const onThisList = Boolean(listId && item.listIds.includes(listId));
+    const fit = searching ? catalogMatch(fold(item.name), foldedQuery) : null;
+    const rankScore =
+      idleScore(item.trips, lateness) * (onThisList ? LIST_BOOST : 1) + pairMatches * PAIR_BOOST;
+
+    return {
+      key,
+      entry: {
+        name: item.name,
+        quantity: item.quantity,
+        variants: item.variants,
+        trips: item.trips,
+        lastBoughtAt: item.lastBoughtAt,
+        usualDays: usualGapDays(item),
+        due: isDue,
+        // "Goes with your list" only when it isn't still in the cupboard from last time
+        paired: pairMatches > 0 && (lateness === null || lateness >= JUST_BOUGHT),
+        onList: isOnList,
+        checked: isChecked,
+        forThisList: !otherList,
+        match: fit,
+      } satisfies BuyAgainCatalogItem,
+      score: rankScore,
+      fit,
+    };
+  });
+
+  const visible = enriched.filter(({ entry, fit }) => {
+    if (searching) return fit !== null;
+    return includeOtherLists || entry.forThisList;
+  });
+
+  const dueItems = searching
+    ? []
+    : visible
+        .filter(({ entry }) => entry.due)
+        .toSorted((a, b) => {
+          if (stickyRank) {
+            return (stickyRank.get(a.key) ?? Infinity) - (stickyRank.get(b.key) ?? Infinity);
+          }
+          return byScore(a.score, b.score, a.entry.name, b.entry.name);
+        })
+        .map(({ entry }) => entry);
+
+  const dueKeys = new Set(dueItems.map((entry) => itemKey(entry.name)));
+  const remaining = visible.filter(({ key }) => !dueKeys.has(key));
+
+  const grouped = new Map<Category, typeof remaining>();
+  for (const candidate of remaining) {
+    const category = categorize(candidate.entry.name);
+    const bucket = grouped.get(category);
+    if (bucket) bucket.push(candidate);
+    else grouped.set(category, [candidate]);
+  }
+
+  const sections: { category: Category; items: BuyAgainCatalogItem[] }[] = [];
+  for (const category of CATEGORIES) {
+    const bucket = grouped.get(category);
+    if (!bucket || bucket.length === 0) continue;
+    bucket.sort((a, b) => {
+      if (searching && a.fit !== b.fit) return (a.fit ?? 2) - (b.fit ?? 2);
+      if (a.entry.forThisList !== b.entry.forThisList) return a.entry.forThisList ? -1 : 1;
+      return (
+        b.entry.trips - a.entry.trips ||
+        Temporal.Instant.compare(
+          Temporal.Instant.from(b.entry.lastBoughtAt),
+          Temporal.Instant.from(a.entry.lastBoughtAt),
+        ) ||
+        a.entry.name.localeCompare(b.entry.name)
+      );
+    });
+    sections.push({ category, items: bucket.map(({ entry }) => entry) });
+  }
+  // While filtering, the aisle with the best match comes first (then walking order)
+  if (searching) {
+    const bestFit = (items: BuyAgainCatalogItem[]) => Math.min(...items.map((i) => i.match ?? 2));
+    sections.sort((a, b) => bestFit(a.items) - bestFit(b.items));
+  }
+
+  return {
+    due: dueItems,
+    sections,
+    hasOtherLists,
+    total: dueItems.length + remaining.length,
+  };
+}
+
+/** Warm, plain hint for a row in the Buy again sheet: "5 days ago · weekly" */
+export function lastBoughtCue(
+  lastBoughtAt: string,
+  usualDays: number | null,
+  now: Temporal.Instant,
+  /** Whose calendar "today" and "yesterday" follow; the device's own by default */
+  timeZone: string = Temporal.Now.timeZoneId(),
+): string {
+  // Calendar days where you are, so something bought at 23:00 last night reads "yesterday"
+  const lastZoned = Temporal.Instant.from(lastBoughtAt).toZonedDateTimeISO(timeZone);
+  const today = now.toZonedDateTimeISO(timeZone).toPlainDate();
+  const days = Math.max(0, lastZoned.toPlainDate().until(today).days);
+  const age =
+    days === 0
+      ? "Bought today"
+      : days === 1
+        ? "Bought yesterday"
+        : days < 14
+          ? `Bought ${days} days ago`
+          : days < 45
+            ? `Bought ${Math.round(days / 7)} weeks ago`
+            : days > 330
+              ? `Last bought in ${lastZoned.toLocaleString("en", { month: "long", year: "numeric" })}`
+              : `Last bought in ${lastZoned.toLocaleString("en", { month: "long" })}`;
+
+  const cycle =
+    usualDays === null || usualDays <= 1
+      ? null
+      : usualDays >= 6 && usualDays <= 8
+        ? "weekly"
+        : usualDays >= 12 && usualDays <= 16
+          ? "every 2 weeks"
+          : usualDays >= 19 && usualDays <= 23
+            ? "every 3 weeks"
+            : usualDays >= 26 && usualDays <= 34
+              ? "monthly"
+              : `every ${usualDays} days`;
+
+  return cycle ? `${age} · ${cycle}` : age;
+}
+
+/** Below this many letters, a filter only matches the start of a name or word ("i" isn't in everything) */
+const SUBSTRING_MIN = 3;
+
+/** 0 prefix match, 1 word-start match, 2 substring match, null no match */
+function catalogMatch(name: string, query: string): 0 | 1 | 2 | null {
+  if (name.startsWith(query)) return 0;
+  if (name.split(/[\s-]+/).some((word) => word.startsWith(query))) return 1;
+  return query.length >= SUBSTRING_MIN && name.includes(query) ? 2 : null;
+}
+
+export type FilterEnterTarget =
+  | { kind: "item"; item: BuyAgainCatalogItem }
+  | { kind: "add" }
+  | { kind: "ambiguous"; count: number };
+
+/**
+ * What Enter in the Buy again filter acts on, given the past buys it shows. The exact name first.
+ * Else the one past buy the typed text abbreviates: it starts a word there and stops part-way
+ * through it ("pepp" → "3 color bell pepper"). A whole word inside a longer name is a different
+ * thing ("milk" isn't "Oat milk"), and a match inside a word is a coincidence. With none of those,
+ * Enter adds what was typed; with several, it waits for more typing.
+ */
+export function filterEnterTarget(
+  items: readonly BuyAgainCatalogItem[],
+  typedName: string,
+): FilterEnterTarget {
+  const key = itemKey(typedName);
+  const exact = items.find((item) => itemKey(item.name) === key);
+  if (exact) return { kind: "item", item: exact };
+  const typed = fold(typedName);
+  const abbreviated = items.filter((item) => abbreviates(fold(item.name), typed));
+  if (abbreviated.length === 1 && abbreviated[0]) return { kind: "item", item: abbreviated[0] };
+  if (abbreviated.length > 1) return { kind: "ambiguous", count: abbreviated.length };
+  return { kind: "add" };
+}
+
+/** True when `typed` starts a word of `name` and ends part-way through a word */
+function abbreviates(name: string, typed: string): boolean {
+  if (typed === "") return false;
+  for (let at = name.indexOf(typed); at !== -1; at = name.indexOf(typed, at + 1)) {
+    const startsWord = at === 0 || /[\s-]/.test(name[at - 1] ?? "");
+    const next = name[at + typed.length];
+    if (startsWord && next !== undefined && !/[\s-]/.test(next)) return true;
+  }
+  return false;
+}
+
+function usualGapDays({ trips, firstBoughtAt, lastBoughtAt }: BoughtItem): number | null {
+  if (trips < 2) return null;
+  const spanHours = Temporal.Instant.from(firstBoughtAt)
+    .until(Temporal.Instant.from(lastBoughtAt))
+    .total("hours");
+  return Math.max(1, Math.round(spanHours / (trips - 1) / DAY_HOURS));
 }
 
 function byScore(aScore: number, bScore: number, aName: string, bName: string) {

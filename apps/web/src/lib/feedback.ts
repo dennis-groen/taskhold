@@ -5,12 +5,43 @@ import { errorMessage } from "./api.ts";
 // Long enough to read the message and reach the button
 const UNDO_MS = 6_000;
 
-/** A brief notice after a change that can be taken back, e.g. "Milk removed" */
-export function offerUndo(message: string, onUndo: () => void, detail?: string): void {
+/**
+ * A brief notice after a change that can be taken back, e.g. "Milk removed". Pass `onCommit` for
+ * destructive actions that should wait until the undo window closes before running on the server.
+ */
+export function offerUndo(
+  message: string,
+  onUndo: () => void,
+  detail?: string,
+  onCommit?: () => void,
+): void {
+  let settled = false;
+  const commit = () => {
+    if (settled) return;
+    settled = true;
+    onCommit?.();
+  };
   toast(message, {
     description: detail,
     duration: UNDO_MS,
-    action: { label: "Undo", onClick: onUndo },
+    action: {
+      label: "Undo",
+      onClick: () => {
+        if (settled) return;
+        settled = true;
+        onUndo();
+      },
+    },
+    onAutoClose: commit,
+    onDismiss: commit,
+  });
+}
+
+/** A brief confirmation with a single follow-up action, e.g. "Added 4 to Groceries" · "View" */
+export function notifyAction(message: string, actionLabel: string, onAction: () => void): void {
+  toast(message, {
+    duration: 4_500,
+    action: { label: actionLabel, onClick: onAction },
   });
 }
 

@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FocusEvent, type FormEvent, type ReactNode } from "react";
 
-import { InfoIcon, PlusIcon } from "@/components/icons.ts";
+import { ClockCounterClockwiseIcon, InfoIcon, PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { useChange } from "@/lib/offline-changes.ts";
 import { firstName } from "@/lib/shared-with.ts";
@@ -15,6 +15,8 @@ import { shoppingChanges } from "../shopping.changes.ts";
 import {
   useAddItem,
   useBuyAgain,
+  useBuyAgainDueCount,
+  useBuyAgainHistoryCount,
   useBuyAgainState,
   useEditItem,
   useManageLists,
@@ -23,6 +25,7 @@ import {
 import { listQuery } from "../shopping.queries.ts";
 import { stepQuantity } from "../item-quantity.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
+import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
 
 type Viewer = { id: string; name: string };
 
@@ -112,12 +115,16 @@ type Clash = { item: ShoppingItem; entry: Entry };
 function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [restockOpen, setRestockOpen] = useState(false);
   const [clash, setClash] = useState<Clash | null>(null);
   const { data: list } = useQuery(listQuery(listId));
   const add = useAddItem(viewer);
   const undoAdd = useUndoAddItem();
   const edit = useEditItem(listId);
   const toggle = useChange(shoppingChanges.toggle);
+  const historyCount = useBuyAgainHistoryCount();
+  const dueCount = useBuyAgainDueCount(listId);
   const entry = typed.trim() ? parseEntry(typed) : null;
   const isTyping = Boolean(entry?.name);
   const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(listId);
@@ -127,6 +134,8 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
     added: !isTyping && addedIdFor(name) !== undefined,
     quantity: isTyping ? (entry?.quantity ?? quantity) : quantity,
   }));
+  // Keep the dock slim while ticking items in the aisle; reveal quick chips once focused or typing
+  const showChips = isTyping || focused;
   // The clash card follows housemates' changes while it's up
   const clashing = clash && list?.items.find((item) => item.id === clash.item.id);
 
@@ -166,61 +175,121 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
     if (id) undoAdd(listId, id);
   }
 
+  function openRestock() {
+    setFocused(false);
+    inputRef.current?.blur();
+    setRestockOpen(true);
+  }
+
+  function handleFocus(event: FocusEvent<HTMLDivElement>) {
+    if (event.currentTarget.contains(event.target)) {
+      setFocused(true);
+    }
+  }
+
+  function handleBlur(event: FocusEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setFocused(false);
+    }
+  }
+
   if (!list) return null;
 
+  const chipsVisible = showChips && chips.length > 0;
+
   return (
-    <div className="flex flex-col gap-1.5">
-      {clash && clashing ? (
-        <ClashCard
-          item={clashing}
-          entry={clash.entry}
-          viewerId={viewer.id}
-          onUntick={() => {
-            toggle.run({ listId, itemId: clashing.id, checked: false, by: viewer });
-            setClash(null);
-          }}
-          onSetQuantity={(quantity) => {
-            edit(clashing.id, { quantity });
-            setClash(null);
-          }}
-          onAddAnyway={() => {
-            add(listId, clash.entry.name, clash.entry.quantity);
-            setClash(null);
-          }}
-        />
-      ) : entry?.name ? (
-        <Preview entry={entry} />
-      ) : null}
+    <>
+      <div onFocus={handleFocus} onBlur={handleBlur} className="flex flex-col">
+        {clash && clashing ? (
+          <div className="mb-1.5">
+            <ClashCard
+              item={clashing}
+              entry={clash.entry}
+              viewerId={viewer.id}
+              onUntick={() => {
+                toggle.run({ listId, itemId: clashing.id, checked: false, by: viewer });
+                setClash(null);
+              }}
+              onSetQuantity={(quantity) => {
+                edit(clashing.id, { quantity });
+                setClash(null);
+              }}
+              onAddAnyway={() => {
+                add(listId, clash.entry.name, clash.entry.quantity);
+                setClash(null);
+              }}
+            />
+          </div>
+        ) : entry?.name ? (
+          <div className="mb-1.5">
+            <Preview entry={entry} />
+          </div>
+        ) : null}
 
-      <BuyAgainChips
-        chips={chips}
-        label={isTyping ? "Bought before" : "Buy again"}
-        onPick={pickChip}
-        onUndo={isTyping ? undefined : undoChip}
-        className="px-1"
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows,opacity,margin] duration-200 ease-(--ease-out) motion-reduce:transition-none",
+            chipsVisible
+              ? "mb-1.5 grid-rows-[1fr] opacity-100"
+              : "pointer-events-none mb-0 grid-rows-[0fr] opacity-0",
+          )}
+        >
+          <div className="min-h-0 overflow-hidden" inert={!chipsVisible}>
+            <BuyAgainChips
+              chips={chips}
+              label={isTyping ? "Bought before" : "Buy again"}
+              onPick={pickChip}
+              onUndo={isTyping ? undefined : undoChip}
+              className="px-1"
+            />
+          </div>
+        </div>
+
+        <DockForm
+          onSubmit={submit}
+          canSubmit={Boolean(entry?.name)}
+          submitLabel={`Add to ${list.name}`}
+        >
+          <input
+            ref={inputRef}
+            aria-label={`Add to ${list.name}`}
+            placeholder={`Add to ${list.name}, e.g. "2 milk"`}
+            value={typed}
+            onChange={(event) => {
+              setTyped(event.target.value);
+              setClash(null);
+            }}
+            maxLength={100}
+            autoComplete="off"
+            enterKeyHint="done"
+            className={cn(FIELD, !isTyping && historyCount > 0 && "pr-1")}
+          />
+          {!isTyping && historyCount > 0 && (
+            <button
+              type="button"
+              aria-label={dueCount > 0 ? `Buy again, ${dueCount} due` : "Buy again"}
+              onMouseDown={keepFocus}
+              onClick={openRestock}
+              className="flex h-10 shrink-0 items-center gap-1 rounded-[14px] px-2.5 text-sm font-[750] text-area-fg outline-none transition-[background-color,scale] duration-150 ease-(--ease-out) hover:bg-area-tint/70 focus-visible:ring-3 focus-visible:ring-ring/80 active:scale-[0.94] motion-reduce:active:scale-100"
+            >
+              <ClockCounterClockwiseIcon aria-hidden weight="bold" className="size-[19px]" />
+              {dueCount > 0 && (
+                <span className="text-xs leading-none tabular-nums">{dueCount}</span>
+              )}
+            </button>
+          )}
+        </DockForm>
+      </div>
+
+      {/* Rendered outside the dock focus wrapper so portal focus never expands dock chips */}
+      <BuyAgainSheet
+        open={restockOpen}
+        onOpenChange={setRestockOpen}
+        listId={listId}
+        listName={list.name}
+        viewer={viewer}
       />
-
-      <DockForm
-        onSubmit={submit}
-        canSubmit={Boolean(entry?.name)}
-        submitLabel={`Add to ${list.name}`}
-      >
-        <input
-          ref={inputRef}
-          aria-label={`Add to ${list.name}`}
-          placeholder={`Add to ${list.name}, e.g. "2 milk"`}
-          value={typed}
-          onChange={(event) => {
-            setTyped(event.target.value);
-            setClash(null);
-          }}
-          maxLength={100}
-          autoComplete="off"
-          enterKeyHint="done"
-          className={FIELD}
-        />
-      </DockForm>
-    </div>
+    </>
   );
 }
 

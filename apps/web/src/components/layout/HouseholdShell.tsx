@@ -121,7 +121,7 @@ export function HouseholdShell({
       </nav>
 
       <div className="lg:pl-64">
-        <main className="mx-auto max-w-[680px] px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:pt-8 lg:pb-32">
+        <main className="mx-auto max-w-[680px] px-4 pb-[calc(12.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:pt-8 lg:pb-40">
           {children}
         </main>
       </div>

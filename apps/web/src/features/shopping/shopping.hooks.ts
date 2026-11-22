@@ -4,13 +4,18 @@ import {
   useSuspenseQuery,
   type QueryClient,
 } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useChange, useWaitingVars } from "@/lib/offline-changes.ts";
 
 import { itemKey } from "./item-entry.ts";
-import type { ShoppingListSummary } from "./shopping.api.ts";
+import type { BoughtItem, ShoppingListSummary } from "./shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
-import { suggestBuyAgain, type BuyAgainSuggestion } from "./buy-again.ts";
+import {
+  browseBuyAgain,
+  suggestBuyAgain,
+  type BuyAgainCatalog,
+  type BuyAgainSuggestion,
+} from "./buy-again.ts";
 import { historyQuery, isListGone, listQuery, listsQuery } from "./shopping.queries.ts";
 
 type Person = { id: string; name: string };
@@ -123,31 +128,39 @@ export function useEditItem(listId: string | undefined) {
  */
 export function useBuyAgainState(listId: string | undefined) {
   const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
-  const pendingAddIds = new Set(
-    useWaitingVars(shoppingChanges.add)
-      .filter((vars) => vars.listId === listId)
-      .map((vars) => vars.id),
-  );
+  const pendingAddSignature = useWaitingVars(shoppingChanges.add)
+    .filter((vars) => vars.listId === listId)
+    .map((vars) => vars.id)
+    .toSorted()
+    .join("\0");
   // Keyed by `${listId}:${itemKey(name)}` so switching target lists on the overview keeps each
   // list's session taps intact
   const [picked, setPicked] = useState<Record<string, string>>({});
 
-  const openIds = new Set(list?.items.filter((item) => !item.checked).map((item) => item.id));
-  const checkedIds = new Set(list?.items.filter((item) => item.checked).map((item) => item.id));
-  const prefix = listId ? `${listId}:` : "";
-
-  const activeByKey = new Map<string, string>();
-  if (listId) {
+  const activeByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!listId) return map;
+    const pendingAddIds = new Set(pendingAddSignature ? pendingAddSignature.split("\0") : []);
+    const openIds = new Set(list?.items.filter((item) => !item.checked).map((item) => item.id));
+    const checkedIds = new Set(list?.items.filter((item) => item.checked).map((item) => item.id));
+    const prefix = `${listId}:`;
     for (const [compoundKey, id] of Object.entries(picked)) {
       if (!compoundKey.startsWith(prefix)) continue;
       if (checkedIds.has(id)) continue;
       if (list !== undefined && !openIds.has(id) && !pendingAddIds.has(id)) continue;
-      activeByKey.set(compoundKey.slice(prefix.length), id);
+      map.set(compoundKey.slice(prefix.length), id);
     }
-  }
+    return map;
+  }, [listId, list, picked, pendingAddSignature]);
+
+  const pinnedSignature = [...activeByKey.values()].toSorted().join("\0");
+  const pinnedIds = useMemo(
+    () => new Set(pinnedSignature ? pinnedSignature.split("\0") : []),
+    [pinnedSignature],
+  );
 
   return {
-    pinnedIds: new Set(activeByKey.values()),
+    pinnedIds,
     addedIdFor: (name: string) => activeByKey.get(itemKey(name)),
     markAdded: (name: string, id: string) => {
       if (!listId) return;
@@ -167,7 +180,7 @@ export function useBuyAgainState(listId: string | undefined) {
   };
 }
 
-/** Removes an item (and its merged spellings) from Buy again history */
+/** Removes an item (and its merged spellings) from Buy again history on the server */
 export function useForgetBuyAgain() {
   const forget = useChange(shoppingChanges.forgetHistory);
   return (names: string[]) => {
@@ -186,18 +199,99 @@ export function useBuyAgain(
   typed: string,
   pinnedIds?: ReadonlySet<string>,
 ): BuyAgainSuggestion[] {
-  const { data: history = [] } = useQuery(historyQuery());
+  const history = useQuery(historyQuery()).data ?? NO_HISTORY;
   const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
   // "Due" is judged once per screen, so chips don't reshuffle while someone is picking
   const [now] = useState(() => Temporal.Now.instant());
-  const isTyping = typed.trim() !== "";
-  const allOpen = list?.items.filter((item) => !item.checked) ?? [];
-  const onList = allOpen
-    .filter((item) => isTyping || !pinnedIds?.has(item.id))
-    .map((item) => item.name);
-  const inBasket = allOpen.map((item) => item.name);
-  const checkedOnList = list?.items.filter((item) => item.checked).map((item) => item.name) ?? [];
-  return suggestBuyAgain(history, { now, typed, listId, onList, inBasket, checkedOnList });
+  return useMemo(() => {
+    const isTyping = typed.trim() !== "";
+    const allOpen = list?.items.filter((item) => !item.checked) ?? [];
+    const onList = allOpen
+      .filter((item) => isTyping || !pinnedIds?.has(item.id))
+      .map((item) => item.name);
+    const inBasket = allOpen.map((item) => item.name);
+    const checkedOnList = list?.items.filter((item) => item.checked).map((item) => item.name) ?? [];
+    return suggestBuyAgain(history, { now, typed, listId, onList, inBasket, checkedOnList });
+  }, [history, list, now, typed, listId, pinnedIds]);
+}
+
+/** One empty history, so "not loaded yet" doesn't hand memos a new array every render */
+const NO_HISTORY: BoughtItem[] = [];
+
+/**
+ * "Now", read again each time the app comes back to the foreground, so a badge counted yesterday
+ * doesn't stay stale on a phone that kept the app open overnight.
+ */
+function useNowSinceForeground(): Temporal.Instant {
+  const [now, setNow] = useState(() => Temporal.Now.instant());
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") setNow(Temporal.Now.instant());
+    };
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  }, []);
+  return now;
+}
+
+/** Number of past buys stored for the household, for deciding whether to show Buy again triggers */
+export function useBuyAgainHistoryCount(): number {
+  const history = useQuery(historyQuery()).data ?? NO_HISTORY;
+  return history.length;
+}
+
+/**
+ * Exact count of un-added "Running low" items for a list—the same definition the Buy again sheet
+ * uses for its "Add N due" button, so the dock badge and sheet always agree.
+ */
+export function useBuyAgainDueCount(listId: string | undefined): number {
+  const history = useQuery(historyQuery()).data ?? NO_HISTORY;
+  const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
+  const now = useNowSinceForeground();
+  return useMemo(() => {
+    const allOpen = list?.items.filter((item) => !item.checked).map((item) => item.name) ?? [];
+    const checkedOnList = list?.items.filter((item) => item.checked).map((item) => item.name) ?? [];
+    return browseBuyAgain(history, {
+      now,
+      listId,
+      onList: allOpen,
+      inBasket: allOpen,
+      checkedOnList,
+    }).due.filter((item) => !item.onList && !item.checked).length;
+  }, [history, list, now, listId]);
+}
+
+/** Full purchase history organized into "Running low" and aisle sections for the Buy again sheet */
+export function useBuyAgainCatalog(
+  listId: string | undefined,
+  {
+    query = "",
+    includeOtherLists = false,
+    now,
+    stickyDueOrder,
+  }: {
+    query?: string;
+    includeOtherLists?: boolean;
+    now: Temporal.Instant;
+    stickyDueOrder?: readonly string[];
+  },
+): BuyAgainCatalog {
+  const history = useQuery(historyQuery()).data ?? NO_HISTORY;
+  const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
+  return useMemo(() => {
+    const allOpen = list?.items.filter((item) => !item.checked).map((item) => item.name) ?? [];
+    const checkedOnList = list?.items.filter((item) => item.checked).map((item) => item.name) ?? [];
+    return browseBuyAgain(history, {
+      now,
+      listId,
+      query,
+      includeOtherLists,
+      onList: allOpen,
+      inBasket: allOpen,
+      checkedOnList,
+      stickyDueOrder,
+    });
+  }, [history, list, now, listId, query, includeOtherLists, stickyDueOrder]);
 }
 
 function adjustListCounts(

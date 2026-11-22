@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { suggestBuyAgain } from "./buy-again.ts";
+import { browseBuyAgain, filterEnterTarget, lastBoughtCue, suggestBuyAgain } from "./buy-again.ts";
 import type { BoughtItem } from "./shopping.api.ts";
 
 const now = Temporal.Instant.from("2026-11-05T12:00:00Z");
@@ -192,5 +192,161 @@ describe("buy again", () => {
     expect(suggestBuyAgain(legacy, { now, listId: "groceries" })).toEqual([
       { name: "Milk", quantity: null, variants: ["Milk"], paired: false },
     ]);
+  });
+});
+
+describe("browseBuyAgain", () => {
+  it("splits due items into Running low and groups the rest by supermarket aisle", () => {
+    const items = [
+      bought("Milk", 10, 4, 5, { quantity: "2", listIds: ["groceries"] }), // due -> Running low
+      bought("Coffee", 4, 14, 2, { listIds: ["groceries"] }), // recent -> Drinks
+      bought("Apples", 1, 1, 12, { listIds: ["groceries"] }), // one-off -> Produce
+      bought("Batteries", 4, 14, 15, { listIds: ["hardware"] }), // other list
+    ];
+
+    const scoped = browseBuyAgain(items, { now, listId: "groceries" });
+    expect(scoped.due.map((item) => item.name)).toEqual(["Milk"]);
+    expect(scoped.sections.map((section) => section.category)).toEqual(["Produce", "Drinks"]);
+    expect(scoped.sections[0]?.items.map((item) => item.name)).toEqual(["Apples"]);
+    expect(scoped.sections[1]?.items.map((item) => item.name)).toEqual(["Coffee"]);
+    expect(scoped.hasOtherLists).toBe(true);
+    expect(scoped.total).toBe(3);
+
+    // Including other lists reveals Batteries under Household without putting it in groceries' Running low
+    const allLists = browseBuyAgain(items, { now, listId: "groceries", includeOtherLists: true });
+    expect(allLists.due.map((item) => item.name)).toEqual(["Milk"]);
+    expect(allLists.sections.map((section) => section.category)).toEqual([
+      "Produce",
+      "Drinks",
+      "Household",
+    ]);
+    expect(allLists.total).toBe(4);
+  });
+
+  it("keeps Running low to what's nearly out, while chips can suggest earlier", () => {
+    const items = [
+      bought("Milk", 10, 4, 5, { listIds: ["groceries"] }), // past its gap -> Running low
+      bought("Minced beef", 4, 10, 4, { listIds: ["groceries"] }), // 40% of its gap -> an aisle
+      bought("Eggs", 6, 10, 8, { listIds: ["groceries"] }), // 80% of its gap -> Running low
+      bought("Parmesan", 4, 20, 10, { listIds: ["groceries"], pairedWith: ["Pasta"] }), // half, paired
+      bought("Pasta", 4, 14, 3, { listIds: ["groceries"] }),
+    ];
+    const catalog = browseBuyAgain(items, {
+      now,
+      listId: "groceries",
+      onList: ["Pasta"],
+      inBasket: ["Pasta"],
+    });
+    expect(catalog.due.map((item) => item.name).toSorted()).toEqual(["Eggs", "Milk", "Parmesan"]);
+    // The chips still offer Minced beef: suggesting it early is fine, calling it "due" isn't
+    expect(namesOf(items, { now, listId: "groceries" })).toContain("Minced beef");
+  });
+
+  it("filters across all lists when searching, matching substrings too", () => {
+    const items = [
+      bought("Milk", 6, 4, 5, { listIds: ["groceries"] }),
+      bought("Oat milk", 2, 7, 3, { listIds: ["groceries"] }),
+      bought("Batteries", 4, 14, 15, { listIds: ["hardware"] }),
+    ];
+    const found = browseBuyAgain(items, { now, listId: "groceries", query: "tter" });
+    expect(found.due).toEqual([]);
+    expect(found.sections.map((s) => s.items.map((i) => i.name))).toEqual([["Batteries"]]);
+  });
+
+  it("keeps items already on the list visible in place with onList/checked flags", () => {
+    const items = [
+      bought("Milk", 10, 4, 5, { listIds: ["groceries"] }),
+      bought("Bread", 6, 7, 7, { listIds: ["groceries"] }),
+    ];
+    const catalog = browseBuyAgain(items, {
+      now,
+      listId: "groceries",
+      onList: ["Milk"],
+      checkedOnList: ["Bread"],
+    });
+    expect(catalog.due).toMatchObject([{ name: "Milk", onList: true, checked: false }]);
+    expect(catalog.sections[0]?.items).toMatchObject([
+      { name: "Bread", onList: false, checked: true },
+    ]);
+  });
+
+  it("keeps Running low membership frozen when stickyDueOrder is provided", () => {
+    const items = [
+      bought("Milk", 10, 4, 5),
+      bought("Pasta", 4, 14, 14),
+      bought("Passata", 4, 20, 10, { pairedWith: ["Pasta"] }),
+    ];
+    // Frozen at open with Milk & Pasta due; adding Pasta mid-session doesn't jump Passata into Running low
+    const frozen = browseBuyAgain(items, {
+      now,
+      onList: ["Pasta"],
+      inBasket: ["Pasta"],
+      stickyDueOrder: ["milk", "pasta"],
+    });
+    expect(frozen.due.map((item) => item.name)).toEqual(["Milk", "Pasta"]);
+    expect(frozen.sections.flatMap((s) => s.items.map((i) => i.name))).toEqual(["Passata"]);
+  });
+});
+
+describe("filterEnterTarget", () => {
+  const items = [
+    bought("Oat milk", 3, 7, 3),
+    bought("3 color bell pepper", 3, 7, 3),
+    bought("Croissants", 3, 7, 3),
+    bought("Cream cheese", 3, 7, 3),
+    bought("Chocolate", 3, 7, 3),
+  ];
+  const shown = (query: string) =>
+    browseBuyAgain(items, { now, query }).sections.flatMap((section) => section.items);
+  const target = (query: string) => {
+    const result = filterEnterTarget(shown(query), query);
+    return result.kind === "item" ? result.item.name : result.kind;
+  };
+
+  it("acts on the exact name, or the one past buy the text abbreviates", () => {
+    expect(target("chocolate")).toBe("Chocolate");
+    expect(target("pepp")).toBe("3 color bell pepper");
+    expect(target("cro")).toBe("Croissants");
+  });
+
+  it("adds what was typed when it's a whole word of another name, not that item", () => {
+    expect(target("milk")).toBe("add");
+    expect(target("bell")).toBe("add");
+  });
+
+  it("waits for more typing when several past buys fit", () => {
+    expect(filterEnterTarget(shown("c"), "c")).toEqual({ kind: "ambiguous", count: 4 });
+  });
+
+  it("doesn't match single letters inside words, and puts the best-matching aisle first", () => {
+    expect(shown("i").map((item) => item.name)).toEqual([]);
+    expect(shown("che").map((item) => item.name)).toEqual(["Cream cheese"]);
+  });
+});
+
+describe("lastBoughtCue", () => {
+  it("formats age and usual cadence in warm, consistent copy", () => {
+    expect(lastBoughtCue(daysAgo(0), null, now, "UTC")).toBe("Bought today");
+    expect(lastBoughtCue(daysAgo(1), null, now, "UTC")).toBe("Bought yesterday");
+    expect(lastBoughtCue(daysAgo(5), 7, now, "UTC")).toBe("Bought 5 days ago · weekly");
+    expect(lastBoughtCue(daysAgo(10), 14, now, "UTC")).toBe("Bought 10 days ago · every 2 weeks");
+    expect(lastBoughtCue(daysAgo(21), 30, now, "UTC")).toBe("Bought 3 weeks ago · monthly");
+    expect(lastBoughtCue(daysAgo(65), 4, now, "UTC")).toBe(
+      "Last bought in September · every 4 days",
+    );
+    expect(lastBoughtCue(daysAgo(350), null, now, "UTC")).toBe("Last bought in November 2025");
+  });
+
+  it("counts calendar days where you are, not 24-hour blocks", () => {
+    // 23:00 in Amsterdam the evening before, 09:00 the next morning: under 24 hours, but yesterday
+    const lastNight = "2026-11-04T22:00:00Z";
+    const thisMorning = Temporal.Instant.from("2026-11-05T08:00:00Z");
+    expect(lastBoughtCue(lastNight, null, thisMorning, "Europe/Amsterdam")).toBe(
+      "Bought yesterday",
+    );
+    // Still July in UTC, but already 1 August in Amsterdam
+    expect(lastBoughtCue("2026-07-31T23:30:00Z", null, now, "Europe/Amsterdam")).toBe(
+      "Last bought in August",
+    );
   });
 });

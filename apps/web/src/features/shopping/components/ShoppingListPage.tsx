@@ -2,17 +2,35 @@ import { useState } from "react";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 
 import { BackLink } from "@/components/BackLink.tsx";
-import { BasketIcon, CheckCircleIcon, ConfettiIcon } from "@/components/icons.ts";
+import {
+  BasketIcon,
+  CaretRightIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  ClockCounterClockwiseIcon,
+  ConfettiIcon,
+  PlusIcon,
+} from "@/components/icons.ts";
 import { CompactHeader } from "@/components/layout/AreaHeader.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Button } from "@/components/ui/button";
+import { offerUndo } from "@/lib/feedback.ts";
 import { useWaitingVars } from "@/lib/offline-changes.ts";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
+import { cn } from "cn";
 
 import type { Category } from "../categories.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "../shopping.changes.ts";
-import { namesOf, useShoppingList } from "../shopping.hooks.ts";
+import {
+  namesOf,
+  useAddItem,
+  useBuyAgain,
+  useBuyAgainHistoryCount,
+  useBuyAgainState,
+  useShoppingList,
+  useUndoAddItem,
+} from "../shopping.hooks.ts";
 import {
   byCategory,
   groupItems,
@@ -20,6 +38,7 @@ import {
   sameCategories,
   type FoldState,
 } from "../shopping-items.ts";
+import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
 import { CategorySection } from "./CategorySection.tsx";
 import { EditItemSheet } from "./EditItemSheet.tsx";
 import { ListMenu } from "./ListMenu.tsx";
@@ -49,6 +68,25 @@ export function ShoppingListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   // Set by "Clear ticked", so the empty list congratulates instead of asking for a first item
   const [finished, setFinished] = useState(false);
+  const [restockOpen, setRestockOpen] = useState(false);
+  const addItem = useAddItem(user);
+  const undoAddItem = useUndoAddItem();
+  const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(listId);
+  const suggestions = useBuyAgain(listId, "", pinnedIds);
+  const historyCount = useBuyAgainHistoryCount();
+  // Keep the empty-list launchpad open while you tap several items in a row, instead of vanishing
+  // after the first tap. Also re-arms if a list empties while open, and resets when switching lists.
+  const [launchpadState, setLaunchpadState] = useState(() => ({
+    listId,
+    open: list.items.length === 0,
+  }));
+  if (launchpadState.listId !== listId) {
+    setLaunchpadState({ listId, open: list.items.length === 0 });
+  } else if (list.items.length === 0 && !finished && !launchpadState.open) {
+    setLaunchpadState({ listId, open: true });
+  }
+  const showLaunchpad =
+    !finished && historyCount > 0 && (list.items.length === 0 || launchpadState.open);
 
   const sections = (byCategory(list.items) ?? [{ category: null, items: list.items }]).map(
     ({ category, items }) => {
@@ -151,8 +189,63 @@ export function ShoppingListPage() {
         meter={{ done: ticked.length, total: list.items.length }}
       />
 
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows,opacity] duration-240 ease-(--ease-in-out) motion-reduce:transition-none",
+          showLaunchpad
+            ? "grid-rows-[1fr] opacity-100"
+            : "pointer-events-none grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden" inert={!showLaunchpad}>
+          <div className="pt-3 lg:pt-4">
+            <EmptyListRestock
+              listName={list.name}
+              hasItems={list.items.length > 0}
+              chips={suggestions.slice(0, 10).map(({ name, quantity }) => ({
+                name,
+                quantity,
+                added: addedIdFor(name) !== undefined,
+              }))}
+              onToggleOne={(name, quantity) => {
+                const existingId = addedIdFor(name);
+                if (existingId) {
+                  clearAdded(name);
+                  undoAddItem(listId, existingId);
+                } else {
+                  const id = addItem(listId, name, quantity);
+                  markAdded(name, id);
+                }
+              }}
+              onAddAll={() => {
+                const toAdd = suggestions
+                  .slice(0, 10)
+                  .filter((item) => addedIdFor(item.name) === undefined);
+                if (toAdd.length === 0) return;
+                const added = toAdd.map(({ name, quantity }) => {
+                  const id = addItem(listId, name, quantity);
+                  markAdded(name, id);
+                  return { name, id };
+                });
+                offerUndo(`Added ${added.length} to ${list.name}`, () => {
+                  for (const item of added) {
+                    clearAdded(item.name);
+                    undoAddItem(listId, item.id);
+                  }
+                });
+              }}
+              onBrowseAll={() => setRestockOpen(true)}
+              onDismiss={() => setLaunchpadState({ listId, open: false })}
+            />
+          </div>
+        </div>
+      </div>
+
       {list.items.length > 0 ? (
-        <div key={listId} className="mt-3 space-y-3 lg:mt-4 lg:space-y-4">
+        <div
+          key={listId}
+          className="mt-3 space-y-3 transition-[opacity,translate] duration-200 ease-(--ease-out) lg:mt-4 lg:space-y-4 starting:translate-y-1 starting:opacity-0 motion-reduce:transition-none"
+        >
           {sections.map(({ category, items, left: sectionLeft }) => {
             const folded = category !== null && nextFolds.folded.has(category);
             const canFold =
@@ -179,11 +272,11 @@ export function ShoppingListPage() {
             );
           })}
         </div>
-      ) : (
+      ) : finished || historyCount === 0 ? (
         <EmptyState className="mt-6" icon={finished ? ConfettiIcon : BasketIcon}>
           {finished ? "Shopping done. Nice one." : "Nothing to get. Add the first item below."}
         </EmptyState>
-      )}
+      ) : null}
 
       {left === 0 && ticked.length > 0 && (
         <p className="mt-6 flex items-center justify-center gap-1.5 text-sm font-semibold text-muted-foreground">
@@ -220,6 +313,144 @@ export function ShoppingListPage() {
         onRemove={() => editing && remove(editing.id)}
         onClose={() => setEditingId(null)}
       />
+
+      <BuyAgainSheet
+        open={restockOpen}
+        onOpenChange={setRestockOpen}
+        listId={listId}
+        listName={list.name}
+        viewer={user}
+      />
     </>
+  );
+}
+
+/**
+ * Empty-list launchpad: lets you kick off a weekly shop right on the canvas with wrapped regulars,
+ * a one-tap "Add all" shortcut, or the full aisle-grouped Buy again sheet.
+ */
+function EmptyListRestock({
+  listName,
+  hasItems,
+  chips,
+  onToggleOne,
+  onAddAll,
+  onBrowseAll,
+  onDismiss,
+}: {
+  listName: string;
+  hasItems: boolean;
+  chips: readonly { name: string; quantity: string | null; added: boolean }[];
+  onToggleOne: (name: string, quantity: string | null) => void;
+  onAddAll: () => void;
+  onBrowseAll: () => void;
+  onDismiss: () => void;
+}) {
+  const unaddedCount = chips.filter((chip) => !chip.added).length;
+  return (
+    <section
+      aria-labelledby="empty-restock-heading"
+      className="rounded-[20px] bg-card p-4 shadow-card"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden
+            className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-area-tint text-area-fg"
+          >
+            <ClockCounterClockwiseIcon weight="bold" className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <h2
+              id="empty-restock-heading"
+              className="truncate text-[0.9375rem] font-[780] tracking-[-0.01em] [font-stretch:112%]"
+            >
+              {chips.length > 0 ? "Buy again" : "Ready to restock?"}
+            </h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {chips.length > 0
+                ? `Tap to add to ${listName}, or type below.`
+                : "Browse what you've bought before, or type below."}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onBrowseAll}
+            className="h-9 gap-1 rounded-full px-3 text-area-fg after:-inset-y-1"
+          >
+            <span>Browse all</span>
+            <CaretRightIcon aria-hidden weight="bold" className="size-3.5" />
+          </Button>
+          {hasItems && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={onDismiss}
+              className="h-9 rounded-full px-3.5 font-[700] after:-inset-y-1"
+            >
+              Done
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {chips.length > 0 && (
+        <>
+          <ul aria-label="Past buys to add" className="mt-3.5 flex flex-wrap gap-2">
+            {chips.map(({ name, quantity, added }) => (
+              <li key={name}>
+                <Button
+                  type="button"
+                  variant="chip"
+                  // One fixed name; "pressed" alone says it's been added
+                  aria-pressed={added}
+                  aria-label={quantity ? `Add ${quantity} ${name}` : `Add ${name}`}
+                  onClick={() => onToggleOne(name, quantity)}
+                  className="max-w-60 gap-1.5 pr-4 pl-3 aria-pressed:font-medium active:scale-[0.96] motion-reduce:active:scale-100"
+                >
+                  {added ? (
+                    <CheckIcon
+                      weight="bold"
+                      aria-hidden
+                      className="size-4 shrink-0 text-area-fg animate-[check-pop_220ms_var(--ease-out)] motion-reduce:animate-none"
+                    />
+                  ) : (
+                    <PlusIcon weight="bold" aria-hidden className="size-4 shrink-0 text-area-fg" />
+                  )}
+                  <span className="truncate">{name}</span>
+                  {quantity && (
+                    <span
+                      className={cn(
+                        "max-w-24 shrink-0 truncate text-xs font-semibold tabular-nums",
+                        added ? "text-primary-soft-foreground/80" : "text-muted-foreground",
+                      )}
+                    >
+                      · {quantity}
+                    </span>
+                  )}
+                </Button>
+              </li>
+            ))}
+          </ul>
+
+          {unaddedCount >= 2 && (
+            <Button
+              type="button"
+              variant="soft"
+              size="lg"
+              onClick={onAddAll}
+              className="mt-4 w-full rounded-2xl"
+            >
+              Add these {unaddedCount}
+            </Button>
+          )}
+        </>
+      )}
+    </section>
   );
 }

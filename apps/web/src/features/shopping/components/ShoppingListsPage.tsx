@@ -2,9 +2,11 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { PlusIcon } from "@/components/icons.ts";
+import { CaretRightIcon, PlusIcon } from "@/components/icons.ts";
 import { AreaHeader, Count, Meter } from "@/components/layout/AreaHeader.tsx";
 import { SharedWithLine } from "@/components/SharedWithLine.tsx";
+import { Button } from "@/components/ui/button";
+import { notifyAction } from "@/lib/feedback.ts";
 import type { Housemate } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
@@ -12,12 +14,14 @@ import type { ShoppingListSummary } from "../shopping.api.ts";
 import {
   useAddItem,
   useBuyAgain,
+  useBuyAgainHistoryCount,
   useBuyAgainState,
   useManageLists,
   useUndoAddItem,
 } from "../shopping.hooks.ts";
 import { listsQuery } from "../shopping.queries.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
+import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
 import { ListMenu } from "./ListMenu.tsx";
 import { ListPicker } from "./ListPicker.tsx";
 
@@ -151,15 +155,18 @@ function ListRow({ list, first }: { list: ShoppingListSummary; first: boolean })
  * above them with one tap.
  */
 function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
+  const navigate = useNavigate();
   const { user } = householdRoute.useRouteContext();
   const add = useAddItem(user);
   const undoAdd = useUndoAddItem();
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [restockOpen, setRestockOpen] = useState(false);
   const target = lists.find((list) => list.id === pickedId) ?? lists[0];
+  const historyCount = useBuyAgainHistoryCount();
   const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(target?.id);
   const suggestions = useBuyAgain(target?.id, "", pinnedIds);
 
-  if (!target || suggestions.length === 0) return null;
+  if (!target || historyCount === 0) return null;
 
   const chips = suggestions.map(({ name, quantity }) => ({
     name,
@@ -170,24 +177,61 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
   return (
     <section aria-labelledby="buy-again-heading" className="mt-8">
       <div className="flex items-center justify-between gap-3 pb-3">
-        <h2 id="buy-again-heading" className="text-sm font-[750]">
-          Buy again
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 id="buy-again-heading" className="text-sm font-[750]">
+            Buy again
+          </h2>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setRestockOpen(true)}
+            className="h-9 gap-0.5 rounded-full px-2.5 text-xs font-[700] text-area-fg after:-inset-y-1"
+          >
+            <span>See all</span>
+            <CaretRightIcon aria-hidden weight="bold" className="size-3" />
+          </Button>
+        </div>
         <ListPicker lists={lists} value={target.id} onChange={setPickedId} />
       </div>
-      <BuyAgainChips
-        chips={chips}
-        onPick={(name) => {
-          const quantity = suggestions.find((item) => item.name === name)?.quantity ?? null;
-          const id = add(target.id, name, quantity);
-          markAdded(name, id);
+      {chips.length > 0 ? (
+        <BuyAgainChips
+          chips={chips}
+          onPick={(name) => {
+            const quantity = suggestions.find((item) => item.name === name)?.quantity ?? null;
+            const id = add(target.id, name, quantity);
+            markAdded(name, id);
+          }}
+          onUndo={(name) => {
+            const id = addedIdFor(name);
+            clearAdded(name);
+            if (id) undoAdd(target.id, id);
+          }}
+          className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0"
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Nothing due for {target.name} right now.{" "}
+          <button
+            type="button"
+            onClick={() => setRestockOpen(true)}
+            className="font-semibold text-area-fg underline-offset-4 hover:underline"
+          >
+            Browse past buys
+          </button>
+        </p>
+      )}
+      <BuyAgainSheet
+        open={restockOpen}
+        onOpenChange={setRestockOpen}
+        listId={target.id}
+        listName={target.name}
+        viewer={user}
+        onSessionClose={(addedCount) => {
+          notifyAction(`Added ${addedCount} to ${target.name}`, "View", () => {
+            void navigate({ to: "/lists/$listId", params: { listId: target.id } });
+          });
         }}
-        onUndo={(name) => {
-          const id = addedIdFor(name);
-          clearAdded(name);
-          if (id) undoAdd(target.id, id);
-        }}
-        className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0"
       />
     </section>
   );
