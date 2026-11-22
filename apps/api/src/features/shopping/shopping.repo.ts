@@ -1,6 +1,6 @@
 // Data access for shopping lists: the only place that queries shopping tables.
 // Every list query is scoped to a household, so a list id from another household reads as missing.
-import { and, asc, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db, type Executor } from "../../db/db.ts";
@@ -161,17 +161,19 @@ export async function insertItem(
   return rows.length > 0;
 }
 
-/** Returns the item's name after the change, or null when the list has no item with that id */
+export type PurchaseHistoryRow = Omit<BoughtItem, "pairedWith">;
+
+/** Returns the item's name and quantity after the change, or null when missing */
 export async function updateItem(
   ref: { listId: string; itemId: string },
   changes: ItemChanges,
   executor: Executor = db,
-): Promise<{ name: string } | null> {
+): Promise<{ name: string; quantity: string | null } | null> {
   const rows = await executor
     .update(shoppingItem)
     .set(changes)
     .where(and(eq(shoppingItem.id, ref.itemId), eq(shoppingItem.listId, ref.listId)))
-    .returning({ name: shoppingItem.name });
+    .returning({ name: shoppingItem.name, quantity: shoppingItem.quantity });
   return rows[0] ?? null;
 }
 
@@ -197,20 +199,21 @@ export async function deleteCheckedItems(listId: string, executor: Executor = db
 }
 
 /**
- * Records that an item was bought. Ticking it again keeps the first time, but follows a new name.
- * Item ids are chosen by clients, so a row from another household with the same id is left alone.
+ * Records that an item was bought. Ticking it again keeps the first time, but follows a new name,
+ * quantity or list. Item ids are chosen by clients, so a row from another household with the same
+ * id is left alone.
  */
 export async function recordPurchase(
-  ref: { householdId: string; itemId: string },
-  values: { name: string; boughtAt: Temporal.Instant },
+  ref: { householdId: string; listId: string; itemId: string },
+  values: { name: string; quantity: string | null; boughtAt: Temporal.Instant },
   executor: Executor = db,
 ): Promise<void> {
   await executor
     .insert(shoppingPurchase)
-    .values({ id: ref.itemId, householdId: ref.householdId, ...values })
+    .values({ id: ref.itemId, householdId: ref.householdId, listId: ref.listId, ...values })
     .onConflictDoUpdate({
       target: shoppingPurchase.id,
-      set: { name: values.name },
+      set: { listId: ref.listId, name: values.name, quantity: values.quantity },
       setWhere: eq(shoppingPurchase.householdId, ref.householdId),
     });
 }
@@ -227,38 +230,67 @@ export async function forgetPurchase(
     );
 }
 
-/** Renaming a ticked item renames its purchase, so a typo fixed in the cart is fixed in history too */
-export async function renamePurchase(
+/** Editing a ticked item updates its purchase, so a typo or quantity fix carries into history */
+export async function updatePurchase(
   ref: { householdId: string; itemId: string },
-  name: string,
+  values: { name: string; quantity: string | null },
   executor: Executor = db,
 ): Promise<void> {
   await executor
     .update(shoppingPurchase)
-    .set({ name })
+    .set(values)
     .where(
       and(eq(shoppingPurchase.id, ref.itemId), eq(shoppingPurchase.householdId, ref.householdId)),
     );
 }
 
+/** Removes all purchase history rows matching any of `names` (case-insensitive) for this household */
+export async function forgetPurchasesByName(
+  householdId: string,
+  names: readonly string[],
+  executor: Executor = db,
+): Promise<number> {
+  const lowered = [...new Set(names.map((name) => name.toLowerCase()))];
+  if (lowered.length === 0) return 0;
+  const rows = await executor
+    .delete(shoppingPurchase)
+    .where(
+      and(
+        eq(shoppingPurchase.householdId, householdId),
+        inArray(sql`lower(${shoppingPurchase.name})`, lowered),
+      ),
+    )
+    .returning({ id: shoppingPurchase.id });
+  return rows.length;
+}
+
 /**
  * Everything bought since `since`, one entry per name (ignoring case), spelled the way it was
- * last bought. Two of the same on one day count as one trip. Most trips first.
+ * last bought, with its usual quantity and the lists it was bought on. Two of the same on one day
+ * count as one trip. Most trips first.
  */
 export async function findPurchaseHistory(
   householdId: string,
   { since, limit }: { since: Temporal.Instant; limit: number },
   executor: Executor = db,
-): Promise<BoughtItem[]> {
+): Promise<PurchaseHistoryRow[]> {
   const key = sql`lower(${shoppingPurchase.name})`;
   const lastBoughtAt = sql`max(${shoppingPurchase.boughtAt})`.mapWith(shoppingPurchase.boughtAt);
   const trips = sql<number>`count(distinct ${shoppingPurchase.boughtAt}::date)`.mapWith(Number);
   const rows = await executor
     .select({
       name: sql<string>`(array_agg(${shoppingPurchase.name} order by ${shoppingPurchase.boughtAt} desc))[1]`,
+      // Most common quantity across buys, counting no-quantity as '' so one occasional amount
+      // doesn't override usually buying it without one
+      quantity: sql<
+        string | null
+      >`nullif(mode() within group (order by coalesce(${shoppingPurchase.quantity}, '')), '')`,
       trips,
       firstBoughtAt: sql`min(${shoppingPurchase.boughtAt})`.mapWith(shoppingPurchase.boughtAt),
       lastBoughtAt,
+      listIds: sql<
+        string[]
+      >`coalesce(array_agg(distinct ${shoppingPurchase.listId}) filter (where ${shoppingPurchase.listId} is not null), array[]::text[])`,
     })
     .from(shoppingPurchase)
     .where(
@@ -268,6 +300,23 @@ export async function findPurchaseHistory(
     .orderBy(desc(trips), desc(lastBoughtAt))
     .limit(limit);
   return rows;
+}
+
+/** Distinct (lowercased item name, calendar day) pairs since `since`, for co-purchase detection */
+export async function findPurchaseTripDays(
+  householdId: string,
+  { since }: { since: Temporal.Instant },
+  executor: Executor = db,
+): Promise<{ item: string; day: string }[]> {
+  return executor
+    .selectDistinct({
+      item: sql<string>`lower(${shoppingPurchase.name})`,
+      day: sql<string>`${shoppingPurchase.boughtAt}::date::text`,
+    })
+    .from(shoppingPurchase)
+    .where(
+      and(eq(shoppingPurchase.householdId, householdId), gte(shoppingPurchase.boughtAt, since)),
+    );
 }
 
 export async function countLists(householdId: string, executor: Executor = db): Promise<number> {

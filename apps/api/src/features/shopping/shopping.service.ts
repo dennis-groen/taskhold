@@ -4,6 +4,7 @@ import { transaction, type Transaction } from "../../db/db.ts";
 import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
+import { buildPurchasePairs } from "./purchase-pairs.ts";
 import * as shoppingRepo from "./shopping.repo.ts";
 import {
   itemIdTaken,
@@ -144,14 +145,18 @@ export async function updateItem(
     // Ticking it off is what counts as buying it, for "buy again"
     if (changes.checked === true) {
       await shoppingRepo.recordPurchase(
-        purchaseRef,
-        { name: updated.name, boughtAt: checkedAt },
+        { ...purchaseRef, listId: list.id },
+        { name: updated.name, quantity: updated.quantity, boughtAt: checkedAt },
         tx,
       );
     } else if (changes.checked === false) {
       await shoppingRepo.forgetPurchase(purchaseRef, tx);
-    } else if (changes.name !== undefined) {
-      await shoppingRepo.renamePurchase(purchaseRef, updated.name, tx);
+    } else if (changes.name !== undefined || changes.quantity !== undefined) {
+      await shoppingRepo.updatePurchase(
+        purchaseRef,
+        { name: updated.name, quantity: updated.quantity },
+        tx,
+      );
     }
     await changed(householdId, tx);
   });
@@ -192,12 +197,35 @@ const HISTORY_LIMIT = 300;
 export async function getPurchaseHistory(userId: string): Promise<BoughtItem[]> {
   const household = await householdsService.getMembershipOf(userId);
   const since = Temporal.Now.instant().subtract({ hours: 24 * HISTORY_DAYS });
-  const items = await shoppingRepo.findPurchaseHistory(household.id, {
+  const rows = await shoppingRepo.findPurchaseHistory(household.id, {
     since,
     limit: HISTORY_LIMIT,
   });
+  const pairs =
+    rows.length >= 2
+      ? buildPurchasePairs(
+          await shoppingRepo.findPurchaseTripDays(household.id, { since }),
+          new Map(rows.map((row) => [row.name.toLowerCase(), row.name])),
+        )
+      : new Map<string, string[]>();
+  const items: BoughtItem[] = rows.map((row) => ({
+    ...row,
+    pairedWith: pairs.get(row.name.toLowerCase()) ?? [],
+  }));
   annotate("shopping", { history_count: items.length });
   return items;
+}
+
+/** Removes items from the household's "buy again" history so they stop being suggested */
+export async function forgetPurchaseHistory(
+  userId: string,
+  names: readonly string[],
+): Promise<number> {
+  const household = await householdsService.getMembershipOf(userId);
+  const removed = await shoppingRepo.forgetPurchasesByName(household.id, names);
+  annotate("shopping", { forgotten_count: removed });
+  if (removed > 0) await changed(household.id);
+  return removed;
 }
 
 async function findListOf(userId: string, listId: string) {

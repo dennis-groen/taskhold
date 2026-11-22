@@ -5,6 +5,7 @@ import * as shoppingService from "./shopping.service.ts";
 import {
   addItemBody,
   createListBody,
+  forgetHistoryBody,
   itemParam,
   listBody,
   listParam,
@@ -16,6 +17,13 @@ export const shoppingRoutes = protectedRouter()
   .get("/history", async (c) => {
     const items = await shoppingService.getPurchaseHistory(c.get("user").id);
     return c.json({ items }, 200);
+  })
+  .post("/history/forget", validate("json", forgetHistoryBody), async (c) => {
+    const removed = await shoppingService.forgetPurchaseHistory(
+      c.get("user").id,
+      c.req.valid("json").names,
+    );
+    return c.json({ removed }, 200);
   })
   .get("/lists", async (c) => {
     const lists = await shoppingService.getLists(c.get("user").id);

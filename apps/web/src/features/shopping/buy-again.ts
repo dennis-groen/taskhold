@@ -17,6 +17,12 @@ const DECAY_AFTER = 2.5;
 /** Floor for typing matches so frequent items still outrank one-offs even when recently bought */
 const TYPING_FLOOR = 0.5;
 
+/** Boost for items previously bought on the open list over legacy or other-list items */
+const LIST_BOOST = 1.25;
+
+/** Score added per item currently in the basket that's frequently bought with this candidate */
+const PAIR_BOOST = 3;
+
 /** Cold-start fallback for new households with few regulars: recent one-offs in this window */
 const COLD_START_REGULARS = 3;
 const COLD_START_LIMIT = 6;
@@ -25,72 +31,111 @@ const COLD_START_MAX_HOURS = 30 * 24;
 
 const DAY_HOURS = 24;
 
+export type BuyAgainSuggestion = {
+  name: string;
+  /** Usual quantity for this item, or null when usually bought without one */
+  quantity: string | null;
+  /** Raw history spellings folded into this suggestion (passed to forgetHistory) */
+  variants: string[];
+  /** True when boosted because an item it's often bought with is already waiting on the list */
+  paired: boolean;
+};
+
+type MergedBoughtItem = BoughtItem & { variants: string[] };
+
 /**
- * The names to suggest, best first.
+ * Suggestions to offer, best first.
  *
  * Variants that only differ in case, accents or a trailing plural ("Banana" and "Bananas") are
  * folded into one entry spelled the way it was last bought.
  *
- * With nothing typed: regulars (bought on two days or more) that are due, the most overdue and
- * most often bought first. Items far past their usual cycle decay and eventually drop off so
- * abandoned or seasonal buys don't clog the row. Households with fewer than three regulars yet
- * also see recent one-off buys (2–30 days ago) so the row is useful right away.
+ * With nothing typed: regulars (bought on two days or more) that are due, scoped to `listId` when
+ * given (legacy items with no list stay eligible anywhere), with a boost for items often bought
+ * on the same trip as something already in `inBasket`. Items far past their usual cycle decay and
+ * eventually drop off so abandoned or seasonal buys don't clog the row. Lists with fewer than
+ * three regulars yet also see recent one-off buys (2–30 days ago) so the row is useful right away.
  *
- * While typing: anything bought in the last year with a word starting with what's typed, names
- * that start with it first, ignoring case and accents. The exact name typed isn't repeated.
+ * While typing: anything bought in the last year across all lists with a word starting with what's
+ * typed, names that start with it first (preferring items from `listId`), ignoring case and
+ * accents. The exact name typed isn't repeated.
  *
- * What's already waiting on the list is always left out; what's ticked on the list is treated as
- * just bought so it stays out of idle suggestions without hiding from typed searches.
+ * What's already waiting on the list (`onList`) is always left out; what's ticked (`checkedOnList`)
+ * is treated as just bought so it stays out of idle suggestions without hiding from typed searches.
  */
 export function suggestBuyAgain(
   history: BoughtItem[],
   {
     now,
     typed = "",
+    listId,
     onList = [],
+    inBasket,
     checkedOnList = [],
   }: {
     now: Temporal.Instant;
     typed?: string;
+    listId?: string;
     onList?: readonly string[];
+    /** All open items on the list (including pinned chips), used for co-purchase boosting */
+    inBasket?: readonly string[];
     checkedOnList?: readonly string[];
   },
-): string[] {
+): BuyAgainSuggestion[] {
   const merged = mergeVariants(history);
   const waiting = new Set(onList.map(itemKey));
+  const basket = new Set((inBasket ?? onList).map(itemKey));
   const checked = new Set(checkedOnList.map(itemKey));
   const query = fold(typed);
-  const totalRegulars = merged.filter((item) => item.trips >= 2).length;
+
+  const belongsToOtherList = (item: MergedBoughtItem) =>
+    Boolean(listId && item.listIds.length > 0 && !item.listIds.includes(listId));
+
+  const totalRegulars = merged.filter(
+    (item) => item.trips >= 2 && !belongsToOtherList(item),
+  ).length;
 
   const candidates = merged
     .filter((item) => !waiting.has(itemKey(item.name)))
     .map((item) => {
       const isChecked = checked.has(itemKey(item.name));
       const lateness = isChecked ? 0 : due(item, now);
+      const pairMatches = isChecked
+        ? 0
+        : item.pairedWith.filter((other) => basket.has(itemKey(other))).length;
+      const onThisList = Boolean(listId && item.listIds.includes(listId));
       return {
         item,
         name: item.name,
         isChecked,
         lateness,
-        idleScore: idleScore(item.trips, lateness),
-        typingScore: typingScore(item.trips, lateness),
+        pairMatches,
+        otherList: belongsToOtherList(item),
+        idleScore:
+          idleScore(item.trips, lateness) * (onThisList ? LIST_BOOST : 1) +
+          pairMatches * PAIR_BOOST,
+        typingScore: typingScore(item.trips, lateness) * (onThisList ? LIST_BOOST : 1),
       };
     });
 
   if (!query) {
     const regulars = candidates
-      .filter(
-        ({ isChecked, lateness }) =>
-          !isChecked && lateness !== null && urgency(lateness) >= JUST_BOUGHT,
-      )
+      .filter(({ isChecked, otherList, lateness, pairMatches }) => {
+        if (isChecked || otherList) return false;
+        if (lateness !== null && urgency(lateness) >= JUST_BOUGHT) return true;
+        // Co-purchased items surface even if they decayed, unless literally just bought
+        return pairMatches > 0 && (lateness === null || lateness >= JUST_BOUGHT);
+      })
       .toSorted((a, b) => byScore(a.idleScore, b.idleScore, a.name, b.name))
       .slice(0, REGULARS_LIMIT)
-      .map(({ name }) => name);
+      .map(toSuggestion);
 
     if (totalRegulars < COLD_START_REGULARS && regulars.length < COLD_START_LIMIT) {
+      const picked = new Set(regulars.map((entry) => itemKey(entry.name)));
       const recentOneOffs = candidates
-        .filter(({ item, isChecked }) => {
-          if (isChecked || item.trips !== 1) return false;
+        .filter(({ item, isChecked, otherList }) => {
+          if (isChecked || otherList || item.trips !== 1 || picked.has(itemKey(item.name))) {
+            return false;
+          }
           const ageHours = Temporal.Instant.from(item.lastBoughtAt).until(now).total("hours");
           return ageHours >= COLD_START_MIN_HOURS && ageHours <= COLD_START_MAX_HOURS;
         })
@@ -102,7 +147,7 @@ export function suggestBuyAgain(
             ) || a.name.localeCompare(b.name),
         )
         .slice(0, COLD_START_LIMIT - regulars.length)
-        .map(({ name }) => name);
+        .map(toSuggestion);
       return [...regulars, ...recentOneOffs];
     }
 
@@ -117,17 +162,44 @@ export function suggestBuyAgain(
         (a.fit ?? 0) - (b.fit ?? 0) || byScore(a.typingScore, b.typingScore, a.name, b.name),
     )
     .slice(0, MATCHES_LIMIT)
-    .map(({ name }) => name);
+    .map(toSuggestion);
+}
+
+function toSuggestion({
+  item,
+  pairMatches,
+}: {
+  item: MergedBoughtItem;
+  pairMatches: number;
+}): BuyAgainSuggestion {
+  return {
+    name: item.name,
+    quantity: item.quantity,
+    variants: item.variants,
+    paired: pairMatches > 0,
+  };
 }
 
 /** Combines singular/plural and accent variants into one entry, keeping the latest spelling */
-function mergeVariants(history: BoughtItem[]): BoughtItem[] {
-  const byKey = new Map<string, BoughtItem>();
-  for (const item of history) {
+function mergeVariants(history: BoughtItem[]): MergedBoughtItem[] {
+  const byKey = new Map<string, MergedBoughtItem & { quantityTrips: number; quantityAt: string }>();
+  for (const raw of history) {
+    // Guard against cached or older-API entries missing fields added after v1
+    const item: BoughtItem = {
+      ...raw,
+      quantity: raw.quantity ?? null,
+      listIds: Array.isArray(raw.listIds) ? raw.listIds : [],
+      pairedWith: Array.isArray(raw.pairedWith) ? raw.pairedWith : [],
+    };
     const key = itemKey(item.name);
     const existing = byKey.get(key);
     if (!existing) {
-      byKey.set(key, item);
+      byKey.set(key, {
+        ...item,
+        variants: [item.name],
+        quantityTrips: item.trips,
+        quantityAt: item.lastBoughtAt,
+      });
       continue;
     }
     const itemIsNewer =
@@ -140,11 +212,34 @@ function mergeVariants(history: BoughtItem[]): BoughtItem[] {
         Temporal.Instant.from(item.firstBoughtAt),
         Temporal.Instant.from(existing.firstBoughtAt),
       ) < 0;
+    const preferItemQuantity =
+      item.trips > existing.quantityTrips ||
+      (item.trips === existing.quantityTrips &&
+        Temporal.Instant.compare(
+          Temporal.Instant.from(item.lastBoughtAt),
+          Temporal.Instant.from(existing.quantityAt),
+        ) > 0);
+    const listIds = [...new Set([...existing.listIds, ...item.listIds])];
+    const pairedWith = [
+      ...new Set(
+        [...existing.pairedWith, ...item.pairedWith].filter((other) => itemKey(other) !== key),
+      ),
+    ];
+    const variants = existing.variants.includes(item.name)
+      ? existing.variants
+      : [...existing.variants, item.name];
+
     byKey.set(key, {
       name: itemIsNewer ? item.name : existing.name,
+      quantity: preferItemQuantity ? item.quantity : existing.quantity,
       trips: existing.trips + item.trips,
       firstBoughtAt: itemIsOlder ? item.firstBoughtAt : existing.firstBoughtAt,
       lastBoughtAt: itemIsNewer ? item.lastBoughtAt : existing.lastBoughtAt,
+      listIds,
+      pairedWith,
+      variants,
+      quantityTrips: preferItemQuantity ? item.trips : existing.quantityTrips,
+      quantityAt: preferItemQuantity ? item.lastBoughtAt : existing.quantityAt,
     });
   }
   return [...byKey.values()];

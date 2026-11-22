@@ -10,7 +10,7 @@ import { useChange, useWaitingVars } from "@/lib/offline-changes.ts";
 import { itemKey } from "./item-entry.ts";
 import type { ShoppingListSummary } from "./shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
-import { suggestBuyAgain } from "./buy-again.ts";
+import { suggestBuyAgain, type BuyAgainSuggestion } from "./buy-again.ts";
 import { historyQuery, isListGone, listQuery, listsQuery } from "./shopping.queries.ts";
 
 type Person = { id: string; name: string };
@@ -167,8 +167,17 @@ export function useBuyAgainState(listId: string | undefined) {
   };
 }
 
+/** Removes an item (and its merged spellings) from Buy again history */
+export function useForgetBuyAgain() {
+  const forget = useChange(shoppingChanges.forgetHistory);
+  return (names: string[]) => {
+    if (names.length > 0) forget.run({ names });
+  };
+}
+
 /**
- * "Buy again" names for a list: the household's regulars, or past buys matching what's typed,
+ * "Buy again" suggestions for a list: the household's regulars for this list (boosted by items
+ * often bought together with what's already on the list), or past buys matching what's typed,
  * leaving out what's already waiting on that list (except idle chips pinned in this session).
  * Nothing until the history has loaded.
  */
@@ -176,18 +185,19 @@ export function useBuyAgain(
   listId: string | undefined,
   typed: string,
   pinnedIds?: ReadonlySet<string>,
-): string[] {
+): BuyAgainSuggestion[] {
   const { data: history = [] } = useQuery(historyQuery());
   const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
   // "Due" is judged once per screen, so chips don't reshuffle while someone is picking
   const [now] = useState(() => Temporal.Now.instant());
   const isTyping = typed.trim() !== "";
-  const onList =
-    list?.items
-      .filter((item) => !item.checked && (isTyping || !pinnedIds?.has(item.id)))
-      .map((item) => item.name) ?? [];
+  const allOpen = list?.items.filter((item) => !item.checked) ?? [];
+  const onList = allOpen
+    .filter((item) => isTyping || !pinnedIds?.has(item.id))
+    .map((item) => item.name);
+  const inBasket = allOpen.map((item) => item.name);
   const checkedOnList = list?.items.filter((item) => item.checked).map((item) => item.name) ?? [];
-  return suggestBuyAgain(history, { now, typed, onList, checkedOnList });
+  return suggestBuyAgain(history, { now, typed, listId, onList, inBasket, checkedOnList });
 }
 
 function adjustListCounts(

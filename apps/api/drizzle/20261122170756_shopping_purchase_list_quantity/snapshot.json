@@ -1,0 +1,124 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "8ba6d136-0558-4878-8b41-3722202b7e5c",
+  "prevIds": [
+    "03ca6fda-8983-40ff-921e-dad594cdf05d"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "shopping_purchase",
+        "list_id"
+      ],
+      "writes": [
+        "s|col|public.shopping_purchase.list_id",
+        "n|col|public.shopping_purchase.list_id",
+        "e|col|public.shopping_purchase.list_id"
+      ],
+      "reads": [
+        "n|tbl|public.shopping_purchase",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "shopping_purchase",
+        "quantity"
+      ],
+      "writes": [
+        "s|col|public.shopping_purchase.quantity",
+        "n|col|public.shopping_purchase.quantity",
+        "e|col|public.shopping_purchase.quantity"
+      ],
+      "reads": [
+        "n|tbl|public.shopping_purchase",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "shopping_purchase"
+      ],
+      "writes": [
+        "s|fk|public.shopping_purchase.shopping_purchase_list_id_shopping_list_id_fkey",
+        "n|fk|public.shopping_purchase.shopping_purchase_list_id_shopping_list_id_fkey",
+        "e|fk|public.shopping_purchase.shopping_purchase_list_id_shopping_list_id_fkey",
+        "n|con|public.shopping_purchase.shopping_purchase_list_id_shopping_list_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.shopping_purchase",
+        "n|sch|public",
+        "n|tbl|public.shopping_list",
+        "n|sch|public",
+        "n|col|public.shopping_purchase.list_id",
+        "n|col|public.shopping_list.id",
+        "e|uniqueness|public.shopping_list.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "list_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "quantity",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "shopping_purchase",
+        "name": "shopping_purchase_list_id_shopping_list_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "list_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "shopping_list",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    }
+  ]
+}

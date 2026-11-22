@@ -3,19 +3,21 @@
 // what a phone may still have waiting, so change it only with care.
 import { defineChange } from "@/lib/offline-changes.ts";
 
+import { itemKey } from "./item-entry.ts";
 import {
   addItem,
   clearCheckedItems,
   createList,
   deleteItem,
   deleteList,
+  forgetHistory,
   renameList,
   updateItem,
   type ShoppingItem,
   type ShoppingList,
   type ShoppingListSummary,
 } from "./shopping.api.ts";
-import { listQuery, listsQuery } from "./shopping.queries.ts";
+import { historyQuery, listQuery, listsQuery } from "./shopping.queries.ts";
 
 type Person = { id: string; name: string };
 
@@ -187,6 +189,18 @@ export const shoppingChanges = {
         const checked = before?.items.filter((item) => item.checked) ?? [];
         return checked.length > 0 ? { listId, items: checked } : null;
       },
+    },
+  }),
+
+  forgetHistory: defineChange("shopping", "forget-history", {
+    idempotent: true,
+    ordered: true,
+    send: ({ names }: { names: string[] }) => forgetHistory(names),
+    target: () => historyQuery().queryKey,
+    describe: ({ names }) => `Hid ${names[0] ?? "an item"} from Buy again`,
+    apply: (current, { names }) => {
+      const forgotten = new Set(names.map(itemKey));
+      return current.filter((item) => !forgotten.has(itemKey(item.name)));
     },
   }),
 

@@ -157,11 +157,15 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const target = lists.find((list) => list.id === pickedId) ?? lists[0];
   const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(target?.id);
-  const names = useBuyAgain(target?.id, "", pinnedIds);
+  const suggestions = useBuyAgain(target?.id, "", pinnedIds);
 
-  if (!target || names.length === 0) return null;
+  if (!target || suggestions.length === 0) return null;
 
-  const chips = names.map((name) => ({ name, added: addedIdFor(name) !== undefined }));
+  const chips = suggestions.map(({ name, quantity }) => ({
+    name,
+    quantity,
+    added: addedIdFor(name) !== undefined,
+  }));
 
   return (
     <section aria-labelledby="buy-again-heading" className="mt-8">
@@ -174,7 +178,8 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
       <BuyAgainChips
         chips={chips}
         onPick={(name) => {
-          const id = add(target.id, name, null);
+          const quantity = suggestions.find((item) => item.name === name)?.quantity ?? null;
+          const id = add(target.id, name, quantity);
           markAdded(name, id);
         }}
         onUndo={(name) => {

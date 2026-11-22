@@ -12,6 +12,11 @@ export async function fetchHistory(): Promise<BoughtItem[]> {
   return (await parseResponse(api.shopping.history.$get())).items;
 }
 
+/** Removes past buys by name so they stop showing up in "buy again" */
+export async function forgetHistory(names: string[]): Promise<number> {
+  return (await parseResponse(api.shopping.history.forget.$post({ json: { names } }))).removed;
+}
+
 export async function fetchLists(): Promise<ShoppingListSummary[]> {
   return (await parseResponse(lists.$get())).lists;
 }

@@ -15,7 +15,7 @@ const STORAGE_KEY = "taskhold:offline-cache";
 
 // Bump when the shape of cached data or of a change's variables changes, so an older copy is
 // dropped instead of being shown or sent
-const VERSION = "1";
+const VERSION = "2";
 
 /** After this long without the app being used, a saved copy is dropped instead of restored */
 const MAX_AGE = Temporal.Duration.from({ days: 7 });

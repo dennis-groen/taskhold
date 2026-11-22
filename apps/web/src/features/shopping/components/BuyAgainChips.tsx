@@ -66,8 +66,13 @@ export function BuyAgainChips({
               <PlusIcon weight="bold" aria-hidden className="size-4 shrink-0 text-area-fg" />
             )}
             <span className="truncate">{name}</span>
-            {quantity && !added && (
-              <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+            {quantity && (
+              <span
+                className={cn(
+                  "shrink-0 text-xs font-semibold",
+                  added ? "text-primary-soft-foreground/80" : "text-muted-foreground",
+                )}
+              >
                 · {quantity}
               </span>
             )}

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "../../db/db.ts";
@@ -252,16 +252,28 @@ describe("shopping lists", () => {
 });
 
 /** A fresh list for the person, with shorthand for adding, ticking, renaming and clearing */
-async function shop(person: TestUser) {
-  const list = await listOf(person);
+async function shop(person: TestUser, name = "Groceries") {
+  const list = await listOf(person, name);
   const items = person.api.shopping.lists[":listId"].items;
   return {
-    add: async (name: string, id: string = randomUUID()) =>
-      (await json(await items.$post({ param: { listId: list.id }, json: { id, name } }), 201)).item,
-    patch: (itemId: string, change: { name?: string; checked?: boolean }) =>
-      items[":itemId"].$patch({ param: { listId: list.id, itemId }, json: change }),
+    id: list.id,
+    add: async (itemName: string, id: string = randomUUID(), quantity?: string) =>
+      (
+        await json(
+          await items.$post({
+            param: { listId: list.id },
+            json: { id, name: itemName, ...(quantity !== undefined && { quantity }) },
+          }),
+          201,
+        )
+      ).item,
+    patch: (
+      itemId: string,
+      change: { name?: string; quantity?: string | null; checked?: boolean },
+    ) => items[":itemId"].$patch({ param: { listId: list.id, itemId }, json: change }),
     clear: () =>
       person.api.shopping.lists[":listId"]["clear-checked"].$post({ param: { listId: list.id } }),
+    removeList: () => person.api.shopping.lists[":listId"].$delete({ param: { listId: list.id } }),
   };
 }
 
@@ -276,7 +288,7 @@ describe("buy again history", () => {
     await householdWith(owner, member);
     const list = await shop(owner);
 
-    const milk = await list.add("Milk");
+    const milk = await list.add("Milk", undefined, "2");
     await list.add("Bread");
     expect(await historyOf(owner)).toEqual([]);
 
@@ -287,30 +299,136 @@ describe("buy again history", () => {
     expect(history).toEqual([
       {
         name: "Milk",
+        quantity: "2",
         trips: 1,
         firstBoughtAt: expect.any(String),
         lastBoughtAt: expect.any(String),
+        listIds: [list.id],
+        pairedWith: [],
       },
     ]);
   });
 
-  it("takes a purchase back when the item is unticked, and follows a rename", async () => {
+  it("takes a purchase back when the item is unticked, and follows name and quantity edits", async () => {
     const owner = await signUp();
     await householdWith(owner);
     const list = await shop(owner);
-    const item = await list.add("Mlik");
+    const item = await list.add("Mlik", undefined, "2");
 
     await json(await list.patch(item.id, { checked: true }), 200);
-    await json(await list.patch(item.id, { name: "Milk" }), 200);
-    expect((await historyOf(owner)).map(({ name }) => name)).toEqual(["Milk"]);
+    await json(await list.patch(item.id, { name: "Milk", quantity: "3" }), 200);
+    expect(await historyOf(owner)).toMatchObject([{ name: "Milk", quantity: "3" }]);
 
     await json(await list.patch(item.id, { checked: false }), 200);
     expect(await historyOf(owner)).toEqual([]);
   });
 
-  it("counts one name once per day, whatever its case, spelled as last bought", async () => {
+  it("returns the most common quantity and tracks which lists an item was bought on", async () => {
     const owner = await signUp();
     await householdWith(owner);
+    const groceries = await shop(owner, "Groceries");
+    const market = await shop(owner, "Market");
+
+    const buy = async (
+      target: Awaited<ReturnType<typeof shop>>,
+      name: string,
+      quantity?: string,
+    ) => {
+      const item = await target.add(name, undefined, quantity);
+      await json(await target.patch(item.id, { checked: true }), 200);
+    };
+
+    // Milk: bought twice with "2" and once without quantity -> usual quantity is "2"
+    await buy(groceries, "Milk", "2");
+    await buy(groceries, "Milk", "2");
+    await buy(market, "Milk");
+
+    // Bread: bought twice without quantity and once with "2" -> usual quantity is null
+    await buy(groceries, "Bread");
+    await buy(groceries, "Bread");
+    await buy(groceries, "Bread", "2");
+
+    const history = await historyOf(owner);
+    const milk = history.find((entry) => entry.name === "Milk");
+    const bread = history.find((entry) => entry.name === "Bread");
+    expect(milk?.quantity).toBe("2");
+    expect(milk?.listIds.toSorted()).toEqual([groceries.id, market.id].toSorted());
+    expect(bread?.quantity).toBeNull();
+    expect(bread?.listIds).toEqual([groceries.id]);
+
+    // Deleting a list keeps the purchase history and clears its list id
+    expect((await market.removeList()).status).toBe(204);
+    const afterDelete = await historyOf(owner);
+    expect(afterDelete.find((entry) => entry.name === "Milk")?.listIds).toEqual([groceries.id]);
+  });
+
+  it("detects items often bought on the same trip without pairing ubiquitous staples", async () => {
+    const owner = await signUp();
+    await householdWith(owner);
+    const list = await shop(owner);
+    const now = Temporal.Now.instant();
+
+    const buyOnDay = async (daysAgo: number, names: string[]) => {
+      for (const name of names) {
+        const item = await list.add(name);
+        await json(await list.patch(item.id, { checked: true }), 200);
+        await db
+          .update(shoppingPurchase)
+          .set({ boughtAt: now.subtract({ hours: 24 * daysAgo }) })
+          .where(eq(shoppingPurchase.id, item.id));
+      }
+    };
+
+    // 6 trips: Milk on every trip; Pasta + Passata together on 2 trips
+    await buyOnDay(1, ["Milk", "Pasta", "Passata"]);
+    await buyOnDay(8, ["Milk", "Pasta", "Passata"]);
+    await buyOnDay(15, ["Milk", "Bread"]);
+    await buyOnDay(22, ["Milk", "Eggs"]);
+    await buyOnDay(29, ["Milk", "Apples"]);
+    await buyOnDay(36, ["Milk", "Cheese"]);
+
+    const history = await historyOf(owner);
+    const byName = new Map(history.map((entry) => [entry.name, entry]));
+    expect(byName.get("Passata")?.pairedWith).toEqual(["Pasta"]);
+    expect(byName.get("Pasta")?.pairedWith).toEqual(["Passata"]);
+    // Milk is bought on every trip (lift = 1), so it doesn't pair with Pasta
+    expect(byName.get("Milk")?.pairedWith).toEqual([]);
+  });
+
+  it("forgets named items from history for this household only", async () => {
+    const owner = await signUp();
+    const outsider = await signUp();
+    await householdWith(owner);
+    await householdWith(outsider);
+    const myList = await shop(owner);
+    const theirList = await shop(outsider);
+
+    for (const name of ["Paint roller", "paint roller", "Milk"]) {
+      const item = await myList.add(name);
+      await json(await myList.patch(item.id, { checked: true }), 200);
+    }
+    const theirs = await theirList.add("Paint roller");
+    await json(await theirList.patch(theirs.id, { checked: true }), 200);
+
+    const forgot = await owner.api.shopping.history.forget.$post({
+      json: { names: ["Paint roller"] },
+    });
+    expect(await json(forgot, 200)).toEqual({ removed: 2 });
+    expect((await historyOf(owner)).map(({ name }) => name)).toEqual(["Milk"]);
+    // Outsider's history is untouched, and forgetting again is a safe no-op
+    expect((await historyOf(outsider)).map(({ name }) => name)).toEqual(["Paint roller"]);
+    const again = await owner.api.shopping.history.forget.$post({
+      json: { names: ["Paint roller"] },
+    });
+    expect(await json(again, 200)).toEqual({ removed: 0 });
+
+    const invalid = await owner.api.shopping.history.forget.$post({ json: { names: [] } });
+    expect(await errorCode(invalid, 400)).toBe("INVALID_REQUEST");
+  });
+
+  it("counts one name once per day, whatever its case, spelled as last bought", async () => {
+    const owner = await signUp();
+    const household = await householdWith(owner);
     const list = await shop(owner);
     for (const name of ["milk", "Milk", "Eggs"]) {
       const item = await list.add(name);
@@ -331,7 +449,9 @@ describe("buy again history", () => {
     const rows = await db
       .select({ id: shoppingPurchase.id })
       .from(shoppingPurchase)
-      .where(eq(shoppingPurchase.name, "Eggs"));
+      .where(
+        and(eq(shoppingPurchase.householdId, household.id), eq(shoppingPurchase.name, "Eggs")),
+      );
     expect(rows).toHaveLength(2);
   });
 
@@ -391,6 +511,12 @@ describe("buy again history", () => {
   it("needs a household", async () => {
     const loner = await signUp();
     expect(await errorCode(await loner.api.shopping.history.$get(), 404)).toBe("NOT_IN_HOUSEHOLD");
+    expect(
+      await errorCode(
+        await loner.api.shopping.history.forget.$post({ json: { names: ["Milk"] } }),
+        404,
+      ),
+    ).toBe("NOT_IN_HOUSEHOLD");
   });
 });
 

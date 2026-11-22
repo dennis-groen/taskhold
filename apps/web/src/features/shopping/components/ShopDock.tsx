@@ -121,11 +121,11 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
   const entry = typed.trim() ? parseEntry(typed) : null;
   const isTyping = Boolean(entry?.name);
   const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(listId);
-  const names = useBuyAgain(listId, entry?.name ?? "", pinnedIds);
-  const chips = names.map((name) => ({
+  const suggestions = useBuyAgain(listId, entry?.name ?? "", pinnedIds);
+  const chips = suggestions.map(({ name, quantity }) => ({
     name,
     added: !isTyping && addedIdFor(name) !== undefined,
-    quantity: isTyping ? entry?.quantity : null,
+    quantity: isTyping ? (entry?.quantity ?? quantity) : quantity,
   }));
   // The clash card follows housemates' changes while it's up
   const clashing = clash && list?.items.find((item) => item.id === clash.item.id);
@@ -150,8 +150,9 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
   }
 
   function pickChip(name: string) {
+    const usualQuantity = suggestions.find((item) => item.name === name)?.quantity ?? null;
     const id = addEntry(
-      { name, quantity: isTyping ? (entry?.quantity ?? null) : null },
+      { name, quantity: isTyping ? (entry?.quantity ?? usualQuantity) : usualQuantity },
       // Idle chips shouldn't pop up the keyboard when the input wasn't focused; BuyAgainChips's
       // preventDefault on mousedown already keeps it up when it was
       { focus: isTyping },

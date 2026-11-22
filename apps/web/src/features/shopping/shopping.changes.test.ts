@@ -8,7 +8,7 @@ import { registerChanges, runChange } from "@/lib/offline-changes.ts";
 
 import type { ShoppingList } from "./shopping.api.ts";
 import { shoppingChanges } from "./shopping.changes.ts";
-import { listQuery, listsQuery } from "./shopping.queries.ts";
+import { historyQuery, listQuery, listsQuery } from "./shopping.queries.ts";
 
 const api = vi.hoisted(() => ({
   createList: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   addItem: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   updateItem: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   deleteItem: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  forgetHistory: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 vi.mock("./shopping.api.ts", () => ({
   ...api,
@@ -74,6 +75,7 @@ beforeEach(() => {
   api.addItem.mockResolvedValue({});
   api.updateItem.mockResolvedValue({});
   api.deleteItem.mockResolvedValue({});
+  api.forgetHistory.mockResolvedValue(1);
 });
 
 afterEach(() => {
@@ -214,6 +216,37 @@ describe("shopping changes", () => {
     expect(listNames(queryClient)).toEqual([]);
     expect(api.deleteList).toHaveBeenCalledExactlyOnceWith("list");
     expect(shoppingChanges.deleteList.options(queryClient).meta.idempotent).toBe(true);
+  });
+
+  it("takes forgotten items out of Buy again history straight away", async () => {
+    const queryClient = appClient();
+    queryClient.setQueryData(historyQuery().queryKey, [
+      {
+        name: "Bananas",
+        quantity: "6",
+        trips: 3,
+        firstBoughtAt: "2026-10-01T12:00:00Z",
+        lastBoughtAt: "2026-11-01T12:00:00Z",
+        listIds: ["list"],
+        pairedWith: [],
+      },
+      {
+        name: "Milk",
+        quantity: "2",
+        trips: 5,
+        firstBoughtAt: "2026-10-01T12:00:00Z",
+        lastBoughtAt: "2026-11-01T12:00:00Z",
+        listIds: ["list"],
+        pairedWith: [],
+      },
+    ]);
+
+    await runChange(queryClient, shoppingChanges.forgetHistory, { names: ["Banana", "Bananas"] });
+
+    expect(queryClient.getQueryData(historyQuery().queryKey)?.map((item) => item.name)).toEqual([
+      "Milk",
+    ]);
+    expect(api.forgetHistory).toHaveBeenCalledExactlyOnceWith(["Banana", "Bananas"]);
   });
 
   it("still sends a tick that an earlier version of the app saved on the device", async () => {

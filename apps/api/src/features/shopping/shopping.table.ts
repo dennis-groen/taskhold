@@ -59,7 +59,12 @@ export const shoppingPurchase = pgTable(
     householdId: text("household_id")
       .notNull()
       .references(() => household.id, { onDelete: "cascade" }),
+    // Which list it was bought from, so suggestions follow the list. Nullable so deleting a list
+    // keeps its purchase history and older rows stay valid.
+    listId: text("list_id").references(() => shoppingList.id, { onDelete: "set null" }),
     name: text("name").notNull(),
+    // The amount bought, so "buy again" can pre-fill the usual quantity
+    quantity: text("quantity"),
     boughtAt: instant("bought_at").default(now).notNull(),
   },
   (table) => [

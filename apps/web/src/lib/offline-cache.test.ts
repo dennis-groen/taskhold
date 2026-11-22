@@ -152,8 +152,8 @@ describe("opening the app without a connection", () => {
   it("ignores a copy saved by an older version of the app", async () => {
     await useOnlineAsSam();
     const saved = localStorage.getItem(STORAGE_KEY) ?? "";
-    expect(saved).toContain('"buster":"1:sam"');
-    localStorage.setItem(STORAGE_KEY, saved.replace('"buster":"1:sam"', '"buster":"0:sam"'));
+    expect(saved).toContain('"buster":"2:sam"');
+    localStorage.setItem(STORAGE_KEY, saved.replace('"buster":"2:sam"', '"buster":"1:sam"'));
 
     const app = await openApp();
     await app.openSavedCopy(app.queryClient);
@@ -184,7 +184,7 @@ describe("what's kept on the device", () => {
 describe("another tab of the app", () => {
   it.each([
     ["signs out", null],
-    ["signs in as someone else", JSON.stringify({ buster: "1:bo", timestamp: 0 })],
+    ["signs in as someone else", JSON.stringify({ buster: "2:bo", timestamp: 0 })],
   ])("when it %s, stops this tab saving the last person's data", async (_, newValue) => {
     const app = await useOnlineAsSam();
     // A change that is still waiting to be saved when the other tab signs out
@@ -202,7 +202,7 @@ describe("another tab of the app", () => {
 
   it("leaves this tab alone when it saves for the same person", async () => {
     const app = await useOnlineAsSam();
-    const other = JSON.stringify({ buster: "1:sam", timestamp: Date.now(), clientState: {} });
+    const other = JSON.stringify({ buster: "2:sam", timestamp: Date.now(), clientState: {} });
 
     otherTabStores(other);
 

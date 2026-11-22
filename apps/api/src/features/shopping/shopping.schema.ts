@@ -59,9 +59,14 @@ export const updateItemBody = z
     message: "Nothing to change.",
   });
 
+export const forgetHistoryBody = z.object({
+  names: z.array(itemName(z.string())).min(1).max(20),
+});
+
 export type CreateListInput = z.output<typeof createListBody>;
 export type AddItemInput = z.output<typeof addItemBody>;
 export type UpdateItemInput = z.output<typeof updateItemBody>;
+export type ForgetHistoryInput = z.output<typeof forgetHistoryBody>;
 
 const listColumns = createSelectSchema(shoppingList, {
   createdAt: (schema) => schema.pipe(instantSchema),
@@ -88,12 +93,19 @@ export const shoppingListSchema = listColumns
 
 const purchaseColumns = createSelectSchema(shoppingPurchase);
 
-/** One name the household has bought, for "buy again": how often, and when first and last */
-export const boughtItemSchema = purchaseColumns.pick({ name: true }).extend({
+/**
+ * One name the household has bought, for "buy again": how often, when first and last, its usual
+ * quantity, which lists it's been bought on, and names often bought on the same trip.
+ */
+export const boughtItemSchema = purchaseColumns.pick({ name: true, quantity: true }).extend({
   /** Days it was bought on; two on one day count once */
   trips: z.number(),
   firstBoughtAt: instantSchema,
   lastBoughtAt: instantSchema,
+  /** Lists this item has been bought on; empty for older rows or deleted lists */
+  listIds: z.array(z.string()),
+  /** Other item names frequently bought on the same trip, strongest pairs first */
+  pairedWith: z.array(z.string()),
 });
 
 export type ShoppingListSummary = z.infer<typeof shoppingListSummarySchema>;
