@@ -9,7 +9,13 @@ import type { Housemate } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
 import type { ShoppingListSummary } from "../shopping.api.ts";
-import { useAddItem, useBuyAgain, useManageLists } from "../shopping.hooks.ts";
+import {
+  useAddItem,
+  useBuyAgain,
+  useBuyAgainState,
+  useManageLists,
+  useUndoAddItem,
+} from "../shopping.hooks.ts";
 import { listsQuery } from "../shopping.queries.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
 import { ListMenu } from "./ListMenu.tsx";
@@ -147,13 +153,15 @@ function ListRow({ list, first }: { list: ShoppingListSummary; first: boolean })
 function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
   const { user } = householdRoute.useRouteContext();
   const add = useAddItem(user);
+  const undoAdd = useUndoAddItem();
   const [pickedId, setPickedId] = useState<string | null>(null);
   const target = lists.find((list) => list.id === pickedId) ?? lists[0];
-  const names = useBuyAgain(target?.id, "");
-  const [added, setAdded] = useState<string[]>([]);
-  const shown = names.filter((name) => !added.includes(`${target?.id}:${name}`));
+  const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(target?.id);
+  const names = useBuyAgain(target?.id, "", pinnedIds);
 
-  if (!target || shown.length === 0) return null;
+  if (!target || names.length === 0) return null;
+
+  const chips = names.map((name) => ({ name, added: addedIdFor(name) !== undefined }));
 
   return (
     <section aria-labelledby="buy-again-heading" className="mt-8">
@@ -164,10 +172,15 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
         <ListPicker lists={lists} value={target.id} onChange={setPickedId} />
       </div>
       <BuyAgainChips
-        names={shown}
+        chips={chips}
         onPick={(name) => {
-          setAdded((done) => [...done, `${target.id}:${name}`]);
-          add(target.id, name, null);
+          const id = add(target.id, name, null);
+          markAdded(name, id);
+        }}
+        onUndo={(name) => {
+          const id = addedIdFor(name);
+          clearAdded(name);
+          if (id) undoAdd(target.id, id);
         }}
         className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0"
       />

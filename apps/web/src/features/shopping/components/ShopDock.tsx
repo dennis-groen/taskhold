@@ -12,7 +12,14 @@ import { categorize } from "../categories.ts";
 import { findOnList, parseEntry, type Entry } from "../item-entry.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
 import { shoppingChanges } from "../shopping.changes.ts";
-import { useAddItem, useBuyAgain, useEditItem, useManageLists } from "../shopping.hooks.ts";
+import {
+  useAddItem,
+  useBuyAgain,
+  useBuyAgainState,
+  useEditItem,
+  useManageLists,
+  useUndoAddItem,
+} from "../shopping.hooks.ts";
 import { listQuery } from "../shopping.queries.ts";
 import { stepQuantity } from "../item-quantity.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
@@ -108,28 +115,54 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
   const [clash, setClash] = useState<Clash | null>(null);
   const { data: list } = useQuery(listQuery(listId));
   const add = useAddItem(viewer);
+  const undoAdd = useUndoAddItem();
   const edit = useEditItem(listId);
   const toggle = useChange(shoppingChanges.toggle);
-  const chips = useBuyAgain(listId, typed.trim());
   const entry = typed.trim() ? parseEntry(typed) : null;
+  const isTyping = Boolean(entry?.name);
+  const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(listId);
+  const names = useBuyAgain(listId, entry?.name ?? "", pinnedIds);
+  const chips = names.map((name) => ({
+    name,
+    added: !isTyping && addedIdFor(name) !== undefined,
+    quantity: isTyping ? entry?.quantity : null,
+  }));
   // The clash card follows housemates' changes while it's up
   const clashing = clash && list?.items.find((item) => item.id === clash.item.id);
 
-  function addEntry(next: Entry) {
+  function addEntry(next: Entry, { focus = true }: { focus?: boolean } = {}): string | null {
     const existing = list && findOnList(list.items, next.name);
+    let addedId: string | null = null;
     if (existing) {
       setClash({ item: existing, entry: next });
     } else {
-      add(listId, next.name, next.quantity);
+      addedId = add(listId, next.name, next.quantity);
       setClash(null);
     }
     setTyped("");
-    inputRef.current?.focus();
+    if (focus) inputRef.current?.focus();
+    return addedId;
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (entry?.name) addEntry(entry);
+  }
+
+  function pickChip(name: string) {
+    const id = addEntry(
+      { name, quantity: isTyping ? (entry?.quantity ?? null) : null },
+      // Idle chips shouldn't pop up the keyboard when the input wasn't focused; BuyAgainChips's
+      // preventDefault on mousedown already keeps it up when it was
+      { focus: isTyping },
+    );
+    if (id && !isTyping) markAdded(name, id);
+  }
+
+  function undoChip(name: string) {
+    const id = addedIdFor(name);
+    clearAdded(name);
+    if (id) undoAdd(listId, id);
   }
 
   if (!list) return null;
@@ -159,9 +192,10 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
       ) : null}
 
       <BuyAgainChips
-        names={chips}
-        label={typed.trim() ? "Bought before" : "Buy again"}
-        onPick={(name) => addEntry({ name, quantity: null })}
+        chips={chips}
+        label={isTyping ? "Bought before" : "Buy again"}
+        onPick={pickChip}
+        onUndo={isTyping ? undefined : undoChip}
         className="px-1"
       />
 

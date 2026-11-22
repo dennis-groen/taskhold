@@ -134,7 +134,7 @@ export function foldName(text: string): string {
 }
 
 /** Folded, with the last word made singular, so "Bananas" and "banana" match */
-function itemKey(name: string): string {
+export function itemKey(name: string): string {
   const folded = foldName(name);
   const space = folded.lastIndexOf(" ");
   return folded.slice(0, space + 1) + singular(folded.slice(space + 1));

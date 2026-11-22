@@ -1,25 +1,37 @@
-import { PlusIcon } from "@/components/icons.ts";
+import { CheckIcon, PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { cn } from "cn";
 
+export type BuyAgainChip = {
+  name: string;
+  /** True when tapped in this session and still waiting on the list; tapping again takes it off */
+  added?: boolean;
+  /** Quantity carried from what's being typed, e.g. "2" while typing "2 mi" */
+  quantity?: string | null;
+};
+
 /**
- * Past buys as a row of chips, each with a +. Tapping one adds it. A tap doesn't take focus from
- * a field nearby, so the keyboard stays up for the next item. The row scrolls sideways rather
- * than wrapping, and fades at its edges so it's clear there's more.
+ * Past buys as a row of chips. Tapping one adds it; when `onUndo` is passed, a tapped chip stays
+ * in place as "✓ Name" so neighbouring chips don't jump under the thumb, and tapping again takes it
+ * back off. A tap doesn't take focus from a field nearby, so the keyboard stays up. The row scrolls
+ * sideways rather than wrapping, and fades at its edges so it's clear there's more.
  */
 export function BuyAgainChips({
-  names,
+  chips,
   onPick,
+  onUndo,
   label = "Buy again",
   className,
 }: {
-  names: string[];
+  chips: readonly BuyAgainChip[];
   onPick: (name: string) => void;
+  /** When set, chips act as toggles: tapping an added chip takes it back off the list */
+  onUndo?: (name: string) => void;
   /** Names the row for screen readers */
   label?: string;
   className?: string;
 }) {
-  if (names.length === 0) return null;
+  if (chips.length === 0) return null;
   return (
     <ul
       aria-label={label}
@@ -28,7 +40,7 @@ export function BuyAgainChips({
         className,
       )}
     >
-      {names.map((name) => (
+      {chips.map(({ name, added = false, quantity }) => (
         <li
           key={name}
           className="shrink-0 transition-[opacity,scale] duration-200 ease-(--ease-out) starting:scale-95 starting:opacity-0"
@@ -36,13 +48,29 @@ export function BuyAgainChips({
           <Button
             type="button"
             variant="chip"
-            aria-label={`Add ${name}`}
+            aria-pressed={onUndo ? added : undefined}
+            aria-label={
+              added ? `Remove ${name}` : quantity ? `Add ${quantity} ${name}` : `Add ${name}`
+            }
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => onPick(name)}
+            onClick={() => (added && onUndo ? onUndo(name) : onPick(name))}
             className="h-10 max-w-56 gap-1.5 pr-4 pl-3 active:scale-[0.96]"
           >
-            <PlusIcon weight="bold" aria-hidden className="size-4 shrink-0 text-area-fg" />
+            {added ? (
+              <CheckIcon
+                weight="bold"
+                aria-hidden
+                className="size-4 shrink-0 text-area-fg animate-[check-pop_220ms_var(--ease-out)] motion-reduce:animate-none"
+              />
+            ) : (
+              <PlusIcon weight="bold" aria-hidden className="size-4 shrink-0 text-area-fg" />
+            )}
             <span className="truncate">{name}</span>
+            {quantity && !added && (
+              <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                · {quantity}
+              </span>
+            )}
           </Button>
         </li>
       ))}

@@ -1,7 +1,13 @@
-import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
-import { useChange } from "@/lib/offline-changes.ts";
+import { useChange, useWaitingVars } from "@/lib/offline-changes.ts";
 
+import { itemKey } from "./item-entry.ts";
 import type { ShoppingListSummary } from "./shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
 import { suggestBuyAgain } from "./buy-again.ts";
@@ -80,11 +86,25 @@ export function useManageLists() {
 
 /** Adds an item to any list, optimistically when that list is on screen or cached */
 export function useAddItem(viewer: Person) {
+  const queryClient = useQueryClient();
   const add = useChange(shoppingChanges.add);
   return (listId: string, name: string, quantity: string | null) => {
     const id = crypto.randomUUID();
     add.run({ listId, id, name, quantity, by: person(viewer) });
+    // The overview and sidebar show list counts too; the refetch after the change puts them right
+    // if it fails
+    adjustListCounts(queryClient, listId, { itemCount: 1, openCount: 1 });
     return id;
+  };
+}
+
+/** Removes an item quietly, without an undo toast, e.g. toggling a Buy again chip back off */
+export function useUndoAddItem() {
+  const queryClient = useQueryClient();
+  const remove = useChange(shoppingChanges.remove);
+  return (listId: string, itemId: string) => {
+    remove.run({ listId, itemId });
+    adjustListCounts(queryClient, listId, { itemCount: -1, openCount: -1 });
   };
 }
 
@@ -97,16 +117,95 @@ export function useEditItem(listId: string | undefined) {
 }
 
 /**
- * "Buy again" names for a list: the household's regulars, or past buys matching what's typed,
- * leaving out what's already waiting on that list. Nothing until the history has loaded.
+ * Tracks idle Buy again chips tapped in this session so they stay in place as "✓ Added" instead
+ * of vanishing and shifting neighbouring chips under the thumb. Automatically clears entries if
+ * the item is ticked off or removed elsewhere.
  */
-export function useBuyAgain(listId: string | undefined, typed: string): string[] {
+export function useBuyAgainState(listId: string | undefined) {
+  const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
+  const pendingAddIds = new Set(
+    useWaitingVars(shoppingChanges.add)
+      .filter((vars) => vars.listId === listId)
+      .map((vars) => vars.id),
+  );
+  // Keyed by `${listId}:${itemKey(name)}` so switching target lists on the overview keeps each
+  // list's session taps intact
+  const [picked, setPicked] = useState<Record<string, string>>({});
+
+  const openIds = new Set(list?.items.filter((item) => !item.checked).map((item) => item.id));
+  const checkedIds = new Set(list?.items.filter((item) => item.checked).map((item) => item.id));
+  const prefix = listId ? `${listId}:` : "";
+
+  const activeByKey = new Map<string, string>();
+  if (listId) {
+    for (const [compoundKey, id] of Object.entries(picked)) {
+      if (!compoundKey.startsWith(prefix)) continue;
+      if (checkedIds.has(id)) continue;
+      if (list !== undefined && !openIds.has(id) && !pendingAddIds.has(id)) continue;
+      activeByKey.set(compoundKey.slice(prefix.length), id);
+    }
+  }
+
+  return {
+    pinnedIds: new Set(activeByKey.values()),
+    addedIdFor: (name: string) => activeByKey.get(itemKey(name)),
+    markAdded: (name: string, id: string) => {
+      if (!listId) return;
+      const key = `${listId}:${itemKey(name)}`;
+      setPicked((prev) => ({ ...prev, [key]: id }));
+    },
+    clearAdded: (name: string) => {
+      if (!listId) return;
+      const key = `${listId}:${itemKey(name)}`;
+      setPicked((prev) => {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    },
+  };
+}
+
+/**
+ * "Buy again" names for a list: the household's regulars, or past buys matching what's typed,
+ * leaving out what's already waiting on that list (except idle chips pinned in this session).
+ * Nothing until the history has loaded.
+ */
+export function useBuyAgain(
+  listId: string | undefined,
+  typed: string,
+  pinnedIds?: ReadonlySet<string>,
+): string[] {
   const { data: history = [] } = useQuery(historyQuery());
   const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
   // "Due" is judged once per screen, so chips don't reshuffle while someone is picking
   const [now] = useState(() => Temporal.Now.instant());
-  const onList = list?.items.filter((item) => !item.checked).map((item) => item.name) ?? [];
-  return suggestBuyAgain(history, { now, typed, onList });
+  const isTyping = typed.trim() !== "";
+  const onList =
+    list?.items
+      .filter((item) => !item.checked && (isTyping || !pinnedIds?.has(item.id)))
+      .map((item) => item.name) ?? [];
+  const checkedOnList = list?.items.filter((item) => item.checked).map((item) => item.name) ?? [];
+  return suggestBuyAgain(history, { now, typed, onList, checkedOnList });
+}
+
+function adjustListCounts(
+  queryClient: QueryClient,
+  listId: string,
+  delta: { itemCount: number; openCount: number },
+) {
+  queryClient.setQueryData(listsQuery().queryKey, (lists: ShoppingListSummary[] | undefined) =>
+    lists?.map((list) =>
+      list.id === listId
+        ? {
+            ...list,
+            itemCount: Math.max(0, list.itemCount + delta.itemCount),
+            openCount: Math.max(0, list.openCount + delta.openCount),
+          }
+        : list,
+    ),
+  );
 }
 
 /** Only what the list shows about a person, since a change is saved on the device with its variables */
