@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
-import { InfoIcon, PlusIcon, SlidersHorizontalIcon } from "@/components/icons.ts";
+import { InfoIcon, PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { useChange } from "@/lib/offline-changes.ts";
 import { firstName } from "@/lib/shared-with.ts";
@@ -16,7 +16,6 @@ import { useAddItem, useBuyAgain, useEditItem, useManageLists } from "../shoppin
 import { listQuery } from "../shopping.queries.ts";
 import { stepQuantity } from "../item-quantity.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
-import { QuickAdd } from "./QuickAdd.tsx";
 
 type Viewer = { id: string; name: string };
 
@@ -29,19 +28,17 @@ export function ShopDock({ viewer }: { viewer: Viewer }) {
   return listId ? <ItemField key={listId} listId={listId} viewer={viewer} /> : <NewListField />;
 }
 
-/** The field's shell: the + that sends it, the input, and whatever sits at the end */
+/** The field's shell: the + that sends it and the input */
 function DockForm({
   onSubmit,
   canSubmit,
   submitLabel,
   children,
-  end,
 }: {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   canSubmit: boolean;
   submitLabel: string;
   children: ReactNode;
-  end?: ReactNode;
 }) {
   return (
     <form
@@ -59,13 +56,12 @@ function DockForm({
         <PlusIcon weight="bold" className="size-[22px]" />
       </button>
       {children}
-      {end}
     </form>
   );
 }
 
 const FIELD =
-  "h-full min-w-0 flex-1 bg-transparent text-[1.0625rem] outline-none placeholder:text-muted-foreground";
+  "h-full min-w-0 flex-1 bg-transparent pr-3 text-[1.0625rem] outline-none placeholder:text-muted-foreground";
 
 /** On the overview: type a name, and the list is made and opened */
 function NewListField() {
@@ -92,7 +88,7 @@ function NewListField() {
         maxLength={60}
         autoComplete="off"
         enterKeyHint="go"
-        className={cn(FIELD, "pr-3")}
+        className={FIELD}
       />
     </DockForm>
   );
@@ -104,8 +100,7 @@ type Clash = { item: ShoppingItem; entry: Entry };
 /**
  * On a list: adds what's typed to it. While typing, a card says how it'll be read ("Adds Oat milk
  * · 2 to Dairy & Eggs") and the chips narrow to match. Something the list has already isn't added
- * twice: a card offers to change its amount, untick it, or add a new row anyway. The sliders open
- * the full sheet, for adding to another list.
+ * twice: a card offers to change its amount, untick it, or add a new row anyway.
  */
 function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -174,20 +169,6 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
         onSubmit={submit}
         canSubmit={Boolean(entry?.name)}
         submitLabel={`Add to ${list.name}`}
-        end={
-          <QuickAdd
-            viewer={viewer}
-            trigger={
-              <button
-                type="button"
-                aria-label="Add to another list"
-                className="grid size-11 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-[background-color,scale] duration-150 ease-(--ease-out) hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/80 active:scale-[0.92] motion-reduce:active:scale-100"
-              >
-                <SlidersHorizontalIcon className="size-[22px]" />
-              </button>
-            }
-          />
-        }
       >
         <input
           ref={inputRef}

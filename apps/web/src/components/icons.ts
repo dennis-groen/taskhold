@@ -58,7 +58,6 @@ export {
   ShoppingCartIcon,
   SignOutIcon,
   SkipForwardIcon,
-  SlidersHorizontalIcon,
   SnowflakeIcon,
   SprayBottleIcon,
   SunHorizonIcon,

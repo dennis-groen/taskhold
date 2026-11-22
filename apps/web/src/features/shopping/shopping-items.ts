@@ -47,3 +47,38 @@ export function byCategory(
     return inCategory ? [{ category, items: inCategory }] : [];
   });
 }
+
+export type FoldState = {
+  /** Completed category cards currently folded to their header */
+  folded: ReadonlySet<Category>;
+  /** Completed category cards the shopper tapped open to peek inside */
+  peeked: ReadonlySet<Category>;
+};
+
+/**
+ * Next fold state for category cards on a shopping list. A card unfolds the moment an item in it
+ * is unticked or added (even mid-tap), and peek memory clears as soon as the section is no longer
+ * all done. Newly completed cards only fold once this device is quiet, so a housemate finishing
+ * another aisle never jumps rows under your thumb.
+ */
+export function reconcileFolds(
+  current: FoldState,
+  allDone: ReadonlySet<Category>,
+  quiet: boolean,
+): FoldState {
+  const peeked = new Set([...current.peeked].filter((category) => allDone.has(category)));
+  const candidates = quiet ? allDone : current.folded;
+  const folded = new Set(
+    [...candidates].filter((category) => allDone.has(category) && !peeked.has(category)),
+  );
+  return { folded, peeked };
+}
+
+/** Whether two category sets hold the same members */
+export function sameCategories(a: ReadonlySet<Category>, b: ReadonlySet<Category>): boolean {
+  if (a.size !== b.size) return false;
+  for (const category of a) {
+    if (!b.has(category)) return false;
+  }
+  return true;
+}

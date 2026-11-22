@@ -50,7 +50,10 @@ export function ShoppingItemRow({
   return (
     <li
       data-settling={settling ? (item.checked ? "checked" : "open") : undefined}
-      className="relative flex min-h-12 items-center gap-1 pr-[11px] pl-5 ticks-left:flex-row-reverse ticks-left:pr-5 ticks-left:pl-[11px] before:absolute before:top-0 before:right-0 before:left-5 before:h-px before:bg-border first:before:hidden"
+      // Inside a category card: pl-4 lines item text up with the header's icon chip; pr-[7px]
+      // puts the 26px tick circle (9px inside its 44px target) 16px from the card's edge, flush
+      // with the header count. In left-handed mode, text starts at 7 + 44 + 4 = 55px from left.
+      className="relative flex min-h-12 items-center gap-1 pr-[7px] pl-4 ticks-left:flex-row-reverse ticks-left:pr-4 ticks-left:pl-[7px] before:absolute before:top-0 before:right-0 before:left-4 before:h-px before:bg-border first:before:hidden ticks-left:before:left-[55px]"
     >
       <button
         type="button"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { groupItems } from "./shopping-items.ts";
+import type { Category } from "./categories.ts";
+import { groupItems, reconcileFolds, sameCategories, type FoldState } from "./shopping-items.ts";
 import type { ShoppingItem } from "./shopping.api.ts";
 
 function item(id: string, createdAt: string, checkedAt: string | null = null): ShoppingItem {
@@ -50,5 +51,60 @@ describe("grouping shopping items", () => {
       item("Batteries 2", "2026-11-01T13:00:01Z"),
     ]);
     expect(open.map((entry) => entry.id)).toEqual(["Batteries 2", "Batteries 10"]);
+  });
+});
+
+function state(folded: Category[], peeked: Category[] = []): FoldState {
+  return { folded: new Set(folded), peeked: new Set(peeked) };
+}
+
+describe("folding completed shopping categories", () => {
+  it("folds newly completed categories once this device is quiet, unless peeked", () => {
+    const next = reconcileFolds(
+      state(["Meat & Fish"], ["Bakery"]),
+      new Set<Category>(["Produce", "Bakery", "Meat & Fish"]),
+      true,
+    );
+    expect([...next.folded]).toEqual(["Produce", "Meat & Fish"]);
+    expect([...next.peeked]).toEqual(["Bakery"]);
+  });
+
+  it("never newly folds a category while this device is mid-tap (even if a housemate finishes another aisle)", () => {
+    const next = reconcileFolds(
+      state(["Meat & Fish"]),
+      new Set<Category>(["Produce", "Dairy & Eggs", "Meat & Fish"]),
+      false,
+    );
+    expect([...next.folded]).toEqual(["Meat & Fish"]);
+  });
+
+  it("unfolds a category immediately when an item is unticked or added, even while busy", () => {
+    const next = reconcileFolds(
+      state(["Meat & Fish", "Pantry"]),
+      new Set<Category>(["Pantry"]),
+      false,
+    );
+    expect([...next.folded]).toEqual(["Pantry"]);
+  });
+
+  it("clears peek memory when a peeked category becomes open again so it re-folds next time", () => {
+    const reopened = reconcileFolds(state([], ["Meat & Fish"]), new Set<Category>(), false);
+    expect([...reopened.peeked]).toEqual([]);
+
+    const refolded = reconcileFolds(reopened, new Set<Category>(["Meat & Fish"]), true);
+    expect([...refolded.folded]).toEqual(["Meat & Fish"]);
+  });
+
+  it("compares category sets by membership", () => {
+    expect(
+      sameCategories(
+        new Set<Category>(["Produce", "Pantry"]),
+        new Set<Category>(["Pantry", "Produce"]),
+      ),
+    ).toBe(true);
+    expect(sameCategories(new Set<Category>(["Produce"]), new Set<Category>(["Pantry"]))).toBe(
+      false,
+    );
+    expect(sameCategories(new Set<Category>(["Produce"]), new Set<Category>())).toBe(false);
   });
 });

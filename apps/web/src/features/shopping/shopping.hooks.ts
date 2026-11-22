@@ -2,8 +2,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-quer
 import { useState } from "react";
 import { useChange } from "@/lib/offline-changes.ts";
 
-import { findWaiting, parseEntry, type Entry } from "./item-entry.ts";
-import type { ShoppingItem, ShoppingListSummary } from "./shopping.api.ts";
+import type { ShoppingListSummary } from "./shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
 import { suggestBuyAgain } from "./buy-again.ts";
 import { historyQuery, isListGone, listQuery, listsQuery } from "./shopping.queries.ts";
@@ -16,8 +15,6 @@ type Person = { id: string; name: string };
  */
 export function useShoppingList(listId: string, viewer: Person) {
   const { data: list, error: refetchError } = useSuspenseQuery(listQuery(listId));
-  const add = useAddItem(viewer);
-  const addEntry = useAddEntry(viewer);
   const toggle = useChange(shoppingChanges.toggle);
   const edit = useChange(shoppingChanges.edit);
   const remove = useChange(shoppingChanges.remove);
@@ -27,10 +24,6 @@ export function useShoppingList(listId: string, viewer: Person) {
     list,
     /** Someone deleted the list while it was open */
     gone: isListGone(refetchError),
-    /** Adds what was typed, unless it's already waiting on the list (see useAddEntry) */
-    add: (name: string, quantity: string | null) => addEntry(listId, name, quantity),
-    /** Adds an entry even though the list has it already. Returns the new item's id. */
-    addAnyway: (entry: Entry) => add(listId, entry.name, entry.quantity),
     toggle: (itemId: string, checked: boolean) =>
       toggle.run({ listId, itemId, checked, by: person(viewer) }),
     /** Changes the name and quantity; leave a field out to keep it */
@@ -92,29 +85,6 @@ export function useAddItem(viewer: Person) {
     const id = crypto.randomUUID();
     add.run({ listId, id, name, quantity, by: person(viewer) });
     return id;
-  };
-}
-
-/** What adding typed text did: added it, or found the same item already waiting on the list */
-export type AddResult =
-  | { kind: "added"; id: string; entry: Entry }
-  | { kind: "already"; item: ShoppingItem; entry: Entry };
-
-/**
- * Adds what someone typed to any list. A quantity written into the name moves to its own field
- * ("2 milk" is milk, 2), and an item that's already waiting on the list isn't added twice: that
- * item comes back instead, so the screen can offer to change its quantity or add it anyway.
- * Only checks a list that's loaded on the device; housemates' adds arrive through live updates.
- */
-export function useAddEntry(viewer: Person) {
-  const queryClient = useQueryClient();
-  const add = useAddItem(viewer);
-  return (listId: string, typedName: string, typedQuantity: string | null): AddResult => {
-    const entry = parseEntry(typedName, typedQuantity);
-    const list = queryClient.getQueryData(listQuery(listId).queryKey);
-    const existing = list && findWaiting(list.items, entry.name);
-    if (existing) return { kind: "already", item: existing, entry };
-    return { kind: "added", id: add(listId, entry.name, entry.quantity), entry };
   };
 }
 

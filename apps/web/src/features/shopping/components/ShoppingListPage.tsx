@@ -9,11 +9,18 @@ import { Button } from "@/components/ui/button";
 import { useWaitingVars } from "@/lib/offline-changes.ts";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 
-import { CATEGORY_ICONS } from "../category-icons.ts";
+import type { Category } from "../categories.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "../shopping.changes.ts";
 import { namesOf, useShoppingList } from "../shopping.hooks.ts";
-import { byCategory, groupItems } from "../shopping-items.ts";
+import {
+  byCategory,
+  groupItems,
+  reconcileFolds,
+  sameCategories,
+  type FoldState,
+} from "../shopping-items.ts";
+import { CategorySection } from "./CategorySection.tsx";
 import { EditItemSheet } from "./EditItemSheet.tsx";
 import { ListMenu } from "./ListMenu.tsx";
 import { ListNotFound } from "./ListNotFound.tsx";
@@ -22,10 +29,10 @@ import { ShoppingItemRow } from "./ShoppingItemRow.tsx";
 const routeApi = getRouteApi("/_household/lists/$listId");
 
 /**
- * One list, made for the aisle: a compact bar keeps ten rows on screen, items sit under their
- * section in supermarket order, and the tick is on the right under the thumb. A ticked item
- * sinks to the bottom of its section, so what's left in an aisle stays together. Adding happens
- * in the dock's field below.
+ * One list, made for the aisle: a compact bar keeps rows on screen, each supermarket section
+ * sits in its own card, and the tick is on the right under the thumb. A ticked item sinks to the
+ * bottom of its card, and once every item in a section is ticked and settled the card folds to
+ * its header so remaining aisles rise up. Adding happens in the dock's field below.
  */
 export function ShoppingListPage() {
   const { listId } = routeApi.useParams();
@@ -33,7 +40,7 @@ export function ShoppingListPage() {
   const navigate = useNavigate();
   const { list, gone, toggle, edit, remove, clearChecked } = useShoppingList(listId, user);
   // Ticks stay where they are for a moment, so a wrong one can be taken back in place. No list
-  // ref: rows don't fold away, they move down their own section.
+  // ref: rows don't fold away, they move down their own section and completed cards fold once quiet.
   const { settling, touched } = useSettlingItems();
   // Ticks saved here and not yet synced, so their mark can say so
   const unsynced = new Set(useWaitingVars(shoppingChanges.toggle).map((vars) => vars.itemId));
@@ -43,11 +50,6 @@ export function ShoppingListPage() {
   // Set by "Clear ticked", so the empty list congratulates instead of asking for a first item
   const [finished, setFinished] = useState(false);
 
-  if (gone) return <ListNotFound />;
-
-  const editing = list.items.find((item) => item.id === editingId) ?? null;
-  const ticked = list.items.filter((item) => item.checked);
-  const left = list.items.length - ticked.length;
   const sections = (byCategory(list.items) ?? [{ category: null, items: list.items }]).map(
     ({ category, items }) => {
       const { open, checked } = groupItems(items, settling);
@@ -58,6 +60,54 @@ export function ShoppingListPage() {
       };
     },
   );
+  const allDone = new Set<Category>(
+    sections.flatMap(({ category, items }) =>
+      category !== null && items.length > 0 && items.every((item) => item.checked)
+        ? [category]
+        : [],
+    ),
+  );
+  const quiet = settling.size === 0;
+  // Seeded from `allDone` so a list opened with finished aisles starts folded with no flash.
+  const [foldTracking, setFoldTracking] = useState<{ listId: string; state: FoldState }>(() => ({
+    listId,
+    state: { folded: allDone, peeked: new Set() },
+  }));
+  const currentFolds: FoldState =
+    foldTracking.listId === listId
+      ? foldTracking.state
+      : { folded: allDone, peeked: new Set<Category>() };
+  const nextFolds = reconcileFolds(currentFolds, allDone, quiet);
+  if (
+    foldTracking.listId !== listId ||
+    !sameCategories(currentFolds.folded, nextFolds.folded) ||
+    !sameCategories(currentFolds.peeked, nextFolds.peeked)
+  ) {
+    setFoldTracking({ listId, state: nextFolds });
+  }
+
+  if (gone) return <ListNotFound />;
+
+  const editing = list.items.find((item) => item.id === editingId) ?? null;
+  const ticked = list.items.filter((item) => item.checked);
+  const left = list.items.length - ticked.length;
+
+  function toggleFold(category: Category) {
+    setFoldTracking((prev) => {
+      const base = prev.listId === listId ? prev.state : nextFolds;
+      const folded = new Set(base.folded);
+      const peeked = new Set(base.peeked);
+      if (folded.has(category)) {
+        folded.delete(category);
+        peeked.add(category);
+      } else {
+        peeked.delete(category);
+        if (allDone.has(category)) folded.add(category);
+      }
+      return { listId, state: { folded, peeked } };
+    });
+  }
+
   const rowProps = (item: ShoppingItem) => ({
     item,
     unsynced: unsynced.has(item.id),
@@ -102,11 +152,22 @@ export function ShoppingListPage() {
       />
 
       {list.items.length > 0 ? (
-        <div className="-mx-4 pt-1 sm:-mx-6 lg:mx-0">
-          {sections.map(({ category, items, left: sectionLeft }) => (
-            <section key={category ?? "all"} aria-label={category ?? "To buy"}>
-              {category && <SectionHeading category={category} left={sectionLeft} />}
-              <ul>
+        <div key={listId} className="mt-3 space-y-3 lg:mt-4 lg:space-y-4">
+          {sections.map(({ category, items, left: sectionLeft }) => {
+            const folded = category !== null && nextFolds.folded.has(category);
+            const canFold =
+              category !== null &&
+              (folded || (allDone.has(category) && nextFolds.peeked.has(category)));
+            return (
+              <CategorySection
+                key={category ?? "all"}
+                category={category}
+                left={sectionLeft}
+                total={items.length}
+                folded={folded}
+                canFold={canFold}
+                onToggleFold={() => category && toggleFold(category)}
+              >
                 {items.map((item) => (
                   <ShoppingItemRow
                     key={item.id}
@@ -114,9 +175,9 @@ export function ShoppingListPage() {
                     {...rowProps(item)}
                   />
                 ))}
-              </ul>
-            </section>
-          ))}
+              </CategorySection>
+            );
+          })}
         </div>
       ) : (
         <EmptyState className="mt-6" icon={finished ? ConfettiIcon : BasketIcon}>
@@ -160,27 +221,5 @@ export function ShoppingListPage() {
         onClose={() => setEditingId(null)}
       />
     </>
-  );
-}
-
-/** A section's name with its icon, and how many are left in it */
-function SectionHeading({
-  category,
-  left,
-}: {
-  category: keyof typeof CATEGORY_ICONS;
-  left: number;
-}) {
-  const CategoryIcon = CATEGORY_ICONS[category];
-  return (
-    <h2 className="flex items-baseline justify-between px-5 pt-4 pb-1">
-      <span className="flex items-center gap-1.5 self-center text-sm font-[750]">
-        <CategoryIcon aria-hidden weight="bold" className="size-4 text-area-fg" />
-        {category}
-      </span>
-      <span className="text-[0.8125rem] font-semibold text-muted-foreground tabular-nums">
-        {left === 0 ? "All ticked" : `${left} left`}
-      </span>
-    </h2>
   );
 }
