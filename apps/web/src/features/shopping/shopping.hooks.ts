@@ -1,15 +1,25 @@
 import {
+  onlineManager,
   useQuery,
   useQueryClient,
   useSuspenseQuery,
   type QueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
+import { changeFailed } from "@/lib/feedback.ts";
 import { useChange, useWaitingVars } from "@/lib/offline-changes.ts";
-import type { PersonSummary } from "@/lib/shared-with.ts";
+import { firstName, type PersonSummary } from "@/lib/shared-with.ts";
 
 import { itemKey } from "./item-entry.ts";
-import type { BoughtItem, ShoppingListSummary } from "./shopping.api.ts";
+import {
+  endTrip,
+  startTrip,
+  type BoughtItem,
+  type ShoppingList,
+  type ShoppingListSummary,
+  type ShoppingTrip,
+} from "./shopping.api.ts";
 import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
 import {
   browseBuyAgain,
@@ -55,6 +65,58 @@ export function useShoppingList(listId: string, viewer: PersonSummary) {
 }
 
 /**
+ * Someone out shopping for the list. Needs a connection on purpose: a ping that waits offline and
+ * goes out at the checkout is worse than none, so this is a plain call, not an offline change.
+ */
+export function useShoppingTrip(listId: string, viewer: PersonSummary) {
+  const queryClient = useQueryClient();
+  const { data: list } = useSuspenseQuery(listQuery(listId));
+  const [starting, setStarting] = useState(false);
+  const online = useSyncExternalStore(
+    (onChange) => onlineManager.subscribe(onChange),
+    () => onlineManager.isOnline(),
+  );
+  // A list saved on the device before trips existed has no trip field
+  const trip = list.trip ?? null;
+
+  function setTrip(next: ShoppingTrip | null) {
+    queryClient.setQueryData(listQuery(listId).queryKey, (current: ShoppingList | undefined) =>
+      current ? { ...current, trip: next } : current,
+    );
+  }
+
+  return {
+    trip,
+    mine: trip?.shopper?.id === viewer.id,
+    online,
+    starting,
+    start: async () => {
+      setStarting(true);
+      try {
+        const started = await startTrip(listId, crypto.randomUUID());
+        setTrip(started);
+        if (started.shopper && started.shopper.id !== viewer.id) {
+          toast(`${firstName(started.shopper.name)} is already out shopping.`);
+        }
+      } catch (err) {
+        changeFailed(err, "Couldn't let everyone know. Try again.");
+      } finally {
+        setStarting(false);
+      }
+    },
+    end: async () => {
+      setTrip(null);
+      try {
+        await endTrip(listId);
+      } catch (err) {
+        await queryClient.invalidateQueries({ queryKey: listQuery(listId).queryKey });
+        changeFailed(err, "Couldn't end your trip. Try again.");
+      }
+    },
+  };
+}
+
+/**
  * Making, renaming and deleting lists. They show straight away, wait for a connection and survive
  * a restart (see shopping.changes.ts); a failure rolls back with a notice.
  */
@@ -69,7 +131,7 @@ export function useManageLists() {
     create: (name: string) => {
       const id = crypto.randomUUID();
       // The new list opens before the API has it, offline too
-      queryClient.setQueryData(listQuery(id).queryKey, { id, name, items: [] });
+      queryClient.setQueryData(listQuery(id).queryKey, { id, name, items: [], trip: null });
       createList.run({ id, name });
       return id;
     },

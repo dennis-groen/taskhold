@@ -281,3 +281,9 @@ async function membershipChanged(
     await announce({ householdId: target.householdId, topic: "household" }, tx);
   if (target.userId) await announce({ userId: target.userId, topic: "household" }, tx);
 }
+
+/** The ids of everyone in the household */
+export async function memberIdsOf(householdId: string): Promise<string[]> {
+  const household = await getHousehold(householdId);
+  return household.members.map((member) => member.id);
+}

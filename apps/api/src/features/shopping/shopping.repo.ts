@@ -1,11 +1,11 @@
 // Data access for shopping lists: the only place that queries shopping tables.
 // Every list query is scoped to a household, so a list id from another household reads as missing.
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db, type Executor } from "../../db/db.ts";
 import { user } from "../auth/auth.table.ts";
-import { shoppingItem, shoppingList, shoppingPurchase } from "./shopping.table.ts";
+import { shoppingItem, shoppingList, shoppingPurchase, shoppingTrip } from "./shopping.table.ts";
 import type { BoughtItem, ShoppingItemRecord, ShoppingListSummary } from "./shopping.schema.ts";
 
 export type ListSummaryRecord = ShoppingListSummary;
@@ -333,4 +333,144 @@ export async function countItems(listId: string, executor: Executor = db): Promi
     .from(shoppingItem)
     .where(eq(shoppingItem.listId, listId));
   return rows[0]?.total ?? 0;
+}
+
+/** Locks the list row until the transaction ends, so two people starting a trip take turns */
+export async function lockList(
+  ref: { householdId: string; listId: string },
+  executor: Executor,
+): Promise<{ id: string; name: string } | null> {
+  const rows = await executor
+    .select({ id: shoppingList.id, name: shoppingList.name })
+    .from(shoppingList)
+    .where(and(eq(shoppingList.id, ref.listId), eq(shoppingList.householdId, ref.householdId)))
+    .limit(1)
+    .for("update");
+  return rows[0] ?? null;
+}
+
+export type RunningTrip = {
+  id: string;
+  startedAt: Temporal.Instant;
+  shopper: { id: string; name: string } | null;
+};
+
+/** The trip on the list that hasn't ended and started at or after `since`, if any */
+export async function findRunningTrip(
+  listId: string,
+  since: Temporal.Instant,
+  executor: Executor = db,
+): Promise<RunningTrip | null> {
+  const rows = await executor
+    .select({
+      id: shoppingTrip.id,
+      startedAt: shoppingTrip.startedAt,
+      shopperId: user.id,
+      shopperName: user.name,
+    })
+    .from(shoppingTrip)
+    .leftJoin(user, eq(user.id, shoppingTrip.shopperId))
+    .where(
+      and(
+        eq(shoppingTrip.listId, listId),
+        isNull(shoppingTrip.endedAt),
+        gte(shoppingTrip.startedAt, since),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    startedAt: row.startedAt,
+    shopper: row.shopperId !== null ? { id: row.shopperId, name: row.shopperName ?? "" } : null,
+  };
+}
+
+/** Ends the list's running trips, optionally only one person's or ones that started before a time. Returns how many. */
+export async function endTrips(
+  listId: string,
+  at: Temporal.Instant,
+  filter: { shopperId?: string; startedBefore?: Temporal.Instant } = {},
+  executor: Executor = db,
+): Promise<number> {
+  const rows = await executor
+    .update(shoppingTrip)
+    .set({ endedAt: at })
+    .where(
+      and(
+        eq(shoppingTrip.listId, listId),
+        isNull(shoppingTrip.endedAt),
+        filter.shopperId !== undefined ? eq(shoppingTrip.shopperId, filter.shopperId) : undefined,
+        filter.startedBefore !== undefined
+          ? lt(shoppingTrip.startedAt, filter.startedBefore)
+          : undefined,
+      ),
+    )
+    .returning({ id: shoppingTrip.id });
+  return rows.length;
+}
+
+/** Returns true when the trip was inserted, false when its id was already taken */
+export async function insertTrip(
+  values: Pick<
+    typeof shoppingTrip.$inferInsert,
+    "id" | "householdId" | "listId" | "shopperId" | "notified"
+  >,
+  executor: Executor = db,
+): Promise<boolean> {
+  const rows = await executor
+    .insert(shoppingTrip)
+    .values(values)
+    .onConflictDoNothing()
+    .returning({ id: shoppingTrip.id });
+  return rows.length > 0;
+}
+
+export async function findTripById(
+  id: string,
+  executor: Executor = db,
+): Promise<(RunningTrip & { listId: string; householdId: string }) | null> {
+  const rows = await executor
+    .select({
+      id: shoppingTrip.id,
+      listId: shoppingTrip.listId,
+      householdId: shoppingTrip.householdId,
+      startedAt: shoppingTrip.startedAt,
+      shopperId: user.id,
+      shopperName: user.name,
+    })
+    .from(shoppingTrip)
+    .leftJoin(user, eq(user.id, shoppingTrip.shopperId))
+    .where(eq(shoppingTrip.id, id))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    listId: row.listId,
+    householdId: row.householdId,
+    startedAt: row.startedAt,
+    shopper: row.shopperId !== null ? { id: row.shopperId, name: row.shopperName ?? "" } : null,
+  };
+}
+
+/** Whether a trip on the list that started at or after `since` sent notifications */
+export async function wasNotifiedSince(
+  listId: string,
+  since: Temporal.Instant,
+  executor: Executor = db,
+): Promise<boolean> {
+  const rows = await executor
+    .select({ id: shoppingTrip.id })
+    .from(shoppingTrip)
+    .where(
+      and(
+        eq(shoppingTrip.listId, listId),
+        eq(shoppingTrip.notified, true),
+        gte(shoppingTrip.startedAt, since),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
 }

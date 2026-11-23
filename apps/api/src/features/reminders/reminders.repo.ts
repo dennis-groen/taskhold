@@ -1,6 +1,6 @@
 // Data access for chore reminders: the only place that queries the push subscription and
 // reminder setting tables.
-import { and, desc, eq, exists, isNull, lt, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, exists, inArray, isNull, lt, notInArray, or } from "drizzle-orm";
 
 import { db, type Executor } from "../../db/db.ts";
 import { pushSubscription, reminderSetting } from "./reminders.table.ts";
@@ -191,4 +191,21 @@ export async function claimTestSend(
     )
     .returning({ userId: reminderSetting.userId });
   return rows.length > 0;
+}
+
+/** Devices of the given people who haven't turned shopping trip notifications off */
+export async function findTripListenerDevices(
+  userIds: string[],
+  executor: Executor = db,
+): Promise<SubscriptionRecord[]> {
+  if (userIds.length === 0) return [];
+  return executor
+    .select({
+      endpoint: pushSubscription.endpoint,
+      p256dh: pushSubscription.p256dh,
+      auth: pushSubscription.auth,
+    })
+    .from(pushSubscription)
+    .innerJoin(reminderSetting, eq(reminderSetting.userId, pushSubscription.userId))
+    .where(and(inArray(pushSubscription.userId, userIds), eq(reminderSetting.shoppingTrips, true)));
 }

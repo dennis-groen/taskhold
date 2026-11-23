@@ -4,7 +4,9 @@ import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "../../db/db.ts";
-import { shoppingItem, shoppingList, shoppingPurchase } from "./shopping.table.ts";
+import type { PushMessage, PushTarget } from "../../lib/push.ts";
+import * as shoppingService from "./shopping.service.ts";
+import { shoppingItem, shoppingList, shoppingPurchase, shoppingTrip } from "./shopping.table.ts";
 import { errorCode, householdWith, json, signUp, type TestUser } from "../../../test/harness.ts";
 
 async function listOf(person: TestUser, name = "Groceries") {
@@ -124,7 +126,7 @@ describe("shopping lists", () => {
     const create = () => owner.api.shopping.lists.$post({ json: { id, name: "Market" } });
 
     const { list: first } = await json(await create(), 201);
-    expect(first).toEqual({ id, name: "Market", items: [] });
+    expect(first).toEqual({ id, name: "Market", items: [], trip: null });
     await owner.api.shopping.lists[":listId"].items.$post({
       param: { listId: id },
       json: { name: "Bread" },
@@ -567,5 +569,231 @@ describe("limits", () => {
       "ITEM_LIMIT_REACHED",
     );
     await json(await items.$post({ param, json: { id: last, name: "The 500th" } }), 201);
+  });
+});
+
+/** Subscribes a made-up device; returns its endpoint */
+async function turnOn(person: TestUser) {
+  const endpoint = `https://fcm.googleapis.com/fcm/send/${randomUUID()}`;
+  const response = await person.api.reminders.subscription.$put({
+    json: {
+      subscription: { endpoint, keys: { p256dh: "BPublicKey-x_1", auth: "secret_1" } },
+      timeZone: "UTC",
+    },
+  });
+  await json(response, 200);
+  return endpoint;
+}
+
+/** A push sender that records what it would send */
+function recorder() {
+  const sent: { endpoint: string; message: PushMessage }[] = [];
+  const send = async (target: PushTarget, message: PushMessage) => {
+    sent.push({ endpoint: target.endpoint, message });
+    return "sent" as const;
+  };
+  return { sent, send, to: (endpoint: string) => sent.filter((s) => s.endpoint === endpoint) };
+}
+
+async function currentTrip(person: TestUser, listId: string) {
+  const { list } = await json(
+    await person.api.shopping.lists[":listId"].$get({ param: { listId } }),
+    200,
+  );
+  return list.trip;
+}
+
+async function tripSetup() {
+  const shopper = await signUp("Sam Shopper");
+  const housemate = await signUp("Hannah Home");
+  await householdWith(shopper, housemate);
+  const list = await listOf(shopper, "Groceries");
+  return { shopper, housemate, list };
+}
+
+describe("shopping trips", () => {
+  it("show on the list for every member", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    const trip = await json(
+      await shopper.api.shopping.lists[":listId"].trip.$post({
+        param: { listId: list.id },
+        json: { id: randomUUID() },
+      }),
+      200,
+    );
+    expect(trip.trip.shopper?.id).toBe(shopper.id);
+
+    expect((await currentTrip(housemate, list.id))?.shopper?.id).toBe(shopper.id);
+    expect((await currentTrip(shopper, list.id))?.id).toBe(trip.trip.id);
+  });
+
+  it("tell housemates with a phone, and not the shopper", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    const shopperPhone = await turnOn(shopper);
+    const housematePhone = await turnOn(housemate);
+    const push = recorder();
+
+    await shoppingService.startTrip(shopper.id, list.id, { id: randomUUID() }, push.send);
+
+    expect(push.to(shopperPhone)).toEqual([]);
+    expect(push.to(housematePhone).map((s) => s.message)).toEqual([
+      {
+        title: "Sam is going shopping",
+        body: "Need anything? Add it to Groceries.",
+        url: `/lists/${list.id}`,
+        tag: `shopping-trip-${list.id}`,
+      },
+    ]);
+  });
+
+  it("don't tell a housemate who turned shopping trips off", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    const housematePhone = await turnOn(housemate);
+    await json(
+      await housemate.api.reminders.settings.$patch({ json: { shoppingTrips: false } }),
+      200,
+    );
+    const push = recorder();
+
+    await shoppingService.startTrip(shopper.id, list.id, { id: randomUUID() }, push.send);
+
+    expect(push.to(housematePhone)).toEqual([]);
+  });
+
+  it("don't tell again when started again within 30 minutes", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    await turnOn(housemate);
+    const push = recorder();
+    const first = await shoppingService.startTrip(
+      shopper.id,
+      list.id,
+      { id: randomUUID() },
+      push.send,
+    );
+    expect(push.sent).toHaveLength(1);
+
+    await shoppingService.endTrip(shopper.id, list.id);
+    await shoppingService.startTrip(shopper.id, list.id, { id: randomUUID() }, push.send);
+    expect(push.sent).toHaveLength(1);
+
+    // An hour on, it's news again
+    await shoppingService.endTrip(shopper.id, list.id);
+    await db
+      .update(shoppingTrip)
+      .set({ startedAt: Temporal.Now.instant().subtract({ hours: 1 }) })
+      .where(eq(shoppingTrip.listId, list.id));
+    await shoppingService.startTrip(shopper.id, list.id, { id: randomUUID() }, push.send);
+    expect(push.sent).toHaveLength(2);
+    expect(first.id).toBeTruthy();
+  });
+
+  it("give the first shopper's trip back when someone else starts one", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    const shopperPhone = await turnOn(shopper);
+    await turnOn(housemate);
+    const push = recorder();
+    const first = await shoppingService.startTrip(
+      shopper.id,
+      list.id,
+      { id: randomUUID() },
+      push.send,
+    );
+    expect(push.sent).toHaveLength(1);
+
+    const second = await shoppingService.startTrip(
+      housemate.id,
+      list.id,
+      { id: randomUUID() },
+      push.send,
+    );
+
+    expect(second.id).toBe(first.id);
+    expect(second.shopper?.id).toBe(shopper.id);
+    expect(push.sent).toHaveLength(1);
+    expect(push.to(shopperPhone)).toEqual([]);
+  });
+
+  it("make one trip and one push when the same id is sent twice", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    await turnOn(housemate);
+    const push = recorder();
+    const id = randomUUID();
+
+    const first = await shoppingService.startTrip(shopper.id, list.id, { id }, push.send);
+    const again = await shoppingService.startTrip(shopper.id, list.id, { id }, push.send);
+
+    expect(again.id).toBe(first.id);
+    expect(push.sent).toHaveLength(1);
+    const rows = await db.select().from(shoppingTrip).where(eq(shoppingTrip.listId, list.id));
+    expect(rows).toHaveLength(1);
+
+    // Another household can't use the id
+    const other = await signUp();
+    await householdWith(other);
+    const otherList = await listOf(other);
+    await expect(
+      shoppingService.startTrip(other.id, otherList.id, { id }, push.send),
+    ).rejects.toMatchObject({ code: "TRIP_ID_TAKEN" });
+  });
+
+  it("stop showing after 2 hours, and a new one can start", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    const push = recorder();
+    await shoppingService.startTrip(shopper.id, list.id, { id: randomUUID() }, push.send);
+    await db
+      .update(shoppingTrip)
+      .set({ startedAt: Temporal.Now.instant().subtract({ hours: 3 }) })
+      .where(eq(shoppingTrip.listId, list.id));
+
+    expect(await currentTrip(housemate, list.id)).toBeNull();
+    const fresh = await shoppingService.startTrip(
+      housemate.id,
+      list.id,
+      { id: randomUUID() },
+      push.send,
+    );
+    expect(fresh.shopper?.id).toBe(housemate.id);
+    expect((await currentTrip(shopper, list.id))?.id).toBe(fresh.id);
+  });
+
+  it("end when the shopper clears ticked items, but not when a housemate does", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    const push = recorder();
+    await shoppingService.startTrip(shopper.id, list.id, { id: randomUUID() }, push.send);
+    const param = { listId: list.id };
+
+    await json(
+      await housemate.api.shopping.lists[":listId"]["clear-checked"].$post({ param }),
+      200,
+    );
+    expect(await currentTrip(shopper, list.id)).not.toBeNull();
+
+    await json(await shopper.api.shopping.lists[":listId"]["clear-checked"].$post({ param }), 200);
+    expect(await currentTrip(housemate, list.id)).toBeNull();
+  });
+
+  it("end when anyone ends them, and ending twice is fine", async () => {
+    const { shopper, housemate, list } = await tripSetup();
+    const push = recorder();
+    await shoppingService.startTrip(shopper.id, list.id, { id: randomUUID() }, push.send);
+    const trip = housemate.api.shopping.lists[":listId"].trip;
+    const param = { listId: list.id };
+
+    expect((await trip.$delete({ param })).status).toBe(204);
+    expect(await currentTrip(shopper, list.id)).toBeNull();
+    expect((await trip.$delete({ param })).status).toBe(204);
+  });
+
+  it("are not found from another household", async () => {
+    const { list } = await tripSetup();
+    const stranger = await signUp();
+    await householdWith(stranger);
+    const trip = stranger.api.shopping.lists[":listId"].trip;
+    const param = { listId: list.id };
+
+    expect(await errorCode(await trip.$post({ param, json: { id: randomUUID() } }), 404)).toBe(
+      "LIST_NOT_FOUND",
+    );
+    expect(await errorCode(await trip.$delete({ param }), 404)).toBe("LIST_NOT_FOUND");
   });
 });

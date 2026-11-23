@@ -63,6 +63,8 @@ export const forgetHistoryBody = z.object({
   names: z.array(itemName(z.string())).min(1).max(20),
 });
 
+export const startTripBody = z.object({ id: z.uuid() });
+
 export type CreateListInput = z.output<typeof createListBody>;
 export type AddItemInput = z.output<typeof addItemBody>;
 export type UpdateItemInput = z.output<typeof updateItemBody>;
@@ -86,9 +88,15 @@ export const shoppingItemRecordSchema = itemColumns
 
 export const shoppingItemSchema = shoppingItemRecordSchema.extend({ checked: z.boolean() });
 
+export const shoppingTripSchema = z.object({
+  id: z.string(),
+  shopper: userColumns.nullable(),
+  startedAt: instantSchema,
+});
+
 export const shoppingListSchema = listColumns
   .pick({ id: true, name: true })
-  .extend({ items: z.array(shoppingItemSchema) });
+  .extend({ items: z.array(shoppingItemSchema), trip: shoppingTripSchema.nullable() });
 
 const purchaseColumns = createSelectSchema(shoppingPurchase);
 
@@ -110,5 +118,6 @@ export const boughtItemSchema = purchaseColumns.pick({ name: true, quantity: tru
 export type ShoppingListSummary = z.infer<typeof shoppingListSummarySchema>;
 export type ShoppingItemRecord = z.infer<typeof shoppingItemRecordSchema>;
 export type ShoppingItem = z.infer<typeof shoppingItemSchema>;
+export type ShoppingTrip = z.infer<typeof shoppingTripSchema>;
 export type ShoppingList = z.infer<typeof shoppingListSchema>;
 export type BoughtItem = z.infer<typeof boughtItemSchema>;

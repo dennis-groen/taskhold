@@ -219,7 +219,7 @@ function ReminderSettings({
           <SettingButton
             icon={PaperPlaneTiltIcon}
             title="Send a test"
-            sub={testResult ?? "Arrives on every phone with the reminder on"}
+            sub={testResult ?? "Arrives on every phone with notifications on"}
             disabled={pending}
             onClick={() =>
               void run(async () => {

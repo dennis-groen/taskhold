@@ -1,4 +1,5 @@
-import { index, pgTable, text } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { instant, now } from "../../db/columns.ts";
 
@@ -69,5 +70,36 @@ export const shoppingPurchase = pgTable(
   },
   (table) => [
     index("shopping_purchase_household_bought_idx").on(table.householdId, table.boughtAt),
+  ],
+);
+
+/**
+ * Someone out shopping for a list. Starting one tells the household; it ends with "Done shopping",
+ * "I'm done", or by itself TRIP_LASTS after it started (shopping.service.ts). One running per list.
+ */
+export const shoppingTrip = pgTable(
+  "shopping_trip",
+  {
+    // Chosen by the app, so a start sent twice makes one trip
+    id: text("id").primaryKey(),
+    householdId: text("household_id")
+      .notNull()
+      .references(() => household.id, { onDelete: "cascade" }),
+    listId: text("list_id")
+      .notNull()
+      .references(() => shoppingList.id, { onDelete: "cascade" }),
+    shopperId: text("shopper_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    startedAt: instant("started_at").default(now).notNull(),
+    endedAt: instant("ended_at"),
+    // Whether starting it sent notifications, so a restart soon after doesn't send them again
+    notified: boolean("notified").default(false).notNull(),
+  },
+  (table) => [
+    index("shopping_trip_listId_startedAt_idx").on(table.listId, table.startedAt),
+    uniqueIndex("shopping_trip_one_running_per_list")
+      .on(table.listId)
+      .where(sql`${table.endedAt} is null`),
   ],
 );

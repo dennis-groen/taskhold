@@ -6,6 +6,9 @@ export const listNotFound = () =>
 export const listIdTaken = () =>
   new AppError("conflict", "LIST_ID_TAKEN", "Another list already uses this id.");
 
+export const tripIdTaken = () =>
+  new AppError("conflict", "TRIP_ID_TAKEN", "Another trip already uses this id.");
+
 export const itemNotFound = () =>
   new AppError("not_found", "ITEM_NOT_FOUND", "This item isn't on the list anymore.");
 

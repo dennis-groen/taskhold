@@ -43,6 +43,7 @@ import { CategorySection } from "./CategorySection.tsx";
 import { EditItemSheet } from "./EditItemSheet.tsx";
 import { ListMenu } from "./ListMenu.tsx";
 import { ListNotFound } from "./ListNotFound.tsx";
+import { ShoppingTripBar } from "./ShoppingTripBar.tsx";
 import { ShoppingItemRow } from "./ShoppingItemRow.tsx";
 
 const routeApi = getRouteApi("/_household/lists/$listId");
@@ -188,6 +189,8 @@ export function ShoppingListPage() {
         }
         meter={{ done: ticked.length, total: list.items.length }}
       />
+
+      <ShoppingTripBar listId={list.id} viewer={user} items={list.items} />
 
       <div
         className={cn(

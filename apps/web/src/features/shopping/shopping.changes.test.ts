@@ -47,7 +47,7 @@ const bread = {
   checkedBy: null,
   checkedAt: null,
 };
-const list: ShoppingList = { id: "list", name: "Groceries", items: [milk, bread] };
+const list: ShoppingList = { id: "list", name: "Groceries", items: [milk, bread], trip: null };
 
 function appClient() {
   const queryClient = new QueryClient();

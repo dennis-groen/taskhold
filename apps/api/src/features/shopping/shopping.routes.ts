@@ -9,6 +9,7 @@ import {
   itemParam,
   listBody,
   listParam,
+  startTripBody,
   updateItemBody,
 } from "./shopping.schema.ts";
 
@@ -79,4 +80,21 @@ export const shoppingRoutes = protectedRouter()
     const { listId } = c.req.valid("param");
     const removed = await shoppingService.clearCheckedItems(c.get("user").id, listId);
     return c.json({ removed }, 200);
+  })
+  .post(
+    "/lists/:listId/trip",
+    validate("param", listParam),
+    validate("json", startTripBody),
+    async (c) => {
+      const trip = await shoppingService.startTrip(
+        c.get("user").id,
+        c.req.valid("param").listId,
+        c.req.valid("json"),
+      );
+      return c.json({ trip }, 200);
+    },
+  )
+  .delete("/lists/:listId/trip", validate("param", listParam), async (c) => {
+    await shoppingService.endTrip(c.get("user").id, c.req.valid("param").listId);
+    return c.body(null, 204);
   });

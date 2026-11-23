@@ -7,6 +7,7 @@ import { logger } from "../../lib/logger.ts";
 import { pushConfigured, sendPush, type PushMessage, type SendPush } from "../../lib/push.ts";
 import { annotate, describeError } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
+import * as householdsService from "../households/households.service.ts";
 import * as todosService from "../todos/todos.service.ts";
 import { env } from "../../env.ts";
 import * as remindersRepo from "./reminders.repo.ts";
@@ -81,8 +82,8 @@ export async function sendTest(userId: string, send: SendPush = sendPush): Promi
   const sent = await deliver(
     devices,
     {
-      title: "Reminders are on",
-      body: "Chores and to-dos that are due will show up here every day.",
+      title: "Notifications are on",
+      body: "You'll get your daily reminder and shopping trips here.",
       url: "/chores",
       tag: "chore-reminder-test",
     },
@@ -140,6 +141,22 @@ async function remind(
   const message = summary(chores, todos);
   if (!message) return null;
   const devices = await remindersRepo.findSubscriptions(setting.userId);
+  return deliver(devices, message, send);
+}
+
+/** Tells everyone else in the household who wants to hear about shopping trips. Returns how many devices got it. */
+export async function tellHousemates(
+  {
+    householdId,
+    exceptUserId,
+    message,
+  }: { householdId: string; exceptUserId: string; message: PushMessage },
+  send: SendPush = sendPush,
+): Promise<number> {
+  if (!pushConfigured) return 0;
+  const memberIds = await householdsService.memberIdsOf(householdId);
+  const others = memberIds.filter((id) => id !== exceptUserId);
+  const devices = await remindersRepo.findTripListenerDevices(others);
   return deliver(devices, message, send);
 }
 

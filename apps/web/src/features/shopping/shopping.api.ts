@@ -5,6 +5,7 @@ const lists = api.shopping.lists;
 export type ShoppingListSummary = InferResponseType<typeof lists.$get, 200>["lists"][number];
 export type ShoppingList = InferResponseType<(typeof lists)[":listId"]["$get"], 200>["list"];
 export type ShoppingItem = ShoppingList["items"][number];
+export type ShoppingTrip = NonNullable<ShoppingList["trip"]>;
 export type BoughtItem = InferResponseType<typeof api.shopping.history.$get, 200>["items"][number];
 
 /** What the household bought in the last year, one entry per name, for "buy again" */
@@ -73,6 +74,23 @@ export async function deleteItem(listId: string, itemId: string): Promise<void> 
       param: { listId: pathParam(listId), itemId: pathParam(itemId) },
     }),
   );
+}
+
+/**
+ * Tells the household the person is going shopping. `id` is chosen by the app, so a start sent
+ * twice makes one trip. Returns the trip now running, which is someone else's when they were first.
+ */
+export async function startTrip(listId: string, id: string): Promise<ShoppingTrip> {
+  return (
+    await parseResponse(
+      lists[":listId"].trip.$post({ param: { listId: pathParam(listId) }, json: { id } }),
+    )
+  ).trip;
+}
+
+/** Ends the list's trip. Nobody is notified. */
+export async function endTrip(listId: string): Promise<void> {
+  await parseResponse(lists[":listId"].trip.$delete({ param: { listId: pathParam(listId) } }));
 }
 
 /** Removes every checked item from the list */
