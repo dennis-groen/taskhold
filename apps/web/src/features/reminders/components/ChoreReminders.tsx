@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 
 import {
   BellIcon,
+  BasketIcon,
   BellSlashIcon,
   ClockIcon,
   ExportIcon,
@@ -19,7 +20,7 @@ import { errorMessage } from "@/lib/api.ts";
 import { cn } from "cn";
 
 import { useDeviceReminders } from "../reminders.hooks.ts";
-import { sendTestReminder, updateRemindAt } from "../reminders.api.ts";
+import { sendTestReminder, updateReminderSettings } from "../reminders.api.ts";
 import { reminderKeys, reminderStatusQuery } from "../reminders.queries.ts";
 
 /** What today's reminder would say, from what's due now. The route works it out. */
@@ -47,13 +48,20 @@ function ReminderSettings({
   preview,
 }: {
   publicKey: string | null;
-  settings: { remindAt: string; timeZone: string } | null;
+  settings: {
+    remindAt: string;
+    timeZone: string;
+    dailySummary: boolean;
+    shoppingTrips: boolean;
+  } | null;
   preview: ReminderPreview | null;
 }) {
   const queryClient = useQueryClient();
   const device = useDeviceReminders(publicKey);
   const switchId = useId();
   const timeId = useId();
+  const dailyId = useId();
+  const shoppingId = useId();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -75,17 +83,26 @@ function ReminderSettings({
   async function saveTime(value: string) {
     if (!settings || !value || value === settings.remindAt) return;
     await run(async () => {
-      queryClient.setQueryData(reminderKeys.status(), await updateRemindAt(value));
+      queryClient.setQueryData(
+        reminderKeys.status(),
+        await updateReminderSettings({ remindAt: value }),
+      );
     }, "Couldn't change the time. Try again.");
   }
 
+  async function saveChoice(changes: { dailySummary: boolean } | { shoppingTrips: boolean }) {
+    await run(async () => {
+      queryClient.setQueryData(reminderKeys.status(), await updateReminderSettings(changes));
+    }, "Couldn't save that. Try again.");
+  }
+
   function turnOn() {
-    void run(device.turnOn, "Couldn't turn reminders on. Try again.");
+    void run(device.turnOn, "Couldn't turn notifications on. Try again.");
   }
 
   function flip(checked: boolean) {
     if (!checked) {
-      void run(device.turnOff, "Couldn't turn reminders off.");
+      void run(device.turnOff, "Couldn't turn notifications off.");
       return;
     }
     if (device.state === "needs-install") return setSheet("install");
@@ -113,12 +130,12 @@ function ReminderSettings({
       <SettingRow
         icon={blocked ? BellSlashIcon : BellIcon}
         tone={blocked ? "muted" : undefined}
-        title="Daily reminder"
+        title="Notifications on this phone"
         sub={
           blocked
             ? "Blocked in your phone's Settings"
             : on
-              ? "Your chores, Anyone's, and your to-dos"
+              ? "Daily reminder and shopping trips"
               : `${time}, when chores or to-dos are due`
         }
         htmlFor={switchId}
@@ -149,23 +166,53 @@ function ReminderSettings({
       {on && settings && (
         <>
           <SettingRow
-            icon={ClockIcon}
-            title="Reminder time"
-            sub="Same on all your devices"
-            htmlFor={timeId}
+            icon={BellIcon}
+            title="Daily reminder"
+            sub="Your chores, Anyone's, and your to-dos"
+            htmlFor={dailyId}
             end={
-              <input
-                id={timeId}
-                key={settings.remindAt}
-                type="time"
-                required
-                defaultValue={settings.remindAt}
+              <Switch
+                id={dailyId}
+                checked={settings.dailySummary}
                 disabled={pending}
-                className="h-11 rounded-xl bg-muted px-3 text-base font-[650] tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/80"
-                onBlur={(event) => void saveTime(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void saveTime(event.currentTarget.value);
-                }}
+                onCheckedChange={(checked) => void saveChoice({ dailySummary: checked })}
+              />
+            }
+          />
+          {settings.dailySummary && (
+            <SettingRow
+              icon={ClockIcon}
+              title="Reminder time"
+              sub="Same on all your devices"
+              htmlFor={timeId}
+              end={
+                <input
+                  id={timeId}
+                  key={settings.remindAt}
+                  type="time"
+                  required
+                  defaultValue={settings.remindAt}
+                  disabled={pending}
+                  className="h-11 rounded-xl bg-muted px-3 text-base font-[650] tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/80"
+                  onBlur={(event) => void saveTime(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void saveTime(event.currentTarget.value);
+                  }}
+                />
+              }
+            />
+          )}
+          <SettingRow
+            icon={BasketIcon}
+            title="When someone goes shopping"
+            sub="So you can add what you need"
+            htmlFor={shoppingId}
+            end={
+              <Switch
+                id={shoppingId}
+                checked={settings.shoppingTrips}
+                disabled={pending}
+                onCheckedChange={(checked) => void saveChoice({ shoppingTrips: checked })}
               />
             }
           />
@@ -196,7 +243,7 @@ function ReminderSettings({
 
       <Drawer open={sheet !== null} onOpenChange={(open) => !open && setSheet(null)}>
         <SheetContent>
-          <SheetEyebrow icon={BellIcon}>Daily reminder</SheetEyebrow>
+          <SheetEyebrow icon={BellIcon}>Notifications</SheetEyebrow>
           {sheet === "install" ? (
             <InstallFirst />
           ) : (

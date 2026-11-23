@@ -118,30 +118,33 @@ export async function upsertSetting(
     .onConflictDoUpdate({ target: reminderSetting.userId, set: { timeZone: values.timeZone } });
 }
 
-export async function updateRemindAt(
+export async function updateSettings(
   userId: string,
-  remindAt: Temporal.PlainTime,
+  changes: Partial<{ remindAt: Temporal.PlainTime; dailySummary: boolean; shoppingTrips: boolean }>,
   executor: Executor = db,
 ): Promise<boolean> {
   const rows = await executor
     .update(reminderSetting)
-    .set({ remindAt })
+    .set(changes)
     .where(eq(reminderSetting.userId, userId))
     .returning({ userId: reminderSetting.userId });
   return rows.length > 0;
 }
 
-/** Settings of everyone with at least one device to remind */
-export async function findSettingsWithDevices(executor: Executor = db): Promise<SettingRecord[]> {
+/** Settings of everyone who wants the daily summary and has a device to send it to */
+export async function findDailySummarySettings(executor: Executor = db): Promise<SettingRecord[]> {
   return executor
     .select()
     .from(reminderSetting)
     .where(
-      exists(
-        executor
-          .select({ id: pushSubscription.id })
-          .from(pushSubscription)
-          .where(eq(pushSubscription.userId, reminderSetting.userId)),
+      and(
+        eq(reminderSetting.dailySummary, true),
+        exists(
+          executor
+            .select({ id: pushSubscription.id })
+            .from(pushSubscription)
+            .where(eq(pushSubscription.userId, reminderSetting.userId)),
+        ),
       ),
     );
 }

@@ -1,4 +1,4 @@
-import { index, pgTable, text } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text } from "drizzle-orm/pg-core";
 
 import { instant, now, plainDate, plainTime } from "../../db/columns.ts";
 
@@ -33,6 +33,10 @@ export const reminderSetting = pgTable("reminder_setting", {
   // Local time of day in `timeZone`, the zone of the device they last turned reminders on from
   remindAt: plainTime("remind_at").notNull(),
   timeZone: text("time_zone").notNull(),
+  // Whether the person wants the daily summary. Off still keeps their devices for other notifications.
+  dailySummary: boolean("daily_summary").default(true).notNull(),
+  // Whether the person hears when someone in the household goes shopping (plans/002)
+  shoppingTrips: boolean("shopping_trips").default(true).notNull(),
   // The local date of the last summary, so each day gets at most one
   lastSentOn: plainDate("last_sent_on"),
   // When the person last sent themselves a test notification, so they can't send one after another

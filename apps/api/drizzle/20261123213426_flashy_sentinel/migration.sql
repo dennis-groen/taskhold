@@ -1,0 +1,2 @@
+ALTER TABLE "reminder_setting" ADD COLUMN "daily_summary" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "reminder_setting" ADD COLUMN "shopping_trips" boolean DEFAULT true NOT NULL;

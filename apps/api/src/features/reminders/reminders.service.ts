@@ -17,7 +17,7 @@ import {
   remindersUnavailable,
   testSentRecently,
 } from "./reminders.errors.ts";
-import { isPushService, type SubscribeInput } from "./reminders.schema.ts";
+import { isPushService, type SettingsInput, type SubscribeInput } from "./reminders.schema.ts";
 
 const DEFAULT_REMIND_AT = Temporal.PlainTime.from("08:00");
 // A summary names this many chores, then says how many more there are
@@ -37,6 +37,8 @@ export async function getStatus(userId: string) {
     settings: setting && {
       remindAt: setting.remindAt.toString({ smallestUnit: "minute" }),
       timeZone: setting.timeZone,
+      dailySummary: setting.dailySummary,
+      shoppingTrips: setting.shoppingTrips,
     },
   };
 }
@@ -64,8 +66,9 @@ export async function unsubscribe(userId: string, endpoint: string): Promise<voi
   annotate("reminders", { unsubscribed: removed });
 }
 
-export async function updateRemindAt(userId: string, remindAt: Temporal.PlainTime): Promise<void> {
-  if (!(await remindersRepo.updateRemindAt(userId, remindAt))) throw remindersOff();
+export async function updateSettings(userId: string, input: SettingsInput): Promise<void> {
+  if (!(await remindersRepo.updateSettings(userId, input))) throw remindersOff();
+  annotate("reminders", { settings_changed: Object.keys(input) });
 }
 
 /** Sends a notification to each of the person's devices, so they can see reminders work */
@@ -101,7 +104,7 @@ export async function sendDueReminders(
   let people = 0;
   let notifications = 0;
   let failed = 0;
-  for (const setting of await remindersRepo.findSettingsWithDevices()) {
+  for (const setting of await remindersRepo.findDailySummarySettings()) {
     try {
       const sent = await remind(setting, now, send);
       if (sent === null) continue;

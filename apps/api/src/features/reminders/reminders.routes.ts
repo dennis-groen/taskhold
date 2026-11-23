@@ -17,7 +17,7 @@ export const reminderRoutes = protectedRouter()
     return c.body(null, 204);
   })
   .patch("/settings", validate("json", settingsBody), async (c) => {
-    await remindersService.updateRemindAt(c.get("user").id, c.req.valid("json").remindAt);
+    await remindersService.updateSettings(c.get("user").id, c.req.valid("json"));
     return c.json(await remindersService.getStatus(c.get("user").id), 200);
   })
   .post("/test", async (c) => {

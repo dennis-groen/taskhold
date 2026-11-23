@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "c8a94852-a1ad-47fb-85f6-6f250aa1c081",
+  "prevIds": [
+    "8ba6d136-0558-4878-8b41-3722202b7e5c"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "reminder_setting",
+        "daily_summary"
+      ],
+      "writes": [
+        "s|col|public.reminder_setting.daily_summary",
+        "n|col|public.reminder_setting.daily_summary",
+        "e|col|public.reminder_setting.daily_summary"
+      ],
+      "reads": [
+        "n|tbl|public.reminder_setting",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "reminder_setting",
+        "shopping_trips"
+      ],
+      "writes": [
+        "s|col|public.reminder_setting.shopping_trips",
+        "n|col|public.reminder_setting.shopping_trips",
+        "e|col|public.reminder_setting.shopping_trips"
+      ],
+      "reads": [
+        "n|tbl|public.reminder_setting",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "reminder_setting",
+        "name": "daily_summary",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "reminder_setting",
+        "name": "shopping_trips",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

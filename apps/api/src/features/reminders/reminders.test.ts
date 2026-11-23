@@ -107,6 +107,20 @@ describe("turning reminders on", () => {
     expect(await errorCode(invalid, 400)).toBe("INVALID_REQUEST");
   });
 
+  it("settings answer with both choices, on by default", async () => {
+    const person = await signUp();
+    await turnOn(person);
+    const status = await json(await person.api.reminders.$get(), 200);
+    expect(status.settings).toMatchObject({ dailySummary: true, shoppingTrips: true });
+  });
+
+  it("an empty settings change is refused", async () => {
+    const person = await signUp();
+    await turnOn(person);
+    const response = await person.api.reminders.settings.$patch({ json: {} });
+    expect(await errorCode(response, 400)).toBe("INVALID_REQUEST");
+  });
+
   it("can't change the time before turning them on", async () => {
     const person = await signUp();
     const response = await person.api.reminders.settings.$patch({ json: { remindAt: "09:00" } });
@@ -216,6 +230,35 @@ describe("the daily summary", () => {
 
     await remindersService.sendDueReminders(todayAt("09:00"), send);
     expect(waiting).toHaveLength(2);
+  });
+
+  it("a person who turns the daily reminder off gets no summary", async () => {
+    const person = await signUp();
+    await householdWith(person);
+    await choreOf(person, { name: "Bins", dueOn: utcToday() });
+    const phone = await turnOn(person);
+
+    const off = await person.api.reminders.settings.$patch({ json: { dailySummary: false } });
+    expect((await json(off, 200)).settings?.dailySummary).toBe(false);
+
+    const push = recorder();
+    await remindersService.sendDueReminders(todayAt("09:00"), push.send);
+    expect(push.to(phone)).toEqual([]);
+  });
+
+  it("turning the daily reminder back on brings it back", async () => {
+    const person = await signUp();
+    await householdWith(person);
+    await choreOf(person, { name: "Bins", dueOn: utcToday() });
+    const phone = await turnOn(person);
+
+    await json(await person.api.reminders.settings.$patch({ json: { dailySummary: false } }), 200);
+    const on = await person.api.reminders.settings.$patch({ json: { dailySummary: true } });
+    expect((await json(on, 200)).settings?.dailySummary).toBe(true);
+
+    const push = recorder();
+    await remindersService.sendDueReminders(todayAt("09:00"), push.send);
+    expect(push.to(phone)).toHaveLength(1);
   });
 
   it("stays quiet when nothing is due, or there's no household", async () => {

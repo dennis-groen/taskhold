@@ -23,8 +23,12 @@ export async function saveDevice(subscription: PushSubscription): Promise<Remind
   );
 }
 
-export async function updateRemindAt(remindAt: string): Promise<ReminderStatus> {
-  return parseResponse(reminders.settings.$patch({ json: { remindAt } }));
+export async function updateReminderSettings(changes: {
+  remindAt?: string;
+  dailySummary?: boolean;
+  shoppingTrips?: boolean;
+}): Promise<ReminderStatus> {
+  return parseResponse(reminders.settings.$patch({ json: changes }));
 }
 
 /** Returns how many devices got the test notification */

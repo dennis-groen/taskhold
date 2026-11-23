@@ -60,12 +60,20 @@ export const subscribeBody = z.object({
 
 export const unsubscribeBody = z.object({ endpoint: z.string().max(1024) });
 
-export const settingsBody = z.object({
-  // A time of day, "HH:MM"
-  remindAt: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time like 08:00.")
-    .transform((value) => Temporal.PlainTime.from(value)),
-});
+export const settingsBody = z
+  .object({
+    // A time of day, "HH:MM"
+    remindAt: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time like 08:00.")
+      .transform((value) => Temporal.PlainTime.from(value))
+      .optional(),
+    dailySummary: z.boolean().optional(),
+    shoppingTrips: z.boolean().optional(),
+  })
+  .refine((body) => Object.values(body).some((value) => value !== undefined), {
+    message: "Nothing to change.",
+  });
 
+export type SettingsInput = z.output<typeof settingsBody>;
 export type SubscribeInput = z.infer<typeof subscribeBody>;
