@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { SignOutIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
+import { notify } from "@/lib/feedback.ts";
 
 import { leaveHousehold, type Household } from "../households.api.ts";
 
@@ -46,6 +47,7 @@ export function LeaveHouseholdButton({
       onConfirm={async () => {
         await leaveHousehold();
         await navigate({ to: "/onboarding" });
+        notify(successor ? `You left ${household.name}` : `${household.name} deleted`);
       }}
     />
   );

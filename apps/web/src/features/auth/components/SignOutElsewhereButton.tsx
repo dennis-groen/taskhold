@@ -21,8 +21,8 @@ export function SignOutElsewhereButton() {
         const ended = await signOutElsewhere();
         toast(
           ended === 0
-            ? "You weren't signed in anywhere else."
-            : `Signed out of ${ended === 1 ? "1 other device" : `${ended} other devices`}.`,
+            ? "You weren't signed in anywhere else"
+            : `Signed out of ${ended === 1 ? "1 other device" : `${ended} other devices`}`,
         );
       }}
     />

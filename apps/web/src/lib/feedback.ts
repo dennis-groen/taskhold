@@ -37,6 +37,14 @@ export function offerUndo(
   });
 }
 
+/**
+ * A brief confirmation for something that can't be seen on screen any more, e.g. after a dialog
+ * took the person somewhere else ("Groceries deleted"). Not for changes the screen already shows.
+ */
+export function notify(message: string, detail?: string): void {
+  toast(message, { description: detail });
+}
+
 /** A brief confirmation with a single follow-up action, e.g. "Added 4 to Groceries" · "View" */
 export function notifyAction(message: string, actionLabel: string, onAction: () => void): void {
   toast(message, {

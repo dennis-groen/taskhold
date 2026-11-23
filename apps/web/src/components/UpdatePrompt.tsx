@@ -29,7 +29,8 @@ export function UpdatePrompt() {
 
   useEffect(() => {
     if (!needRefresh) return;
-    toast("A new version of taskhold is ready.", {
+    toast("A new version of taskhold is ready", {
+      description: "Reload to get the latest.",
       id: "app-update",
       // Stays until the person picks: reloading interrupts whatever they're doing
       duration: Number.POSITIVE_INFINITY,

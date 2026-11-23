@@ -27,11 +27,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme}
       className="toaster group"
       icons={{
-        success: <CheckCircleIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <WarningIcon className="size-4" />,
-        error: <XCircleIcon className="size-4" />,
-        loading: <SpinnerIcon className="size-4 animate-spin" />,
+        success: <CheckCircleIcon weight="fill" className="size-5" />,
+        info: <InfoIcon weight="fill" className="size-5" />,
+        warning: <WarningIcon weight="fill" className="size-5" />,
+        error: <XCircleIcon weight="fill" className="size-5" />,
+        loading: <SpinnerIcon className="size-5 animate-spin" />,
       }}
       style={COLORS}
       toastOptions={{

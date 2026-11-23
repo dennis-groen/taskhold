@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { UserMinusIcon } from "@/components/icons.ts";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
+import { notify } from "@/lib/feedback.ts";
 
 import { removeMember, type HouseholdMember } from "../households.api.ts";
 
@@ -43,6 +44,7 @@ export function RemoveMemberButton({
         onConfirm={async () => {
           await removeMember(member.id);
           await router.invalidate();
+          notify(`${firstName} removed`, "Your household has a new invite code.");
         }}
       />
     </>

@@ -96,7 +96,9 @@ export function useShoppingTrip(listId: string, viewer: PersonSummary) {
         const started = await startTrip(listId, crypto.randomUUID());
         setTrip(started);
         if (started.shopper && started.shopper.id !== viewer.id) {
-          toast(`${firstName(started.shopper.name)} is already out shopping.`);
+          toast.info(`${firstName(started.shopper.name)} is already out shopping`, {
+            description: "They'll tick things off as they go.",
+          });
         }
       } catch (err) {
         changeFailed(err, "Couldn't let everyone know. Try again.");

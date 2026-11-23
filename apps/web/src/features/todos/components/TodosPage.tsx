@@ -125,10 +125,10 @@ export function TodosPage() {
         }}
         onMove={(todo) => {
           moveToChores(todo.id);
-          toast("Moved to Chores, for anyone", {
+          toast("Moved to Chores", {
             description: todo.notes
-              ? `${todo.name} is shared now. Its notes were deleted.`
-              : `${todo.name} is shared now.`,
+              ? `${todo.name} is shared with everyone now. Its notes were deleted.`
+              : `${todo.name} is shared with everyone now.`,
             action: { label: "View", onClick: () => void navigate({ to: "/chores" }) },
           });
         }}

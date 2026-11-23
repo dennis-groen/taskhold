@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Spinner } from "@/components/ui/spinner";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { errorMessage } from "@/lib/api.ts";
+import { notify } from "@/lib/feedback.ts";
 
 import { InviteCodeSlots } from "./InviteCodeSlots.tsx";
 import { acceptInvite, lookUpInvite, type InvitePreview } from "../households.api.ts";
@@ -47,6 +48,7 @@ export function JoinHouseholdPage() {
     try {
       await acceptInvite(code);
       await navigate({ to: "/lists" });
+      if (invite) notify(`Welcome to ${invite.householdName}`);
     } catch (err) {
       setJoinError(errorMessage(err, "Couldn't join the household. Try again."));
       setJoining(false);

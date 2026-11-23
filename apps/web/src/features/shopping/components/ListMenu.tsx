@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { notify } from "@/lib/feedback.ts";
 import { cn } from "cn";
 
 import { useManageLists } from "../shopping.hooks.ts";
@@ -78,6 +79,7 @@ export function ListMenu({
           await beforeDelete?.();
           // Gone from the overview straight away, and sent once there is a connection
           remove(list.id);
+          notify(`${list.name} deleted`);
         }}
       />
     </>

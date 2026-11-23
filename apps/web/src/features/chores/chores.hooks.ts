@@ -61,14 +61,14 @@ export function usePutOff(viewer: PersonSummary) {
           choreId: chore.id,
           dueOn: Temporal.PlainDate.from(on).add({ days: 1 }).toString(),
         },
-        { message: `${chore.name} moved to tomorrow.` },
+        { message: `${chore.name} moved to tomorrow` },
       ),
     skip: (chore: Chore, on: string) => {
       const moved = skip(scheduleOf(chore), Temporal.PlainDate.from(on));
-      const due = moved.kind === "moved" ? ` ${dueLabel(moved.dueOn.toString(), on)}.` : "";
+      const detail = moved.kind === "moved" ? dueLabel(moved.dueOn.toString(), on) : undefined;
       skipChange.run(
         { choreId: chore.id, today: on, by: { id: viewer.id, name: viewer.name } },
-        { message: `${chore.name} skipped.${due}` },
+        { message: `${chore.name} skipped`, detail },
       );
     },
   };
