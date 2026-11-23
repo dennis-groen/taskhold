@@ -15,19 +15,19 @@ import { CompactHeader } from "@/components/layout/AreaHeader.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Button } from "@/components/ui/button";
 import { offerUndo } from "@/lib/feedback.ts";
-import { useWaitingVars } from "@/lib/offline-changes.ts";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { cn } from "cn";
 
 import type { Category } from "../categories.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
-import { shoppingChanges, type ItemChanges } from "../shopping.changes.ts";
+import type { ItemChanges } from "../shopping.changes.ts";
 import {
   namesOf,
   useAddItem,
   useBuyAgain,
   useBuyAgainHistoryCount,
   useBuyAgainState,
+  usePendingToggleIds,
   useShoppingList,
   useUndoAddItem,
 } from "../shopping.hooks.ts";
@@ -62,7 +62,7 @@ export function ShoppingListPage() {
   // ref: rows don't fold away, they move down their own section and completed cards fold once quiet.
   const { settling, touched } = useSettlingItems();
   // Ticks saved here and not yet synced, so their mark can say so
-  const unsynced = new Set(useWaitingVars(shoppingChanges.toggle).map((vars) => vars.itemId));
+  const unsynced = usePendingToggleIds();
   // The item open in the edit sheet. Looked up on each render, so the sheet closes by itself if a
   // housemate removes the item while it's open.
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -75,10 +75,8 @@ export const householdRecordSchema = householdColumns
   .pick({ id: true, name: true, inviteCode: true })
   .extend({ members: z.array(memberRecordSchema) });
 
-export type HouseholdMember = z.infer<typeof householdMemberSchema>;
 export type Household = z.infer<typeof householdSchema>;
 export type Membership = z.infer<typeof membershipSchema>;
 export type InvitePreview = z.infer<typeof invitePreviewSchema>;
 export type MembershipRecord = z.infer<typeof membershipRecordSchema>;
-export type MemberRecord = z.infer<typeof memberRecordSchema>;
 export type HouseholdRecord = z.infer<typeof householdRecordSchema>;

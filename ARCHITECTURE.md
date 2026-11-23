@@ -115,16 +115,21 @@ Both apps use the [Temporal API](https://developer.mozilla.org/en-US/docs/Web/Ja
 - **Comparing timestamps:** use `Temporal.Instant.compare`, not string comparison. ISO strings vary in precision (`…:00Z` vs `…:00.5Z`).
 - **Not converted:** `performance.now()` stays for measuring request durations, because it's monotonic and not a date. pino's log timestamps come from pino itself.
 
-## Enforced by lint
+## Enforced by lint and repo invariants
 
-`.oxlintrc.json` turns these rules into `no-restricted-imports` errors, so `pnpm check` fails when a file reaches across a boundary:
+`.oxlintrc.json` turns these rules into lint errors, and `test/repo-invariants.test.ts` plus `knip` catch cross-package drift and dead code, so `pnpm check` fails when a file reaches across a boundary:
 
 - API routes and middleware can't import a repo, a table, the database client or `drizzle-orm`.
-- API services can't build queries (no `drizzle-orm`, no `db`) and can't import another feature's repo or routes. Routes can't import another feature's routes.
+- API services can't build queries (no `drizzle-orm`, no `db`), can't import routes/middleware, and can't import another feature's repo or routes. Routes can't import another feature's routes.
+- API domain helpers and other non-role feature files can't import `drizzle-orm`, repos, runtime tables, `db`, or the HTTP layer. Tables and schemas can't import `db`, repos, services or routes.
 - API repo files can't import services or routes. `lib/` and `env.ts` can't import features.
 - The files the web app bundles from the API (`chore-schedule.ts`, `invite-code.ts`, `live-topics.ts`) import types only.
 - No import cycles, in either app.
-- Web shared code can't import features, routes or the router. Features can't import routes, the router or other features, keep `.tsx` files in `components/`, and can't nest folders more than one level deep.
-- Web features don't import `useMutation` or `mutationOptions`: writes are changes (`lib/offline-changes.ts`). Components of the areas (shopping, chores, to-dos) import only types from their feature's `*.api.ts`, so they can't call the API by hand either; they write through the feature's hooks.
+- Web shared code can't import features, routes or the router. Features can't import routes, the router or other features, keep `.ts` files at the feature's root and `.tsx` components directly in `components/`, and can't add other subfolders.
+- Web features don't import `useMutation` or `mutationOptions`: writes are changes (`lib/offline-changes.ts`). Feature components run changes through their feature's `*.hooks.ts` (no direct `useChange`, `useWaitingVars`, or runtime `*.changes.ts` imports). Components of the areas (shopping, chores, to-dos) import only types from their feature's `*.api.ts`.
 - Web code imports icons from `components/icons.ts`, never from `@phosphor-icons/react`, so the icon library can be swapped in one file. Only `icons.ts` and the shadcn files in `components/ui/` import the library.
+- `Date` is disallowed everywhere except generated `auth.table.ts`: use `Temporal` (and `performance.now()` for durations).
+- Source files stay under 500 non-blank, non-comment lines (tests, shadcn `components/ui/`, and `grocery-words.ts` are exempt).
 - Default exports are errors everywhere except tool configs (`*.config.ts`).
+- `test/repo-invariants.test.ts` checks that `.oxlintrc.json` regexes are valid for oxlint's Rust regex engine, every shared API export is in `.oxlintrc.json`'s types-only override, every `*.table.ts` is re-exported in `db/schema.ts`, every `*.routes.ts` is mounted in `app.ts`, every `AREA` is covered in `.oxlintrc.json`, web feature folders stay flat, and the API/web offline max-age constants stay in sync.
+- `pnpm knip` checks for unused files, exports, types and dependencies across workspaces.

@@ -140,7 +140,7 @@ describe("opening the app without a connection", () => {
 
   it("restores nothing from a copy saved more than a week ago", async () => {
     await useOnlineAsSam();
-    vi.setSystemTime(Date.now() + 8 * 24 * 60 * 60 * 1_000);
+    vi.setSystemTime(Temporal.Now.instant().add({ hours: 8 * 24 }).epochMilliseconds);
 
     const app = await openApp();
     await app.openSavedCopy(app.queryClient);
@@ -202,7 +202,11 @@ describe("another tab of the app", () => {
 
   it("leaves this tab alone when it saves for the same person", async () => {
     const app = await useOnlineAsSam();
-    const other = JSON.stringify({ buster: "2:sam", timestamp: Date.now(), clientState: {} });
+    const other = JSON.stringify({
+      buster: "2:sam",
+      timestamp: Temporal.Now.instant().epochMilliseconds,
+      clientState: {},
+    });
 
     otherTabStores(other);
 

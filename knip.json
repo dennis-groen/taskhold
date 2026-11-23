@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "drizzle": false,
+  "rules": {
+    "duplicates": "off"
+  },
+  "workspaces": {
+    ".": {
+      "entry": ["test/**/*.test.ts"]
+    },
+    "apps/api": {
+      "entry": ["src/db/migrate.ts", "drizzle.config.ts"]
+    },
+    "apps/web": {
+      "ignore": ["src/components/ui/**", "public/**"]
+    }
+  }
+}

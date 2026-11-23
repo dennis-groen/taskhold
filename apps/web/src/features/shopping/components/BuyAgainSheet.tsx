@@ -1,3 +1,4 @@
+// oxlint-disable max-lines -- tracked for split into subcomponents
 import { useQuery } from "@tanstack/react-query";
 import {
   useCallback,
@@ -29,7 +30,6 @@ import {
 import { SheetContent, SheetEyebrow } from "@/components/layout/Sheet.tsx";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerClose, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import { useChange } from "@/lib/offline-changes.ts";
 import { firstName } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
@@ -44,13 +44,13 @@ import { CATEGORY_ICONS } from "../category-icons.ts";
 import { findOnList, itemKey, parseEntry } from "../item-entry.ts";
 import { stepQuantity } from "../item-quantity.ts";
 import type { BoughtItem, ShoppingItem } from "../shopping.api.ts";
-import { shoppingChanges } from "../shopping.changes.ts";
 import {
   useAddItem,
   useBuyAgainCatalog,
   useBuyAgainState,
   useEditItem,
   useForgetBuyAgain,
+  useToggleItem,
   useUndoAddItem,
 } from "../shopping.hooks.ts";
 import { historyQuery, listQuery } from "../shopping.queries.ts";
@@ -329,7 +329,7 @@ function BuyAgainSheetContent({
   const undoAdd = useUndoAddItem();
   const edit = useEditItem(listId);
   const forget = useForgetBuyAgain();
-  const toggle = useChange(shoppingChanges.toggle);
+  const toggle = useToggleItem(listId, viewer);
   const { addedIdFor, markAdded, clearAdded, pinnedIds } = useBuyAgainState(listId);
 
   useEffect(() => {
@@ -596,7 +596,7 @@ function BuyAgainSheetContent({
     const existing = findOnList(list.items, entry.name);
     if (existing) {
       if (existing.checked) {
-        toggle.run({ listId, itemId: existing.id, checked: false, by: viewer });
+        toggle(existing.id, false);
         if (overrideQuantity && overrideQuantity !== existing.quantity) {
           edit(existing.id, { quantity: overrideQuantity });
         }
@@ -608,12 +608,7 @@ function BuyAgainSheetContent({
       } else if (untickedByKey[key]?.id === existing.id) {
         // Second tap on an item unticked in this session ticks it back off with its original ticker
         const original = untickedByKey[key];
-        toggle.run({
-          listId,
-          itemId: existing.id,
-          checked: true,
-          by: original.checkedBy ?? viewer,
-        });
+        toggle(existing.id, true, original.checkedBy ?? viewer);
         setUntickedByKey((prev) => {
           const next = { ...prev };
           delete next[key];
@@ -653,7 +648,7 @@ function BuyAgainSheetContent({
       const existing = findOnList(list.items, entry.name);
       if (existing) {
         if (existing.checked) {
-          toggle.run({ listId, itemId: existing.id, checked: false, by: viewer });
+          toggle(existing.id, false);
           unticked.push({
             key: itemKey(entry.name),
             id: existing.id,
@@ -687,12 +682,7 @@ function BuyAgainSheetContent({
             undoAdd(listId, item.id);
           }
           for (const item of unticked) {
-            toggle.run({
-              listId,
-              itemId: item.id,
-              checked: true,
-              by: item.checkedBy ?? viewer,
-            });
+            toggle(item.id, true, item.checkedBy ?? viewer);
           }
           setAnnouncement(`Took ${count} back off ${listName}`);
           // The items come back a moment later; until then the button stays, showing "Add N due",
@@ -721,7 +711,7 @@ function BuyAgainSheetContent({
     const existing = findOnList(list.items, parsedQuery.name);
     if (existing) {
       if (existing.checked) {
-        toggle.run({ listId, itemId: existing.id, checked: false, by: viewer });
+        toggle(existing.id, false);
         if (parsedQuery.quantity && parsedQuery.quantity !== existing.quantity) {
           edit(existing.id, { quantity: parsedQuery.quantity });
         }

@@ -66,7 +66,6 @@ export const forgetHistoryBody = z.object({
 export type CreateListInput = z.output<typeof createListBody>;
 export type AddItemInput = z.output<typeof addItemBody>;
 export type UpdateItemInput = z.output<typeof updateItemBody>;
-export type ForgetHistoryInput = z.output<typeof forgetHistoryBody>;
 
 const listColumns = createSelectSchema(shoppingList, {
   createdAt: (schema) => schema.pipe(instantSchema),

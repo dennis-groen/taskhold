@@ -105,7 +105,7 @@ function deferred() {
 function saveAndRestart(queryClient: QueryClient) {
   const saved: PersistedClient = asWaiting({
     buster: "",
-    timestamp: Date.now(),
+    timestamp: Temporal.Now.instant().epochMilliseconds,
     clientState: dehydrate(queryClient, dehydrateOptions),
   });
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- round trip of what was just written

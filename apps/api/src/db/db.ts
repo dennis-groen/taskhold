@@ -32,7 +32,7 @@ pool.on("error", (err) => {
 // Counts queries per request for the wide event. Query text and parameters aren't logged.
 export const db = drizzle({ client: pool, relations, logger: { logQuery: countQuery } });
 
-export type Database = typeof db;
+type Database = typeof db;
 export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /** Anything that can run queries. Repo functions take one so services can pass a transaction. */

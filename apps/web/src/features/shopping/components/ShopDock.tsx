@@ -4,14 +4,12 @@ import { useRef, useState, type FocusEvent, type FormEvent, type ReactNode } fro
 
 import { ClockCounterClockwiseIcon, InfoIcon, PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
-import { useChange } from "@/lib/offline-changes.ts";
 import { firstName } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
 import { categorize } from "../categories.ts";
 import { findOnList, parseEntry, type Entry } from "../item-entry.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
-import { shoppingChanges } from "../shopping.changes.ts";
 import {
   useAddItem,
   useBuyAgain,
@@ -20,6 +18,7 @@ import {
   useBuyAgainState,
   useEditItem,
   useManageLists,
+  useToggleItem,
   useUndoAddItem,
 } from "../shopping.hooks.ts";
 import { listQuery } from "../shopping.queries.ts";
@@ -122,7 +121,7 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
   const add = useAddItem(viewer);
   const undoAdd = useUndoAddItem();
   const edit = useEditItem(listId);
-  const toggle = useChange(shoppingChanges.toggle);
+  const toggle = useToggleItem(listId, viewer);
   const historyCount = useBuyAgainHistoryCount();
   const dueCount = useBuyAgainDueCount(listId);
   const entry = typed.trim() ? parseEntry(typed) : null;
@@ -207,7 +206,7 @@ function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
               entry={clash.entry}
               viewerId={viewer.id}
               onUntick={() => {
-                toggle.run({ listId, itemId: clashing.id, checked: false, by: viewer });
+                toggle(clashing.id, false);
                 setClash(null);
               }}
               onSetQuantity={(quantity) => {

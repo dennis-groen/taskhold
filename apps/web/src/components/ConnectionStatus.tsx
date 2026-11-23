@@ -1,5 +1,5 @@
 import { onlineManager, useQueryClient } from "@tanstack/react-query";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import {
   ArrowClockwiseIcon,
@@ -14,10 +14,17 @@ import { useWaitingChanges } from "@/lib/offline-changes.ts";
 import { cn } from "cn";
 
 // When the connection went, for "Offline since 9:31". Kept outside React so it survives pages.
-let offlineSince: number | null = onlineManager.isOnline() ? null : Date.now();
-onlineManager.subscribe((online) => {
-  offlineSince = online ? null : (offlineSince ?? Date.now());
-});
+let offlineSince: number | null = null;
+const offlineListeners = new Set<() => void>();
+
+function recordOfflineSince(online: boolean) {
+  const next = online ? null : (offlineSince ?? Temporal.Now.instant().epochMilliseconds);
+  if (next === offlineSince) return;
+  offlineSince = next;
+  for (const listener of offlineListeners) listener();
+}
+
+onlineManager.subscribe(recordOfflineSince);
 
 /**
  * A pill at the top while the device is offline, so a tick in a basement supermarket doesn't
@@ -29,6 +36,16 @@ export function ConnectionStatus() {
     (onChange) => onlineManager.subscribe(onChange),
     () => onlineManager.isOnline(),
   );
+  const since = useSyncExternalStore(
+    (onChange) => {
+      offlineListeners.add(onChange);
+      return () => offlineListeners.delete(onChange);
+    },
+    () => offlineSince,
+  );
+  useEffect(() => {
+    recordOfflineSince(online);
+  }, [online]);
   const waiting = useWaitingChanges();
   const [open, setOpen] = useState(false);
   const count = waiting.length;
@@ -63,9 +80,7 @@ export function ConnectionStatus() {
       <Drawer open={open} onOpenChange={setOpen}>
         <SheetContent>
           <SheetEyebrow icon={CloudSlashIcon}>
-            {online
-              ? "Back online"
-              : `Offline${offlineSince ? ` since ${clock(offlineSince)}` : ""}`}
+            {online ? "Back online" : `Offline${since ? ` since ${clock(since)}` : ""}`}
           </SheetEyebrow>
           <div className={cn(SHEET_BODY, "pt-1")}>
             <DrawerTitle className="text-[1.75rem] leading-[1.1] font-[850] tracking-[-0.02em] [font-stretch:118%]">
@@ -127,5 +142,7 @@ function TryNow() {
 
 /** "9:31" */
 function clock(epochMs: number): string {
-  return new Date(epochMs).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return Temporal.Instant.fromEpochMilliseconds(epochMs)
+    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+    .toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }

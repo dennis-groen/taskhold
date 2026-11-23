@@ -49,9 +49,9 @@ async function openStream(person: TestUser) {
 }
 
 async function until(condition: () => boolean, timeout = 2_000) {
-  const started = Date.now();
+  const started = performance.now();
   while (!condition()) {
-    if (Date.now() - started > timeout) throw new Error("Timed out waiting");
+    if (performance.now() - started > timeout) throw new Error("Timed out waiting");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }

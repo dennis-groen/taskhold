@@ -2,7 +2,7 @@
 // member (or another of your devices) just changed, and the app refetches it. While the stream is
 // down, pages fall back to polling (see isLive).
 import { TOPICS, type Topic } from "@taskhold/api/live-topics";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 
 /**
  * What the stream says: refetch one area, or refetch everything because changes may have been
@@ -16,15 +16,10 @@ const MESSAGES = new Set<string>([...TOPICS, "resync"]);
 const RETRY_AFTER_REFUSAL = Temporal.Duration.from({ seconds: 30 });
 
 let live = false;
-const statusListeners = new Set<() => void>();
 
 /** Whether changes arrive by themselves right now. Polling queries skip their interval while true. */
 export function isLive(): boolean {
   return live;
-}
-
-export function useIsLive(): boolean {
-  return useSyncExternalStore(subscribeToStatus, isLive, () => false);
 }
 
 /**
@@ -75,12 +70,5 @@ export function useLiveUpdates(onMessage: (message: LiveMessage) => void) {
 }
 
 function setLive(next: boolean) {
-  if (live === next) return;
   live = next;
-  for (const listener of statusListeners) listener();
-}
-
-function subscribeToStatus(listener: () => void) {
-  statusListeners.add(listener);
-  return () => statusListeners.delete(listener);
 }

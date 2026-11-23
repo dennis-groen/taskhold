@@ -7,7 +7,7 @@ import { isUniqueViolation } from "../../db/pg-errors.ts";
 import { household, householdMember, inviteCodeAttempt } from "./households.table.ts";
 import type { HouseholdRecord, MembershipRecord } from "./households.schema.ts";
 
-export type { HouseholdRecord, MemberRecord, MembershipRecord } from "./households.schema.ts";
+export type { HouseholdRecord, MembershipRecord } from "./households.schema.ts";
 
 export async function findMembershipByUserId(
   userId: string,

@@ -136,6 +136,7 @@ export async function errorCode(
 
 // Better Auth's tables hold Dates: it reads and writes them itself (see ARCHITECTURE.md)
 function toDate(instant: Temporal.Instant): Date {
+  // oxlint-disable-next-line no-restricted-globals -- Better Auth's tables require Date
   return new Date(instant.epochMilliseconds);
 }
 
