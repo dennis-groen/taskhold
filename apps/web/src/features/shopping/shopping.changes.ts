@@ -2,6 +2,7 @@
 // needs travels in its variables, which are saved with it on the device; their shape is part of
 // what a phone may still have waiting, so change it only with care.
 import { defineChange } from "@/lib/offline-changes.ts";
+import type { PersonSummary } from "@/lib/shared-with.ts";
 
 import { itemKey } from "./item-entry.ts";
 import {
@@ -19,9 +20,7 @@ import {
 } from "./shopping.api.ts";
 import { historyQuery, listQuery, listsQuery } from "./shopping.queries.ts";
 
-type Person = { id: string; name: string };
-
-export type ToggleItem = { listId: string; itemId: string; checked: boolean; by: Person };
+export type ToggleItem = { listId: string; itemId: string; checked: boolean; by: PersonSummary };
 export type ItemChanges = { name?: string; quantity?: string | null };
 export type EditItem = { listId: string; itemId: string; changes: ItemChanges };
 export type NewItem = {
@@ -29,7 +28,7 @@ export type NewItem = {
   id: string;
   name: string;
   quantity: string | null;
-  by: Person;
+  by: PersonSummary;
 };
 type ItemRef = { listId: string; itemId: string };
 export type NewList = { id: string; name: string };

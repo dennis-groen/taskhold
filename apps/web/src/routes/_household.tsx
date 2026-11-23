@@ -28,7 +28,7 @@ import { NewTodoForm } from "@/features/todos/components/NewTodoForm.tsx";
 import { todosQuery } from "@/features/todos/todos.queries.ts";
 import { useLiveUpdates, type LiveMessage } from "@/lib/live-updates.ts";
 import { keepForOffline, keptForOffline } from "@/lib/offline-cache.ts";
-import type { Area } from "@/lib/theme.ts";
+import type { ShellArea } from "@/lib/theme.ts";
 import { refetchArea, refetchEverything } from "@/lib/offline-changes.ts";
 
 // Pages for people who belong to a household; loads that household once for all of them
@@ -67,7 +67,7 @@ function HouseholdLayout() {
   // The area colours the app, and the dock's add field adds whatever the page is about: a chore on
   // Chores, a to-do on To-dos, a shopping item everywhere else
   const matchRoute = useMatchRoute();
-  const area: Area = matchRoute({ to: "/chores", fuzzy: true })
+  const area: ShellArea = matchRoute({ to: "/chores", fuzzy: true })
     ? "chores"
     : matchRoute({ to: "/personal", fuzzy: true })
       ? "todos"

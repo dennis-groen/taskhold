@@ -20,12 +20,12 @@ export function useTheme(): ThemeContextValue {
   return context;
 }
 
-/** The parts of the app with their own colour (styles/globals.css, data-area) */
-export type Area = "shop" | "chores" | "todos" | "home";
+/** The shell sections with their own colour (styles/globals.css, data-area) */
+export type ShellArea = "shop" | "chores" | "todos" | "home";
 
 /**
- * Paints the phone's status bar the colour at the top of the screen: the area's slab inside a
- * household, the canvas elsewhere. Reads --status-bar after the theme and area are applied.
+ * Paints the phone's status bar the colour at the top of the screen: the section's slab inside a
+ * household, the canvas elsewhere. Reads --status-bar after the theme and section are applied.
  */
 export function syncStatusBar() {
   const color = getComputedStyle(document.documentElement).getPropertyValue("--status-bar").trim();
@@ -35,8 +35,8 @@ export function syncStatusBar() {
   }
 }
 
-/** Colours the app for an area, or for none (sign-in, onboarding) */
-export function applyArea(area: Area | null) {
+/** Colours the app for a shell section, or for none (sign-in, onboarding) */
+export function applyShellArea(area: ShellArea | null) {
   const root = document.documentElement;
   if (area) root.dataset.area = area;
   else delete root.dataset.area;

@@ -16,14 +16,14 @@ const CHANNEL = "taskhold_changes";
 const RECONNECT_DELAY = Temporal.Duration.from({ seconds: 2 });
 
 /** Who should hear about a change: everyone in a household, or one person on all their devices */
-export type Change =
+export type LiveChange =
   | { householdId: string; topic: Topic }
   | { userId: string; topic: Topic }
   // The account was deleted: its streams close
   | { userId: string; topic: "account" };
 
 export type FeedEvent =
-  | { type: "change"; change: Change }
+  | { type: "change"; change: LiveChange }
   // The feed lost its database connection for a while and changes may have been missed
   | { type: "resync" }
   // The server is shutting down
@@ -34,7 +34,7 @@ export type FeedEvent =
  * commits, so nobody refetches before the change is visible or hears about one rolled back.
  * Failing to announce doesn't fail the change: apps still refetch on focus and reconnect.
  */
-export async function announce(change: Change, executor: Executor = db): Promise<void> {
+export async function announce(change: LiveChange, executor: Executor = db): Promise<void> {
   try {
     await executor.execute(sql`select pg_notify(${CHANNEL}, ${JSON.stringify(change)})`);
   } catch (err) {
@@ -130,12 +130,12 @@ function scheduleReconnect() {
   }, RECONNECT_DELAY.total("milliseconds"));
 }
 
-function parse(payload: string | undefined): Change | null {
+function parse(payload: string | undefined): LiveChange | null {
   try {
     const value: unknown = JSON.parse(payload ?? "");
     if (typeof value !== "object" || value === null || !("topic" in value)) return null;
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only announce() writes to the channel
-    return value as Change;
+    return value as LiveChange;
   } catch {
     return null;
   }

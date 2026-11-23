@@ -7,6 +7,7 @@
 import { isDone, markDone, skip } from "@taskhold/api/chore-schedule";
 
 import { defineChange } from "@/lib/offline-changes.ts";
+import type { PersonSummary } from "@/lib/shared-with.ts";
 
 import { scheduleOf } from "./chore-dates.ts";
 import {
@@ -23,11 +24,9 @@ import {
 } from "./chores.api.ts";
 import { choresQuery } from "./chores.queries.ts";
 
-type Person = { id: string; name: string };
-
-export type CompleteChore = { choreId: string; on: string; by: Person };
+export type CompleteChore = { choreId: string; on: string; by: PersonSummary };
 /** `by` is only for showing the skip before the API answers; changes saved before it lack it */
-export type SkipChore = { choreId: string; today: string; by: Person };
+export type SkipChore = { choreId: string; today: string; by: PersonSummary };
 export type MoveChore = { choreId: string; dueOn: string | null };
 
 type Assignee = NonNullable<Chore["assignee"]>;
@@ -187,7 +186,7 @@ export const choreChanges = {
 };
 
 /** The chore after `person` marks it done on `on`, by the API's own rules */
-export function markedDone(chore: Chore, person: Person, on: string): Chore {
+export function markedDone(chore: Chore, person: PersonSummary, on: string): Chore {
   const done = markDone(scheduleOf(chore), Temporal.PlainDate.from(on));
   if (done.kind === "unchanged") return chore;
   return {
@@ -199,7 +198,7 @@ export function markedDone(chore: Chore, person: Person, on: string): Chore {
 }
 
 /** The chore after `person` skips it on `on`, by the API's own rules */
-function skipped(chore: Chore, person: Person, on: string): Chore {
+function skipped(chore: Chore, person: PersonSummary, on: string): Chore {
   const moved = skip(scheduleOf(chore), Temporal.PlainDate.from(on));
   if (moved.kind !== "moved") return chore;
   return { ...chore, dueOn: moved.dueOn.toString(), lastCompletion: shownEntry(person, on, true) };
@@ -219,7 +218,11 @@ function edited(chore: Chore, { changes, assignee }: EditChore): Chore {
 }
 
 /** A history entry to show until the API's own arrives */
-function shownEntry(person: Person, on: string, wasSkipped: boolean): Chore["lastCompletion"] {
+function shownEntry(
+  person: PersonSummary,
+  on: string,
+  wasSkipped: boolean,
+): Chore["lastCompletion"] {
   return {
     id: crypto.randomUUID(),
     completedBy: person,

@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useChange, useWaitingVars } from "@/lib/offline-changes.ts";
+import type { PersonSummary } from "@/lib/shared-with.ts";
 
 import { itemKey } from "./item-entry.ts";
 import type { BoughtItem, ShoppingListSummary } from "./shopping.api.ts";
@@ -18,13 +19,11 @@ import {
 } from "./buy-again.ts";
 import { historyQuery, isListGone, listQuery, listsQuery } from "./shopping.queries.ts";
 
-type Person = { id: string; name: string };
-
 /**
  * A list plus the changes people make to it. Every change shows on screen straight away and is
  * rolled back if the API rejects it (see shopping.changes.ts).
  */
-export function useShoppingList(listId: string, viewer: Person) {
+export function useShoppingList(listId: string, viewer: PersonSummary) {
   const { data: list, error: refetchError } = useSuspenseQuery(listQuery(listId));
   const toggle = useChange(shoppingChanges.toggle);
   const edit = useChange(shoppingChanges.edit);
@@ -90,7 +89,7 @@ export function useManageLists() {
 }
 
 /** Adds an item to any list, optimistically when that list is on screen or cached */
-export function useAddItem(viewer: Person) {
+export function useAddItem(viewer: PersonSummary) {
   const queryClient = useQueryClient();
   const add = useChange(shoppingChanges.add);
   return (listId: string, name: string, quantity: string | null) => {
@@ -122,9 +121,9 @@ export function useEditItem(listId: string | undefined) {
 }
 
 /** Ticks or unticks an item on a list; defaults `by` to the viewer */
-export function useToggleItem(listId: string, viewer: Person) {
+export function useToggleItem(listId: string, viewer: PersonSummary) {
   const toggle = useChange(shoppingChanges.toggle);
-  return (itemId: string, checked: boolean, by: Person = viewer) =>
+  return (itemId: string, checked: boolean, by: PersonSummary = viewer) =>
     toggle.run({ listId, itemId, checked, by: person(by) });
 }
 
@@ -325,7 +324,7 @@ function adjustListCounts(
 }
 
 /** Only what the list shows about a person, since a change is saved on the device with its variables */
-function person({ id, name }: Person): Person {
+function person({ id, name }: PersonSummary): PersonSummary {
   return { id, name };
 }
 

@@ -12,32 +12,32 @@ import {
 } from "@/components/icons.ts";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Wordmark } from "@/components/Wordmark.tsx";
-import { applyArea, type Area } from "@/lib/theme.ts";
+import { applyShellArea, type ShellArea } from "@/lib/theme.ts";
 import { cn } from "cn";
 
 type NavItem = {
   to: LinkProps["to"];
   label: string;
   icon: Icon;
-  /** The area this tab opens, whose colour its pill takes when it's the page you're on */
-  area: Area;
+  /** The shell section this tab opens, whose colour its pill takes when it's the page you're on */
+  area: ShellArea;
   /** Private: a small lock beside the label, as only you see what's there */
   private?: boolean;
   /** Other pages that belong to this tab, so it stays lit there */
   alsoOn?: string[];
 };
 
-/** The area's own colour, for the dot beside its name in the sidebar */
-const AREA_DOT: Record<Area, string> = {
+/** The section's own colour, for the dot beside its name in the sidebar */
+const AREA_DOT: Record<ShellArea, string> = {
   shop: "bg-(--shop-slab)",
   chores: "bg-(--cho-slab)",
   todos: "bg-(--todo-slab) dark:bg-foreground",
   home: "bg-(--home-slab)",
 };
 
-/** What the sidebar says beside each area, and the shopping lists under Shopping */
+/** What the sidebar says beside each section, and the shopping lists under Shopping */
 export type RailInfo = {
-  counts: Partial<Record<Area, { text: string; alert?: boolean }>>;
+  counts: Partial<Record<ShellArea, { text: string; alert?: boolean }>>;
   lists: { id: string; name: string; count: number }[];
   viewer: { name: string; image: string | null };
   householdName: string;
@@ -52,8 +52,8 @@ const NAV: NavItem[] = [
 
 /**
  * Frame for people in a household. On phones, one dock under the thumb: the add field for the
- * area you're in, over four tabs. On wide screens a sidebar holds both. The area colours the whole
- * app while you're in it (styles/globals.css, data-area), status bar included.
+ * section you're in, over four tabs. On wide screens a sidebar holds both. The section colours the
+ * whole app while you're in it (styles/globals.css, data-area), status bar included.
  */
 export function HouseholdShell({
   area,
@@ -62,21 +62,21 @@ export function HouseholdShell({
   rail,
   children,
 }: {
-  area: Area;
+  area: ShellArea;
   /** A red count on a tab, like overdue chores. Zero shows nothing. */
-  badges?: Partial<Record<Area, number>>;
+  badges?: Partial<Record<ShellArea, number>>;
   /** Counts, lists and who's signed in, for the sidebar on wide screens */
   rail?: RailInfo;
-  /** The add field for this area, rendered once and placed by the shell. Household has none. */
+  /** The add field for this section, rendered once and placed by the shell. Household has none. */
   addButton: ReactNode;
   children: ReactNode;
 }) {
   // The theme provider re-reads the status bar colour itself when the theme changes
   useEffect(() => {
-    applyArea(area);
+    applyShellArea(area);
   }, [area]);
   // Leaving the household (sign-out, onboarding) goes back to the plain canvas
-  useEffect(() => () => applyArea(null), []);
+  useEffect(() => () => applyShellArea(null), []);
 
   return (
     <div className="min-h-dvh bg-canvas">

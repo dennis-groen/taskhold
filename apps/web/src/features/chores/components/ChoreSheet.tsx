@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { daysBetween, pastDateLabel, rowDueLabel, shortDate } from "@/lib/dates.ts";
-import { firstName } from "@/lib/shared-with.ts";
+import { firstName, type PersonSummary } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
 import { canPutOff, markDone, skip } from "@taskhold/api/chore-schedule";
@@ -45,7 +45,7 @@ export function ChoreSheet({
   /** The chore to show; null keeps the sheet closed */
   chore: Chore | null;
   members: Member[];
-  viewer: Viewer;
+  viewer: PersonSummary;
   today: string;
   onComplete: (chore: Chore) => void;
   onUndo: (choreId: string) => void;
@@ -72,9 +72,6 @@ export function ChoreSheet({
   );
 }
 
-/** The person looking, as their skips are shown before the API answers */
-type Viewer = { id: string; name: string };
-
 function SheetBody({
   chore,
   members,
@@ -86,7 +83,7 @@ function SheetBody({
 }: {
   chore: Chore;
   members: Member[];
-  viewer: Viewer;
+  viewer: PersonSummary;
   today: string;
   onComplete: (chore: Chore) => void;
   onUndo: (choreId: string) => void;
@@ -178,7 +175,7 @@ function ReadView({
   onClose,
 }: {
   chore: Chore;
-  viewer: Viewer;
+  viewer: PersonSummary;
   today: string;
   onComplete: () => void;
   onUndo: () => void;

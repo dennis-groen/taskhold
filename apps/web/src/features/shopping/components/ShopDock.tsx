@@ -4,7 +4,7 @@ import { useRef, useState, type FocusEvent, type FormEvent, type ReactNode } fro
 
 import { ClockCounterClockwiseIcon, InfoIcon, PlusIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
-import { firstName } from "@/lib/shared-with.ts";
+import { firstName, type PersonSummary } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
 import { categorize } from "../categories.ts";
@@ -26,13 +26,11 @@ import { stepQuantity } from "../item-quantity.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
 import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
 
-type Viewer = { id: string; name: string };
-
 /**
  * Shopping's part of the dock. On a list: Buy again chips over a field that adds straight to it,
  * catching what's already there. On the overview: a field that starts a new list and opens it.
  */
-export function ShopDock({ viewer }: { viewer: Viewer }) {
+export function ShopDock({ viewer }: { viewer: PersonSummary }) {
   const listId = useParams({ strict: false }).listId;
   return listId ? <ItemField key={listId} listId={listId} viewer={viewer} /> : <NewListField />;
 }
@@ -111,7 +109,7 @@ type Clash = { item: ShoppingItem; entry: Entry };
  * · 2 to Dairy & Eggs") and the chips narrow to match. Something the list has already isn't added
  * twice: a card offers to change its amount, untick it, or add a new row anyway.
  */
-function ItemField({ listId, viewer }: { listId: string; viewer: Viewer }) {
+function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState("");
   const [focused, setFocused] = useState(false);

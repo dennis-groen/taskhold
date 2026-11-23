@@ -2,8 +2,11 @@ export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
+/** Minimal person identity carried in rows and offline changes */
+export type PersonSummary = { id: string; name: string };
+
 /** A housemate as the "Shared with" line shows them */
-export type Housemate = { id: string; name: string; image: string | null };
+export type Housemate = PersonSummary & { image: string | null };
 
 /** Everyone except the viewer, in the order given */
 export function otherHousemates(people: Housemate[], viewerId: string): Housemate[] {

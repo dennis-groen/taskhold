@@ -4,19 +4,18 @@ import { skip } from "@taskhold/api/chore-schedule";
 
 import { dueGroup, dueLabel, today } from "@/lib/dates.ts";
 import { useChange, type UndoOffer } from "@/lib/offline-changes.ts";
+import type { PersonSummary } from "@/lib/shared-with.ts";
 
 import type { Chore, ChoreInput } from "./chores.api.ts";
 import { scheduleOf } from "./chore-dates.ts";
 import { choreChanges, markedDone } from "./chores.changes.ts";
 import { choresQuery } from "./chores.queries.ts";
 
-type Person = { id: string; name: string };
-
 /**
  * The household's chores, plus marking them done and taking that back. Marking done shows on
  * screen straight away and is rolled back if the API rejects it (see chores.changes.ts).
  */
-export function useChores(viewer: Person) {
+export function useChores(viewer: PersonSummary) {
   const { data: chores } = useSuspenseQuery(choresQuery());
   const complete = useChange(choreChanges.complete);
   const undo = useChange(choreChanges.undo);
@@ -50,7 +49,7 @@ export function useOverdueCount(): number {
  * Putting a chore off: to tomorrow, which moves the date and nothing else, or skipping it this
  * time, which moves a repeating chore one interval on and says so in its history. Both offer Undo.
  */
-export function usePutOff(viewer: Person) {
+export function usePutOff(viewer: PersonSummary) {
   const putOff = useChange(choreChanges.putOff);
   const skipChange = useChange(choreChanges.skip);
 
