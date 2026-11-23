@@ -2,13 +2,15 @@
 
 A phone-first PWA for people who share a household: shared shopping lists, chores with reminders, and private to-dos.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) explains the layers, data flow and lint rules in full. This file is the short map. [GLOSSARY.md](GLOSSARY.md) holds the domain's words.
+[ARCHITECTURE.md](ARCHITECTURE.md) explains the layers, data flow and lint rules in full. This file is the short map. [GLOSSARY.md](GLOSSARY.md) holds the domain's words; [apps/web/DESIGN.md](apps/web/DESIGN.md) and [apps/web/PRODUCT.md](apps/web/PRODUCT.md) cover the UI tokens, components, and product constraints.
 
 ## Commands
 
 - `pnpm dev`: run the API (port 3000) and web app (port 5173)
 - `pnpm check`: format check, lint and typecheck. Run it before finishing any task
 - `pnpm test`: all tests (the API's need Postgres: `pnpm db:up`)
+- `pnpm test:web`: web unit tests only (fast, no Postgres needed)
+- `pnpm test:api`: API integration tests only (needs Postgres: `pnpm db:up`)
 - `pnpm test <feature>`: one feature's tests in both apps, e.g. `pnpm test chores`
 - `pnpm test:ci`: all tests, failing if a package runs none (what CI runs)
 - `pnpm db:generate` then `pnpm db:migrate`: after changing a `*.table.ts`
@@ -64,15 +66,23 @@ Folder names match in both apps and follow the API path (`/api/<feature>`). The 
 - `apps/api/src/features/auth/auth.table.ts`: generated with `pnpm auth:generate`
 - `apps/web/src/components/ui/*`: from the shadcn CLI; extend with variants, keep the files diffable
 
+## Gotchas and invariants
+
+- **Offline persistence compatibility:** Never rename a `defineChange` key or change its `vars` shape without bumping `VERSION` in `apps/web/src/lib/offline-cache.ts`, or queued offline changes on people's phones will be stranded or fail to replay
+- **React Compiler is enabled** (`babel-plugin-react-compiler` in `apps/web`): skip manual `useMemo`/`useCallback` for ordinary renders; use them only when referential stability is needed at an effect or non-React boundary
+- **RPC type flow:** `apps/web` references `apps/api/tsconfig.build.json` (`tsc -b`), so after editing API routes run `pnpm typecheck` from the repo root rather than `tsc --noEmit` inside `apps/web`
+- **CI migration check:** CI runs `pnpm db:generate` and fails if `apps/api/drizzle` becomes dirty; always commit generated migrations with `*.table.ts` changes
+- **CSP and imports:** Production CSP blocks runtime inline `<style>` tags (`apps/web/content-security-policy.ts`); local imports use `.ts`/`.tsx` extensions except generated `components/ui/*` and `routeTree.gen`
+
 ## Adding a feature
 
 1. Contract: `<noun>.schema.ts` (zod schemas and inferred types)
-2. Table and migration: `<noun>.table.ts`, re-exported from `db/schema.ts`, then `pnpm db:generate`
+2. Table and migration: `<noun>.table.ts`, re-exported from `db/schema.ts`, add any Drizzle relations in `apps/api/src/db/relations.ts`, then `pnpm db:generate`
 3. Data access: `<noun>.repo.ts`
 4. Logic: `<noun>.service.ts` and `<noun>.errors.ts`
 5. Transport: `<noun>.routes.ts`, mounted in `app.ts`
 6. Tests: `<noun>.test.ts`, including a 404 for another household on every route
 7. Live updates, for data other people or devices see: add the topic to `apps/api/src/features/live/live-topics.ts` and call `announce()` from the service after each write. `pnpm check` then fails in the web app until the next two steps are done
-8. Web: `<noun>.api.ts`, `<noun>.queries.ts` (query keys start with the area's name), `<noun>.changes.ts`, then components. Add the area to `AREAS` in `lib/offline-changes.ts` and its changes to `registerAllChanges` in `router.tsx`
-9. Route file under `routes/`, a nav entry in `components/layout/HouseholdShell.tsx`, and the page's + button in `routes/_household.tsx`
+8. Web: `<noun>.api.ts`, `<noun>.queries.ts` (query keys start with the area's name), `<noun>.changes.ts`, `<noun>.hooks.ts`, then components. Add the area to `AREAS` and `AREA_NAMES` in `lib/offline-changes.ts`, register its changes in `registerAllChanges` in `router.tsx`, and add its `components/*.tsx` glob to the area-components override in `.oxlintrc.json`
+9. Route file under `routes/`, area colour tokens in `styles/globals.css` and `lib/theme.ts`, a nav entry in `components/layout/HouseholdShell.tsx`, and the area's dock add control in `routes/_household.tsx`
 10. Add the feature to the Features list above, then run `pnpm check` and `pnpm test <noun>`

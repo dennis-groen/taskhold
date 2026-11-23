@@ -20,10 +20,10 @@ One calm, shared home base: lists sort themselves by supermarket aisle, chores r
 
 ## Operating Context
 
-- Shopping: lists with items sorted into supermarket categories, ticked into a cart, cleared with "Done shopping". Quick add (round + button) from anywhere.
+- Shopping: lists with items sorted into supermarket categories, ticked into a cart, cleared with "Done shopping". Quick add from the bottom dock (inline item/list input in Shopping, add sheet on Chores and Personal), plus Buy again chips and a restock sheet.
 - Chores: due dates, repeats, assignees, filters (All / Mine / Anyone), reminders via Web Push.
 - Personal: private to-dos only the person sees.
-- Household: members, invite code / link, account, reminders, appearance (light / dark).
+- Household: members, invite code / link, account, reminders, appearance (light / dark / auto), left-handed layout.
 - Sign-in is Google only. Onboarding creates or joins a household.
 
 ## Capabilities and Constraints

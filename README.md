@@ -7,7 +7,6 @@ apps/
   api/   Hono on Node, port 3000, routes under /api
          Better Auth (Google) + Drizzle ORM on Postgres
   web/   Vite + React 19 + React Compiler + TanStack Router, port 5173, proxies /api to the API
-packages/  shared packages (empty for now)
 ```
 
 Both apps are organized in feature slices, with routes, services and repos on the API side. [AGENTS.md](AGENTS.md) is the short map (commands, layout, naming); [ARCHITECTURE.md](ARCHITECTURE.md) has the full folder layout and the rules lint enforces.
@@ -42,7 +41,7 @@ In VS Code, install the recommended Oxc extension to format and lint on save.
 
 ## Auth
 
-- Every page requires a signed-in user except the ones in `PUBLIC_PATHS` in `apps/web/src/routes/__root.tsx` (only `/` for now).
+- Every page requires a signed-in user except the ones in `PUBLIC_PATHS` in `apps/web/src/features/auth/page-access.ts` (only `/` for now).
 - API routers built with `protectedRouter()` (`apps/api/src/features/auth/auth.middleware.ts`) require a session on every route and return 401 otherwise. They also reject state-changing requests whose `Origin` isn't the app's own (403), because the SameSite=Lax session cookie doesn't stop other origins on the same site.
 - Better Auth endpoints the app doesn't use (`update-user`, `get-access-token`, password and email routes, and others) are switched off in `UNUSED_ENDPOINTS` in `auth.ts`. Re-enable one there when a feature needs it.
 - Better Auth rate-limits `/api/auth/*` in every environment (except `NODE_ENV=test`), keyed by client IP. `auth.routes.ts` sets that IP from the connection, so clients can't pick their own with `X-Forwarded-For`. Behind a reverse proxy, list its addresses in `TRUSTED_PROXIES` so the client is read from the forwarded chain instead.
@@ -86,7 +85,7 @@ In VS Code, install the recommended Oxc extension to format and lint on save.
 
 ## Layout
 
-Signed-in pages that need a household share one frame (`components/layout/HouseholdShell.tsx`, layout taken from the Lovable prototype): a left rail on wide screens and a bottom bar on phones with the Shopping, Chores, Personal and Household tabs, plus the round + button for quick add. Pages are a heading over cards of rows (`components/layout/Group.tsx`). `/dashboard` redirects to `/lists`. Onboarding keeps the simpler `AppShell`.
+Signed-in pages that need a household share one frame (`components/layout/HouseholdShell.tsx`): a left sidebar on wide screens and a frosted bottom dock on phones with the area's add control stacked over the Shopping, Chores, To-dos and Household tabs. Overview pages open with a coloured `AreaHeader` slab (`components/layout/AreaHeader.tsx`) over hairline-divided groups (`components/layout/Group.tsx`). `/dashboard` redirects to `/lists`. Onboarding keeps the simpler `AppShell`.
 
 ## Households and onboarding
 
@@ -112,7 +111,7 @@ Signed-in pages that need a household share one frame (`components/layout/Househ
 - "Rename list" at the bottom of a list opens a sheet to change its name (`PATCH /api/shopping/lists/:listId`). Other members see the new name straight away through live updates.
 - **Buy again.** Ticking an item off records it as bought, for the whole household (`shopping_purchase`); unticking takes that back, and renaming a ticked item renames its record. The record outlives the item, so "Done shopping" doesn't erase it. `GET /api/shopping/history` returns the last year, one entry per name (ignoring case, spelled as last bought) with how many days it was bought on and when first and last.
   - The app ranks it (`features/shopping/buy-again.ts`), so it works offline and follows what's typed. With nothing typed it offers regulars (bought on two days or more) that are due: something bought every 4 days and last bought 5 days ago comes first, and something bought a few days into a two-week rhythm isn't offered. While typing it offers anything bought whose name has a word starting with what's typed, accents and case aside. What's already waiting on the list is left out.
-  - The chips show in the dock above the add field on a list, and in the Buy again section on the Shopping overview. A tap adds the item straight to the list, keeps the keyboard up, and the chip leaves the row.
+  - Quick chips appear in the dock above the add field while focused or typing on a list, and in the Buy again section on the Shopping overview; tapping one toggles it on or off the list without closing the keyboard. Both places also open the full Buy again restock sheet (`BuyAgainSheet.tsx`) to search, browse, bulk-add or forget past buys.
   - Records hold only the household and the name, never who bought it. They go with the household; anything older than a year is no longer offered.
 
 ## Chores
@@ -143,9 +142,9 @@ Signed-in pages that need a household share one frame (`components/layout/Househ
 ## Light and dark mode
 
 - The app follows the device's light or dark setting, and switches live when that setting changes.
-- Under Household > Appearance, people can pick Light or Dark instead. The choice is saved in `localStorage` (`taskhold-theme`), so it's per device, and it wins over the device setting from then on. There's no option to go back to following the device; clearing site data resets it.
+- Under Household > Appearance (`components/ThemeToggle.tsx`), people can pick Light, Dark, or Auto (follow the device). Light and Dark are saved in `localStorage` (`taskhold-theme`), per device, and picking Auto clears the stored choice so the device setting leads again.
 - A small inline script in `apps/web/index.html` applies the theme before the first paint, so dark mode doesn't flash white. `components/ThemeProvider.tsx` follows the same rule after that. The Content Security Policy allows it by its hash, which the build computes (see "Security headers").
-- The dark theme uses a lighter violet for `--primary` than the light theme, with dark text on primary buttons. The light theme's violet was under 2:1 contrast against dark cards; this one is over 6:1.
+- Each area has its own light and dark palette in `apps/web/src/styles/globals.css` (see `apps/web/DESIGN.md`): in dark mode, header slabs soften their chroma while text, ticks and active tab pills brighten for contrast.
 
 ## Installing the app (PWA)
 
@@ -310,21 +309,23 @@ On a push to `main`, a third job deploys once both pass (see "Deploying"), so a 
 
 ## Scripts
 
-| Command               | What it does                                     |
-| --------------------- | ------------------------------------------------ |
-| `pnpm dev`            | Start both apps in watch mode                    |
-| `pnpm dev:api`        | Start only the API                               |
-| `pnpm dev:web`        | Start only the frontend                          |
-| `pnpm build`          | Build all apps                                   |
-| `pnpm typecheck`      | Typecheck all apps, tests included               |
-| `pnpm test`           | Run all tests (needs Postgres: `pnpm db:up`)     |
-| `pnpm test <feature>` | Run one feature's tests, e.g. `pnpm test chores` |
-| `pnpm lint`           | Lint everything with oxlint                      |
-| `pnpm format`         | Format everything with oxfmt                     |
-| `pnpm check`          | Format check, lint, typecheck                    |
-| `pnpm db:up`          | Start Postgres (Docker) and wait until healthy   |
-| `pnpm db:down`        | Stop Postgres (data is kept in a Docker volume)  |
-| `pnpm db:generate`    | Generate a migration from the Drizzle schema     |
-| `pnpm db:migrate`     | Apply pending migrations                         |
-| `pnpm db:studio`      | Open Drizzle Studio                              |
-| `pnpm auth:generate`  | Regenerate the Better Auth Drizzle schema        |
+| Command               | What it does                                      |
+| --------------------- | ------------------------------------------------- |
+| `pnpm dev`            | Start both apps in watch mode                     |
+| `pnpm dev:api`        | Start only the API                                |
+| `pnpm dev:web`        | Start only the frontend                           |
+| `pnpm build`          | Build all apps                                    |
+| `pnpm typecheck`      | Typecheck all apps, tests included                |
+| `pnpm test`           | Run all tests (needs Postgres: `pnpm db:up`)      |
+| `pnpm test:web`       | Run only web tests (fast, no Postgres needed)     |
+| `pnpm test:api`       | Run only API tests (needs Postgres: `pnpm db:up`) |
+| `pnpm test <feature>` | Run one feature's tests, e.g. `pnpm test chores`  |
+| `pnpm lint`           | Lint everything with oxlint                       |
+| `pnpm format`         | Format everything with oxfmt                      |
+| `pnpm check`          | Format check, lint, typecheck                     |
+| `pnpm db:up`          | Start Postgres (Docker) and wait until healthy    |
+| `pnpm db:down`        | Stop Postgres (data is kept in a Docker volume)   |
+| `pnpm db:generate`    | Generate a migration from the Drizzle schema      |
+| `pnpm db:migrate`     | Apply pending migrations                          |
+| `pnpm db:studio`      | Open Drizzle Studio                               |
+| `pnpm auth:generate`  | Regenerate the Better Auth Drizzle schema         |

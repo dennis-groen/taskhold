@@ -83,10 +83,10 @@
 }
 
 /*
- * taskhold's palette (design/revamp/FINAL.html). Warm neutrals and one colour per area: basil for
- * shopping, cobalt for chores, yolk for the household. To-dos are graphite, because colour means
- * shared and graphite means only you. The shell sets data-area on <html>; --primary and friends
- * follow it, so every button, tick and sheet takes the area's colour, portals included.
+ * taskhold's palette. Warm neutrals and one colour per area: basil for shopping, cobalt for
+ * chores, yolk for the household. To-dos are graphite, because colour means shared and graphite
+ * means only you. The shell sets data-area on <html>; --primary and friends follow it, so every
+ * button, tick and sheet takes the area's colour, portals included.
  */
 :root {
   --canvas: #f6f5f2;
