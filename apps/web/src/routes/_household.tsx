@@ -95,7 +95,14 @@ function HouseholdLayout() {
       <ShopDock viewer={user} />
     ) : null;
   return (
-    <HouseholdShell area={area} addButton={addButton} badges={{ chores: overdue }} rail={rail}>
+    <HouseholdShell
+      area={area}
+      addButton={addButton}
+      // An open list is scrolled through in the aisle; there the tick matters more than the field
+      foldAddOnScroll={Boolean(matchRoute({ to: "/lists/$listId" }))}
+      badges={{ chores: overdue }}
+      rail={rail}
+    >
       <Outlet />
       <Drawer open={adding !== null} onOpenChange={(open) => !open && setAdding(null)}>
         <SheetContent initialFocus={nameRef}>

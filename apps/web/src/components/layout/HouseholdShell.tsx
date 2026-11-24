@@ -1,5 +1,6 @@
 import { Link, useLocation, type LinkProps } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 
 import { ConnectionStatus } from "@/components/ConnectionStatus.tsx";
 import {
@@ -8,11 +9,13 @@ import {
   HouseIcon,
   ListChecksIcon,
   LockIcon,
+  PlusIcon,
   type Icon,
 } from "@/components/icons.ts";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Wordmark } from "@/components/Wordmark.tsx";
 import { applyShellArea, type ShellArea } from "@/lib/theme.ts";
+import { useScrollCollapse } from "@/lib/use-scroll-collapse.ts";
 import { cn } from "cn";
 
 type NavItem = {
@@ -54,15 +57,22 @@ const NAV: NavItem[] = [
  * Frame for people in a household. On phones, one dock under the thumb: the add field for the
  * section you're in, over four tabs. On wide screens a sidebar holds both. The section colours the
  * whole app while you're in it (styles/globals.css, data-area), status bar included.
+ *
+ * With `foldAddOnScroll`, scrolling down folds the phone dock's add field into a + beside the tabs,
+ * so more of the page shows; scrolling back up, reaching either end, or tapping + brings it back.
+ * It never folds while the add field has focus or holds text not added yet.
  */
 export function HouseholdShell({
   area,
   addButton,
+  foldAddOnScroll = false,
   badges = {},
   rail,
   children,
 }: {
   area: ShellArea;
+  /** Fold the add field away while scrolling down, for pages people scroll through a lot */
+  foldAddOnScroll?: boolean;
   /** A red count on a tab, like overdue chores. Zero shows nothing. */
   badges?: Partial<Record<ShellArea, number>>;
   /** Counts, lists and who's signed in, for the sidebar on wide screens */
@@ -77,6 +87,20 @@ export function HouseholdShell({
   }, [area]);
   // Leaving the household (sign-out, onboarding) goes back to the plain canvas
   useEffect(() => () => applyShellArea(null), []);
+
+  const addRef = useRef<HTMLDivElement>(null);
+  // Focus in the add field (or a sheet it opened) holds the dock open, and so does text typed but
+  // not added yet. Only the field counts: a tab keeps focus after it's tapped on some browsers,
+  // which mustn't keep the dock from folding.
+  const [addHeld, setAddHeld] = useState(false);
+  const [folded, expand] = useScrollCollapse(Boolean(addButton) && foldAddOnScroll && !addHeld);
+
+  function unfold() {
+    // Committed before focusing: the field is inert while folded, and iOS only raises the keyboard
+    // for a focus made inside the tap itself
+    flushSync(expand);
+    addRef.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+  }
 
   return (
     <div className="min-h-dvh bg-canvas">
@@ -140,20 +164,68 @@ export function HouseholdShell({
       {/* Rows fade out above the dock instead of being cut off behind it */}
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(9.5rem+env(safe-area-inset-bottom))] bg-linear-to-t from-canvas from-55% to-canvas/0 lg:hidden"
+        className={cn(
+          "pointer-events-none fixed inset-x-0 bottom-0 z-20 bg-linear-to-t from-canvas from-55% to-canvas/0 transition-[height] duration-240 ease-(--ease-in-out) motion-reduce:transition-none lg:hidden",
+          folded
+            ? "h-[calc(5.5rem+env(safe-area-inset-bottom))]"
+            : "h-[calc(9.5rem+env(safe-area-inset-bottom))]",
+        )}
       />
       <div
         data-bottom-nav
+        data-folded={folded || undefined}
         className="fixed inset-x-2 bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.75rem))] z-30 mx-auto max-w-[560px] rounded-[1.75rem] bg-dock p-1.5 shadow-[0_0_0_1px_var(--dock-line),var(--dock-shadow)] backdrop-blur-[22px] backdrop-saturate-[1.6] lg:hidden"
       >
-        {addButton}
+        {addButton && (
+          <div
+            className={cn(
+              "grid transition-[grid-template-rows,opacity] duration-240 ease-(--ease-in-out) motion-reduce:transition-none",
+              folded ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
+            )}
+          >
+            <div
+              ref={addRef}
+              className="min-h-0 overflow-hidden"
+              inert={folded}
+              onFocus={() => setAddHeld(true)}
+              onBlur={(event: FocusEvent<HTMLDivElement>) => {
+                const wrapper = event.currentTarget;
+                if (wrapper.contains(event.relatedTarget)) return;
+                const unsent = [...wrapper.querySelectorAll("input")].some((input) => input.value);
+                setAddHeld(unsent);
+              }}
+            >
+              {addButton}
+            </div>
+          </div>
+        )}
         <nav aria-label="Main">
-          <ul className={cn("grid h-14 grid-cols-4", addButton && "mt-0.5")}>
+          <ul
+            className={cn(
+              "grid h-14 transition-[grid-template-columns,margin] duration-240 ease-(--ease-in-out) motion-reduce:transition-none",
+              folded ? "grid-cols-[1fr_1fr_1fr_1fr_3.5rem]" : "grid-cols-[1fr_1fr_1fr_1fr_0rem]",
+              addButton && !folded && "mt-0.5",
+            )}
+          >
             {NAV.map((item) => (
               <li key={item.label} className="flex">
                 <NavLink {...item} badge={badges[item.area] ?? 0} />
               </li>
             ))}
+            {/* Kept in the grid at zero width when unfolded, so the tabs slide instead of jump */}
+            <li className="flex min-w-0 items-center justify-end overflow-hidden" inert={!folded}>
+              <button
+                type="button"
+                aria-label="Add an item"
+                onClick={unfold}
+                className={cn(
+                  "grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground outline-none transition-[scale,opacity] duration-200 ease-(--ease-out) focus-visible:ring-3 focus-visible:ring-ring/80 active:scale-[0.92] motion-reduce:transition-none motion-reduce:active:scale-100",
+                  folded ? "scale-100 opacity-100" : "scale-75 opacity-0",
+                )}
+              >
+                <PlusIcon weight="bold" className="size-[22px]" />
+              </button>
+            </li>
           </ul>
         </nav>
       </div>

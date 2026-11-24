@@ -314,6 +314,17 @@
   :root:has([data-bottom-nav]) {
     --toast-bottom: calc(8.5rem + max(0.75rem, calc(env(safe-area-inset-bottom) - 0.75rem)));
   }
+  /* The add field folded away while scrolling a list: only the tabs are left */
+  :root:has([data-bottom-nav][data-folded]) {
+    --toast-bottom: calc(5rem + max(0.75rem, calc(env(safe-area-inset-bottom) - 0.75rem)));
+  }
+}
+/* A toast glides with the dock when it folds on scroll, rather than jumping */
+[data-sonner-toaster][data-y-position="bottom"] {
+  transition: bottom 240ms var(--ease-in-out);
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 /* Lift toasts above a sheet's Done footer when a drawer is open */
 :root:has([data-slot="drawer-popup"][data-open]) {
