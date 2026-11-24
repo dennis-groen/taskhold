@@ -3,13 +3,13 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { TrashIcon } from "@/components/icons.ts";
-import { Button } from "@/components/ui/button";
+import { SettingButton } from "@/components/layout/SettingRow.tsx";
 import { forgetOfflineCache } from "@/lib/offline-cache.ts";
 import { forgetPushDevice } from "@/lib/push-device.ts";
 
 import { deleteAccount } from "../auth.api.ts";
 
-type HouseholdSummary = {
+export type HouseholdSummary = {
   name: string;
   /** Oldest first, the order the API uses to pick the next owner */
   members: { id: string; name: string; role: "owner" | "member" }[];
@@ -29,10 +29,12 @@ export function DeleteAccountButton({
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="destructive-ghost" size="lg">
-          <TrashIcon />
-          Delete account
-        </Button>
+        <SettingButton
+          icon={TrashIcon}
+          tone="danger"
+          title="Delete account"
+          sub="Removes your account and private to-dos for good"
+        />
       }
       title="Delete your account?"
       description={`${consequences(household, currentUserId)} This can't be undone.`}

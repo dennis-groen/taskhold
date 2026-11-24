@@ -19,7 +19,7 @@ export function LeftHandedRow() {
       <SettingRow
         icon={HandPointingIcon}
         title="Left-handed layout"
-        sub="Moves the round button in each row to the left, where your left thumb reaches. This phone only."
+        sub="Moves the round button to the left, for your left thumb. This phone only."
         htmlFor={id}
         end={
           <Switch
@@ -44,7 +44,7 @@ function SampleRow({ left }: { left: boolean }) {
   return (
     <div
       aria-hidden
-      className="mr-4 mb-3 ml-[calc(1rem+22px+0.875rem)] rounded-xl bg-muted px-3.5 py-2.5"
+      className="mr-4 mb-3 ml-[calc(1rem+2.5rem+0.875rem)] rounded-xl bg-muted px-3.5 py-2.5"
     >
       <div className="relative h-6 @container">
         <span

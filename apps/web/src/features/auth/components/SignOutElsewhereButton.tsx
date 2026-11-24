@@ -1,7 +1,8 @@
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
-import { Button } from "@/components/ui/button";
+import { DevicesIcon } from "@/components/icons.ts";
+import { SettingButton } from "@/components/layout/SettingRow.tsx";
 
 import { signOutElsewhere } from "../auth.api.ts";
 
@@ -10,9 +11,12 @@ export function SignOutElsewhereButton() {
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="ghost" size="lg">
-          Sign out of other devices
-        </Button>
+        <SettingButton
+          icon={DevicesIcon}
+          tone="plain"
+          title="Sign out of other devices"
+          sub="For a lost or old phone. This one stays signed in."
+        />
       }
       title="Sign out of your other devices?"
       description="Every other phone, tablet and browser signed in as you is signed out. This one stays signed in."

@@ -1,12 +1,14 @@
 import { useNavigate } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
-import { SignOutIcon } from "@/components/icons.ts";
-import { Button } from "@/components/ui/button";
+import { DoorOpenIcon } from "@/components/icons.ts";
+import { SettingButton } from "@/components/layout/SettingRow.tsx";
 import { notify } from "@/lib/feedback.ts";
+import { firstName } from "@/lib/shared-with.ts";
 
 import { leaveHousehold, type Household } from "../households.api.ts";
 
+/** The Household page's last row: asks, then takes the person out and back to onboarding */
 export function LeaveHouseholdButton({
   household,
   currentUserId,
@@ -24,6 +26,7 @@ export function LeaveHouseholdButton({
         title: `Leave and delete ${household.name}?`,
         description: `You're the only one here, so leaving deletes ${household.name} and its invite code. This can't be undone.`,
         confirmLabel: "Leave and delete",
+        sub: "You're the only one here, so this deletes it",
       }
     : {
         title: `Leave ${household.name}?`,
@@ -32,17 +35,25 @@ export function LeaveHouseholdButton({
             ? `${successor.name} becomes the owner. You can only come back with an invite code.`
             : "You can only come back with an invite code.",
         confirmLabel: "Leave household",
+        sub:
+          me?.role === "owner"
+            ? `${firstName(successor.name)} becomes the owner`
+            : "You can come back with an invite code",
       };
 
   return (
     <ConfirmDialog
       trigger={
-        <Button variant="outline" size="lg">
-          <SignOutIcon />
-          Leave household
-        </Button>
+        <SettingButton
+          icon={DoorOpenIcon}
+          tone="danger"
+          title={`Leave ${household.name}`}
+          sub={copy.sub}
+        />
       }
-      {...copy}
+      title={copy.title}
+      description={copy.description}
+      confirmLabel={copy.confirmLabel}
       destructive
       onConfirm={async () => {
         await leaveHousehold();

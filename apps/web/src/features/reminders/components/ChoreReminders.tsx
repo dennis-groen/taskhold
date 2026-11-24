@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import {
+  ArrowClockwiseIcon,
   BellIcon,
   BasketIcon,
   BellSlashIcon,
@@ -10,7 +11,10 @@ import {
   PaperPlaneTiltIcon,
   PlusSquareIcon,
 } from "@/components/icons.ts";
+import { Group } from "@/components/layout/Group.tsx";
+import { OfflineNote } from "@/components/layout/OfflineNote.tsx";
 import { SettingButton, SettingRow } from "@/components/layout/SettingRow.tsx";
+import { GroupNote } from "@/components/layout/SettingsPage.tsx";
 import { SHEET_BODY, SheetContent, SheetEyebrow } from "@/components/layout/Sheet.tsx";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
@@ -27,14 +31,53 @@ import { reminderKeys, reminderStatusQuery } from "../reminders.queries.ts";
 export type ReminderPreview = { title: string; body: string };
 
 /**
- * The daily reminder's rows under "On this phone": the switch, the time, and Send a test. Turning
- * it on the first time explains it with a sample before the phone asks; on an iPhone outside the
- * Home Screen it explains how to install first.
+ * The Notifications page's body, with its loading, offline and unavailable states. The rows: the
+ * switch for this phone, which notifications, the time, and Send a test. Turning it on the first
+ * time explains it with a sample before the phone asks; on an iPhone outside the Home Screen it
+ * explains how to install first.
  */
 export function ChoreReminders({ preview }: { preview: ReminderPreview | null }) {
-  const { data: status } = useQuery(reminderStatusQuery());
-  // The server has no push keys: nothing to offer
-  if (!status?.available) return null;
+  const { data: status, isError, fetchStatus, refetch } = useQuery(reminderStatusQuery());
+
+  if (!status) {
+    // A query made offline waits rather than fails
+    if (fetchStatus === "paused") {
+      return (
+        <OfflineNote className="mt-2">
+          You're offline. Notification settings come back once you're connected.
+        </OfflineNote>
+      );
+    }
+    return (
+      <Group className="mt-2">
+        {isError ? (
+          <SettingButton
+            icon={ArrowClockwiseIcon}
+            tone="plain"
+            title="Try again"
+            sub="Couldn't load your notification settings."
+            onClick={() => void refetch()}
+          />
+        ) : (
+          <SettingRow icon={BellIcon} title="Notifications on this phone" end={<Spinner />} />
+        )}
+      </Group>
+    );
+  }
+
+  if (!status.available) {
+    return (
+      <Group className="mt-2">
+        <SettingRow
+          icon={BellSlashIcon}
+          tone="muted"
+          title="Notifications"
+          sub="taskhold isn't sending notifications right now."
+        />
+      </Group>
+    );
+  }
+
   return (
     <ReminderSettings publicKey={status.publicKey} settings={status.settings} preview={preview} />
   );
@@ -116,130 +159,139 @@ function ReminderSettings({
 
   if (device.state === "unsupported") {
     return (
-      <SettingRow
-        icon={BellSlashIcon}
-        tone="muted"
-        title="Daily reminder"
-        sub="This browser can't show notifications from taskhold."
-      />
+      <Group className="mt-2">
+        <SettingRow
+          icon={BellSlashIcon}
+          tone="muted"
+          title="Notifications"
+          sub="This browser can't show notifications. Try taskhold in Chrome or Safari, or add it to your Home Screen."
+        />
+      </Group>
     );
   }
 
   return (
     <>
-      <SettingRow
-        icon={blocked ? BellSlashIcon : BellIcon}
-        tone={blocked ? "muted" : undefined}
-        title="Notifications on this phone"
-        sub={
-          blocked
-            ? "Blocked in your phone's Settings"
-            : on
-              ? "Daily reminder and shopping trips"
-              : `${time}, when chores or to-dos are due`
-        }
-        htmlFor={switchId}
-        end={
-          device.state === "loading" ? (
-            <Spinner />
-          ) : (
-            <Switch
-              id={switchId}
-              checked={on}
-              disabled={pending || blocked}
-              onCheckedChange={flip}
-            />
-          )
-        }
-      />
-
-      {blocked && (
-        <div className="mx-4 my-2 rounded-2xl bg-destructive/8 px-4 py-3 text-sm">
-          <b className="block font-[700]">Notifications are blocked for taskhold</b>
-          <p className="mt-1 text-pretty text-muted-foreground">
-            Your phone said no when we asked, so taskhold can't ask again. Allow notifications for
-            taskhold in your phone's or browser's settings, then come back here.
-          </p>
-        </div>
-      )}
-
-      {on && settings && (
-        <>
-          <SettingRow
-            icon={BellIcon}
-            title="Daily reminder"
-            sub="Your chores, Anyone's, and your to-dos"
-            htmlFor={dailyId}
-            end={
+      <Group className="mt-2">
+        <SettingRow
+          icon={blocked ? BellSlashIcon : BellIcon}
+          tone={blocked ? "muted" : undefined}
+          title="Notifications on this phone"
+          sub={
+            blocked
+              ? "Blocked in your phone's Settings"
+              : on
+                ? "On for this phone"
+                : `${time}, when chores or to-dos are due`
+          }
+          htmlFor={switchId}
+          end={
+            device.state === "loading" ? (
+              <Spinner />
+            ) : (
               <Switch
-                id={dailyId}
-                checked={settings.dailySummary}
-                disabled={pending}
-                onCheckedChange={(checked) => void saveChoice({ dailySummary: checked })}
+                id={switchId}
+                checked={on}
+                disabled={pending || blocked}
+                onCheckedChange={flip}
               />
-            }
-          />
-          {settings.dailySummary && (
+            )
+          }
+        />
+
+        {blocked && (
+          <div className="mx-4 my-2 rounded-2xl bg-destructive/8 px-4 py-3 text-sm">
+            <b className="block font-[700]">Notifications are blocked for taskhold</b>
+            <p className="mt-1 text-pretty text-muted-foreground">
+              Your phone said no when we asked, so taskhold can't ask again. Allow notifications for
+              taskhold in your phone's or browser's settings, then come back here.
+            </p>
+          </div>
+        )}
+
+        {on && settings && (
+          <>
             <SettingRow
-              icon={ClockIcon}
-              title="Reminder time"
-              sub="Same on all your devices"
-              htmlFor={timeId}
+              icon={BellIcon}
+              title="Daily reminder"
+              sub="Your chores, Anyone's, and your to-dos"
+              htmlFor={dailyId}
               end={
-                <input
-                  id={timeId}
-                  key={settings.remindAt}
-                  type="time"
-                  required
-                  defaultValue={settings.remindAt}
+                <Switch
+                  id={dailyId}
+                  checked={settings.dailySummary}
                   disabled={pending}
-                  className="h-11 rounded-xl bg-muted px-3 text-base font-[650] tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/80"
-                  onBlur={(event) => void saveTime(event.currentTarget.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void saveTime(event.currentTarget.value);
-                  }}
+                  onCheckedChange={(checked) => void saveChoice({ dailySummary: checked })}
                 />
               }
             />
-          )}
-          <SettingRow
-            icon={BasketIcon}
-            title="When someone goes shopping"
-            sub="So you can add what you need"
-            htmlFor={shoppingId}
-            end={
-              <Switch
-                id={shoppingId}
-                checked={settings.shoppingTrips}
-                disabled={pending}
-                onCheckedChange={(checked) => void saveChoice({ shoppingTrips: checked })}
+            {settings.dailySummary && (
+              <SettingRow
+                icon={ClockIcon}
+                title="Reminder time"
+                sub="Same on all your devices"
+                htmlFor={timeId}
+                end={
+                  <input
+                    id={timeId}
+                    key={settings.remindAt}
+                    type="time"
+                    required
+                    defaultValue={settings.remindAt}
+                    disabled={pending}
+                    className="h-11 rounded-xl bg-muted px-3 text-base font-[650] tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/80"
+                    onBlur={(event) => void saveTime(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void saveTime(event.currentTarget.value);
+                    }}
+                  />
+                }
               />
-            }
-          />
-          <SettingButton
-            icon={PaperPlaneTiltIcon}
-            title="Send a test"
-            sub={testResult ?? "Arrives on every phone with notifications on"}
-            disabled={pending}
-            onClick={() =>
-              void run(async () => {
-                const sent = await sendTestReminder();
-                setTestResult(
-                  sent === 0
-                    ? "Nothing arrived. Turn the reminder off and on again."
-                    : `Sent to ${sent === 1 ? "1 phone" : `${sent} phones`}`,
-                );
-              }, "Couldn't send a test. Try again.")
-            }
-          />
-        </>
-      )}
+            )}
+            <SettingRow
+              icon={BasketIcon}
+              title="When someone goes shopping"
+              sub="So you can add what you need"
+              htmlFor={shoppingId}
+              end={
+                <Switch
+                  id={shoppingId}
+                  checked={settings.shoppingTrips}
+                  disabled={pending}
+                  onCheckedChange={(checked) => void saveChoice({ shoppingTrips: checked })}
+                />
+              }
+            />
+            <SettingButton
+              icon={PaperPlaneTiltIcon}
+              title="Send a test"
+              liveSub
+              sub={testResult ?? "Arrives on every phone with notifications on"}
+              disabled={pending}
+              onClick={() =>
+                void run(async () => {
+                  const sent = await sendTestReminder();
+                  setTestResult(
+                    sent === 0
+                      ? "Nothing arrived. Turn the reminder off and on again."
+                      : `Sent to ${sent === 1 ? "1 phone" : `${sent} phones`}`,
+                  );
+                }, "Couldn't send a test. Try again.")
+              }
+            />
+          </>
+        )}
 
-      {error && (
-        <p role="alert" className="px-4 py-3 text-sm text-destructive">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p role="alert" className="px-4 py-3 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+      </Group>
+      <GroupNote>
+        Turn notifications on separately on each phone or browser. Which ones you get and the
+        reminder time are the same on all of them.
+      </GroupNote>
 
       <Drawer open={sheet !== null} onOpenChange={(open) => !open && setSheet(null)}>
         <SheetContent>

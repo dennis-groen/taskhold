@@ -1,12 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 
-import { DeleteAccountButton } from "@/features/auth/components/DeleteAccountButton.tsx";
-import { SignOutButton } from "@/features/auth/components/SignOutButton.tsx";
-import { SignOutElsewhereButton } from "@/features/auth/components/SignOutElsewhereButton.tsx";
+import { SettingsPage } from "@/components/layout/SettingsPage.tsx";
 import { choresQuery } from "@/features/chores/chores.queries.ts";
-import { HouseholdOverviewPage } from "@/features/households/components/HouseholdOverviewPage.tsx";
-import type { Household } from "@/features/households/households.api.ts";
 import {
   ChoreReminders,
   type ReminderPreview,
@@ -16,27 +12,16 @@ import { daysBetween, today } from "@/lib/dates.ts";
 
 const householdRoute = getRouteApi("/_household");
 
-export const Route = createFileRoute("/_household/household")({
-  component: HouseholdRoute,
+export const Route = createFileRoute("/_household/household/notifications")({
+  component: NotificationsRoute,
 });
 
-function HouseholdRoute() {
+function NotificationsRoute() {
   const preview = useReminderPreview();
   return (
-    <HouseholdOverviewPage
-      accountAction={<SignOutButton />}
-      reminders={<ChoreReminders preview={preview} />}
-      deleteAccount={accountDangerZone}
-    />
-  );
-}
-
-function accountDangerZone(household: Household, currentUserId: string) {
-  return (
-    <>
-      <SignOutElsewhereButton />
-      <DeleteAccountButton household={household} currentUserId={currentUserId} />
-    </>
+    <SettingsPage title="Notifications">
+      <ChoreReminders preview={preview} />
+    </SettingsPage>
   );
 }
 

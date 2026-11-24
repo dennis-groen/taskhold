@@ -19,7 +19,7 @@ export function HouseholdMembers({
   return (
     <ul className="divide-y divide-border">
       {members.map((member) => (
-        <li key={member.id} className="flex min-h-15 items-center gap-3 py-2.5 pr-1 pl-4">
+        <li key={member.id} className="flex min-h-15 items-center gap-3.5 py-2.5 pr-1 pl-4">
           <UserAvatar name={member.name} image={member.image} size="lg" />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2 text-[1.0625rem] font-[650]">
