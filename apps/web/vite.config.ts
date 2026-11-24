@@ -53,6 +53,7 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:3000",
     },
+    allowedHosts: [".ts.net"],
   },
   // `vite preview` serves the production build, with its Content Security Policy, the same way
   preview: {
