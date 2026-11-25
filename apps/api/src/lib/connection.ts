@@ -21,8 +21,8 @@ export function socketAddress(c: Context): string | undefined {
  * proxies it's the forwarded chain plus the peer, and Better Auth walks it from the right, skipping
  * trusted proxies, to the first address it doesn't trust.
  *
- * Cloudflare puts the visitor's address in CF-Connecting-IP, while a proxy behind it (Coolify's
- * Traefik) records Cloudflare's edge server as the forwarded hop. So CF-Connecting-IP goes first.
+ * Cloudflare puts the visitor's address in CF-Connecting-IP, while a reverse proxy behind it
+ * (e.g. Traefik) records Cloudflare's edge server as the forwarded hop. So CF-Connecting-IP goes first.
  * It can't be forged by skipping Cloudflare: a direct connection's hop is the sender's own address,
  * which isn't trusted, so the walk stops there before reaching a made-up value.
  */

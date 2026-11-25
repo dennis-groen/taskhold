@@ -9,6 +9,11 @@ import { VitePWA } from "vite-plugin-pwa";
 
 import { contentSecurityPolicy, withoutSonnerInlineStyles } from "./content-security-policy.ts";
 
+// Optional comma-separated hosts (e.g. `.ts.net` for Tailscale) allowed to reach the dev server
+const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(",")
+  .map((host) => host.trim())
+  .filter(Boolean);
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -53,7 +58,7 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:3000",
     },
-    allowedHosts: [".ts.net"],
+    ...(allowedHosts && allowedHosts.length > 0 && { allowedHosts }),
   },
   // `vite preview` serves the production build, with its Content Security Policy, the same way
   preview: {
