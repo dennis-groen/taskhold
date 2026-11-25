@@ -1,6 +1,34 @@
 # taskhold
 
-pnpm monorepo with a Hono API and a Vite + React + TypeScript frontend (React Compiler enabled).
+A phone-first, offline-capable PWA for people who share a household: shared shopping lists, repeating chores with push reminders, and private to-dos.
+
+Built as a TypeScript monorepo with a Hono API, Drizzle ORM on PostgreSQL 18, and a Vite + React 19 frontend, deployed as a single self-hostable Docker image.
+
+## What it does
+
+- **Shared shopping lists** — auto-grouped into supermarket aisles, optimistic check-off with undo, "Buy again" suggestions ranked from household purchase history, and live shopping-trip notifications.
+- **Repeating chores** — next due date counts from when a chore was done rather than when it was due, with skip/postpone, assignees, completion history, and daily Web Push summaries in each person's time zone.
+- **Private to-dos** — visible only to the person who created them, with one-tap promotion into household chores.
+- **Households** — 8-character invite codes and shareable join links, automatic ownership transfer on leave, and instant code rotation when a member leaves or is removed.
+
+## Engineering highlights
+
+- **Multi-instance real-time sync:** PostgreSQL `LISTEN/NOTIFY` bridged to Server-Sent Events (`/api/live`). Notifications are sent inside DB transactions so clients never hear about rolled-back writes, and carry only topic names so all data still goes through normal auth checks.
+- **Offline-first mutations & idempotency:** Declarative write queue (`defineChange`) persisted to `localStorage` with optimistic UI updates, client-chosen UUIDs so retried creates never duplicate, and versioned schema guards.
+- **Concurrency & integrity:** Row-level `FOR UPDATE` locking for household membership transitions, per-identity invite brute-force throttling, and database-claimed daily reminder sends so overlapping runs or multiple instances never double-notify.
+- **Defense-in-depth security:** `__Host-` session cookies over HTTPS, same-origin CSRF checks, unused Better Auth endpoints switched off, build-time SHA-256 Content Security Policy Vite plugin, SSRF-hardened Web Push endpoint allowlist with secret-verified device ownership, and trusted-proxy IP chain parsing.
+- **Observability & guardrails:** Wide-event canonical JSON logging with Pino (tail-sampled, secret-redacted), end-to-end typed Hono RPC, 169 strict `oxlint` layer rules, `knip` dead-code checks, and cross-package architectural invariant tests (`test/repo-invariants.test.ts`).
+
+## Tech stack
+
+| Layer            | Stack                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **API**          | Node.js 26 (`Temporal`), TypeScript, Hono, Drizzle ORM, PostgreSQL 18, Zod                                       |
+| **Auth & Push**  | Better Auth (Google OAuth), Web Push (VAPID), Pino wide-event logging                                            |
+| **Web**          | Vite 8, React 19 (React Compiler), TanStack Router & Query, Tailwind v4, shadcn/Base UI, `vite-plugin-pwa`       |
+| **Quality & CI** | Vitest (real Postgres API integration tests + web unit tests), `oxlint`, `oxfmt`, `knip`, GitHub Actions, Docker |
+
+## Structure
 
 ```
 apps/
@@ -9,7 +37,7 @@ apps/
   web/   Vite + React 19 + React Compiler + TanStack Router, port 5173, proxies /api to the API
 ```
 
-Both apps are organized in feature slices, with routes, services and repos on the API side. [AGENTS.md](AGENTS.md) is the short map (commands, layout, naming); [ARCHITECTURE.md](ARCHITECTURE.md) has the full folder layout and the rules lint enforces.
+Both apps are organized in feature slices, with routes, services and repos on the API side. [ARCHITECTURE.md](ARCHITECTURE.md) explains the layers, data flow and lint rules in full; [GLOSSARY.md](GLOSSARY.md) defines the domain terms; [AGENTS.md](AGENTS.md) is the short contributor map.
 
 ## Getting started
 
@@ -55,7 +83,7 @@ In VS Code, install the recommended Oxc extension to format and lint on save.
 - The API checks once a minute (`reminders.scheduler.ts`) whose time has come in their own time zone. Each person's day is claimed in the database before sending, so a slow run or a second API instance can't send it twice. After downtime, people whose time passed meanwhile get theirs on the next run.
 - Messages go through the browser vendors' push services with Web Push (`web-push`, `apps/api/src/lib/push.ts`), encrypted so only the device can read the names. The server only sends to the known push services (Google, Mozilla, Microsoft, Apple), so a made-up subscription can't make it call another host. Devices the push service says are gone are deleted.
 - Signing out or deleting the account unsubscribes the browser, so the next person on that device doesn't get someone else's reminders. The service worker shows the notifications and opens the page named in the message when one is tapped (`/chores`, or `/personal` when only to-dos are in it) (`apps/web/public/push-handler.js`).
-- **Setup:** generate a key pair once and set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (in `apps/api/.env`, and in Coolify for production):
+- **Setup:** generate a key pair once and set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (in `apps/api/.env`, and in your production environment):
 
   ```bash
   pnpm --filter @taskhold/api exec web-push generate-vapid-keys
@@ -190,22 +218,16 @@ To try the image locally:
 docker build -t taskhold .
 ```
 
-**Coolify** (live at https://taskhold.lunexa.dev, project `taskhold` on `coolify.example.com`):
+**Self-hosting with Coolify (or any Docker host behind a reverse proxy):**
 
-- **Application:** built from `main` of the GitHub repository with the Dockerfile build pack, on port 3000. The health check calls `GET /api/health`. Coolify's scan suggests `compose.yaml`, but that file is only the local dev database.
-- **Deploys wait for CI.** Auto Deploy is off in Coolify (application > Advanced). Instead, the `deploy` job in `.github/workflows/ci.yml` runs after the checks and tests pass on a push to `main`:
-  - It skips the deploy if `main` has moved on since the push, because Coolify builds the head of `main` and that newer commit hasn't passed CI yet. The newer commit's own run deploys it.
-  - It calls the app's deploy webhook, then waits for Coolify to report the deployment `finished`, and fails if it ends as `failed` or `cancelled`, or takes over 25 minutes. A failed deploy shows as a red `main` in GitHub, and Coolify's logs say why.
-  - It needs two repository secrets (GitHub > Settings > Secrets and variables > Actions): `COOLIFY_WEBHOOK`, the Deploy webhook URL from the application's Webhooks tab, and `COOLIFY_TOKEN`, a Coolify API token (Keys & Tokens > API Tokens) with the Deploy and Read permissions. API access must be enabled under Settings > Advanced.
-  - Deploying by hand from Coolify still works, for a rollback or when GitHub is down. It skips CI.
-- **Database:** a Coolify database, PostgreSQL 18, not publicly reachable. `DATABASE_URL` is its internal URL, ending in `/taskhold`.
-- **Domains:** `https://taskhold.lunexa.dev`, with `www` redirecting to it. Remove the extra hosts Coolify generates, such as `sslip.io`. On any host other than the one in `BETTER_AUTH_URL`, saving gets a 403 and sign-in doesn't work.
-- **Variables:** set them as runtime-only ("Not available during build"); the build doesn't need any.
-- **Client IPs:** requests pass through Cloudflare, then Coolify's Traefik.
-  - Traefik replaces `X-Forwarded-For` with the Cloudflare edge server it saw, so the API puts Cloudflare's `CF-Connecting-IP` first in the chain it gives Better Auth (`lib/connection.ts`).
-  - `TRUSTED_PROXIES` lists Coolify's proxy network (`10.0.0.0/24`) and Cloudflare's ranges (https://www.cloudflare.com/ips/), so Better Auth skips both and rate-limits by the visitor's IP.
-  - A forged `CF-Connecting-IP` sent straight to the server is ignored: Traefik records the sender's real address as the hop, and that address isn't trusted.
-  - Update the Cloudflare part if Cloudflare changes its ranges.
+- **Application:** build from `main` with the root `Dockerfile` on port `3000`, with a health check against `GET /api/health`. (`compose.yaml` is only for the local dev database.)
+- **CI-gated deploys:** `.github/workflows/ci.yml` includes a `deploy` job that runs after checks, tests, and the Docker build pass on `main` (skipping stale commits if `main` has moved on). It triggers a Coolify deploy webhook and polls until the deployment finishes, using two repository secrets (`COOLIFY_WEBHOOK` and `COOLIFY_TOKEN`).
+- **Database:** PostgreSQL 18 on an internal/private network, pointed to by `DATABASE_URL`.
+- **Domains:** serve from the single `https://<your-domain>` origin configured in `BETTER_AUTH_URL` (redirect `www` to it and remove any temporary platform hostnames). Requests on any other host fail the same-origin check with 403 and break OAuth callbacks.
+- **Variables:** set environment variables as runtime-only (the Docker build does not need them).
+- **Reverse proxies & client IPs:** if requests pass through a CDN (e.g. Cloudflare) and an internal reverse proxy (e.g. Traefik), list your proxy network CIDR(s) and CDN IP ranges in `TRUSTED_PROXIES`:
+  - Traefik replaces `X-Forwarded-For` with the edge server it saw, so `apps/api/src/lib/connection.ts` puts Cloudflare's `CF-Connecting-IP` ahead of the forwarded chain when `TRUSTED_PROXIES` is set.
+  - A forged `CF-Connecting-IP` sent directly to the server is ignored: the proxy records the sender's real IP as the hop, which isn't trusted, so IP extraction stops there.
 
 ## Production settings
 
