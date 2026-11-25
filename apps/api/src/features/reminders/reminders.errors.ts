@@ -26,3 +26,10 @@ export const pushDeviceTaken = () =>
     "PUSH_DEVICE_TAKEN",
     "This device is set up for someone else. Turn notifications off and on again in the browser.",
   );
+
+export const remindersNotInDemo = () =>
+  new AppError(
+    "forbidden",
+    "REMINDERS_NOT_IN_DEMO",
+    "Notifications aren't part of the demo. Sign in with Google to turn them on.",
+  );

@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e042fe27-0e0b-4123-b2a8-545485ca9033",
+  "prevIds": [
+    "f48b186d-961e-47d0-9833-118d224365cd"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "household",
+        "demo_ip"
+      ],
+      "writes": [
+        "s|col|public.household.demo_ip",
+        "n|col|public.household.demo_ip",
+        "e|col|public.household.demo_ip"
+      ],
+      "reads": [
+        "n|tbl|public.household",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "demo_ip",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

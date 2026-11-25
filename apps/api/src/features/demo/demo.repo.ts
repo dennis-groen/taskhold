@@ -2,10 +2,10 @@
 // so this repo writes the seed straight into the other features' tables (their services can't
 // backdate history) and deletes the sandbox along with its anonymous members. Everything a visitor
 // does inside the demo still goes through the other features' services.
-import { and, count, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 
 import { db, type Executor, type Transaction } from "../../db/db.ts";
-import { session, user } from "../auth/auth.table.ts";
+import { user } from "../auth/auth.table.ts";
 import { chore, choreCompletion } from "../chores/chores.table.ts";
 import { household, householdMember } from "../households/households.table.ts";
 import {
@@ -73,25 +73,36 @@ export async function countDemoHouseholds(executor: Executor = db): Promise<numb
 }
 
 /**
- * How many demo sessions from this IP address are still running: a demo account has one session,
- * and both go when the demo ends or expires. Null counts the sessions Better Auth couldn't record
- * an address for.
+ * How many demo households started from this address exist right now. Counted by household rather
+ * than by session, so signing out of a demo doesn't free its place: the household stays until it
+ * ends or expires.
  */
-export async function countDemoSessionsFrom(
-  ip: string | null,
+export async function countDemoHouseholdsFrom(
+  ip: string,
   executor: Executor = db,
 ): Promise<number> {
   const rows = await executor
     .select({ total: count() })
-    .from(session)
-    .innerJoin(user, eq(user.id, session.userId))
-    .where(
-      and(
-        ip ? eq(session.ipAddress, ip) : or(isNull(session.ipAddress), eq(session.ipAddress, "")),
-        eq(user.isAnonymous, true),
-      ),
-    );
+    .from(household)
+    .where(and(eq(household.demo, true), eq(household.demoIp, ip)));
   return rows[0]?.total ?? 0;
+}
+
+/** Records the address a demo household was started from */
+export async function recordDemoIp(
+  householdId: string,
+  ip: string,
+  tx: Transaction,
+): Promise<void> {
+  await tx.update(household).set({ demoIp: ip }).where(eq(household.id, householdId));
+}
+
+/**
+ * Takes the lock on starting demos until the transaction ends, on every API instance, so a burst
+ * of starts counts the demos one at a time instead of all reading the same count
+ */
+export async function lockDemoStarts(tx: Transaction): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('demo-start', 0))`);
 }
 
 /**

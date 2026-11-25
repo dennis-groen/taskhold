@@ -37,32 +37,33 @@ pnpm db:migrate
 
 ### CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`, in two jobs side by side:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`, in three jobs side by side:
 
 - **Format, lint, typecheck, build:** `pnpm check`, then `pnpm build`, then `pnpm db:generate` must produce no new files in `apps/api/drizzle`, so a `*.table.ts` change can't reach production without its migration.
-- **Tests:** `pnpm test` against a Postgres 18 service container, with `TEST_DATABASE_URL` pointing at `taskhold_test`.
+- **Tests:** `pnpm test:ci` (the repo invariants, then both apps' tests, failing if a package runs none) against a Postgres 18 service container, with `TEST_DATABASE_URL` pointing at `taskhold_test`.
+- **Docker image builds:** `docker build`, so a mistake in the `Dockerfile`'s copy list or `pnpm deploy` shows up before the merge rather than in Coolify.
 
-On a push to `main`, a third job deploys once both pass (see [Deploying](operations.md#deploying)), so a red build never reaches production. Actions are pinned to commit SHAs, with the tag in a comment; update both together.
+On a push to `main`, a fourth job deploys once all three pass (see [Deploying](operations.md#deploying)), so a red build never reaches production. Actions are pinned to commit SHAs, with the tag in a comment; update both together.
 
 ## Scripts
 
-| Command               | What it does                                      |
-| --------------------- | ------------------------------------------------- |
-| `pnpm dev`            | Start both apps in watch mode                     |
-| `pnpm dev:api`        | Start only the API                                |
-| `pnpm dev:web`        | Start only the frontend                           |
-| `pnpm build`          | Build all apps                                    |
-| `pnpm typecheck`      | Typecheck all apps, tests included                |
-| `pnpm test`           | Run all tests (needs Postgres: `pnpm db:up`)      |
-| `pnpm test:web`       | Run only web tests (fast, no Postgres needed)     |
-| `pnpm test:api`       | Run only API tests (needs Postgres: `pnpm db:up`) |
-| `pnpm test <feature>` | Run one feature's tests, e.g. `pnpm test chores`  |
-| `pnpm lint`           | Lint everything with oxlint                       |
-| `pnpm format`         | Format everything with oxfmt                      |
-| `pnpm check`          | Format check, lint, typecheck                     |
-| `pnpm db:up`          | Start Postgres (Docker) and wait until healthy    |
-| `pnpm db:down`        | Stop Postgres (data is kept in a Docker volume)   |
-| `pnpm db:generate`    | Generate a migration from the Drizzle schema      |
-| `pnpm db:migrate`     | Apply pending migrations                          |
-| `pnpm db:studio`      | Open Drizzle Studio                               |
-| `pnpm auth:generate`  | Regenerate the Better Auth Drizzle schema         |
+| Command               | What it does                                           |
+| --------------------- | ------------------------------------------------------ |
+| `pnpm dev`            | Start both apps in watch mode                          |
+| `pnpm dev:api`        | Start only the API                                     |
+| `pnpm dev:web`        | Start only the frontend                                |
+| `pnpm build`          | Build all apps                                         |
+| `pnpm typecheck`      | Typecheck all apps, tests included                     |
+| `pnpm test`           | Run all tests (needs Postgres: `pnpm db:up`)           |
+| `pnpm test:web`       | Run only web tests (fast, no Postgres needed)          |
+| `pnpm test:api`       | Run only API tests (needs Postgres: `pnpm db:up`)      |
+| `pnpm test <feature>` | Run one feature's tests, e.g. `pnpm test chores`       |
+| `pnpm lint`           | Lint everything with oxlint                            |
+| `pnpm format`         | Format everything with oxfmt                           |
+| `pnpm check`          | Format check, lint, typecheck, repo invariants, `knip` |
+| `pnpm db:up`          | Start Postgres (Docker) and wait until healthy         |
+| `pnpm db:down`        | Stop Postgres (data is kept in a Docker volume)        |
+| `pnpm db:generate`    | Generate a migration from the Drizzle schema           |
+| `pnpm db:migrate`     | Apply pending migrations                               |
+| `pnpm db:studio`      | Open Drizzle Studio                                    |
+| `pnpm auth:generate`  | Regenerate the Better Auth Drizzle schema              |

@@ -120,6 +120,31 @@ describe("starting the demo", () => {
     expect(await errorCode(sixth, 429)).toBe("TOO_MANY_DEMOS");
   });
 
+  it("keeps counting a demo after its visitor signs out", async () => {
+    const ip = randomIp();
+    const running = [];
+    for (let i = 0; i < 5; i++) running.push(await startDemo(ip));
+    const signedOut = await app.request("/api/auth/sign-out", {
+      method: "POST",
+      headers: { origin: new URL(env.BETTER_AUTH_URL).origin, cookie: running[0]?.cookie ?? "" },
+    });
+    expect(signedOut.status).toBe(200);
+    const sixth = await clientFor({ "x-forwarded-for": ip }).demo.$post();
+    expect(await errorCode(sixth, 429)).toBe("TOO_MANY_DEMOS");
+  });
+
+  it("starts five at most from a burst of requests from one address", async () => {
+    const ip = randomIp();
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () => clientFor({ "x-forwarded-for": ip }).demo.$post()),
+    );
+    const statuses = responses.map((response) => response.status).toSorted((a, b) => a - b);
+    expect(statuses).toEqual([204, 204, 204, 204, 204, 429, 429, 429]);
+    // The refused ones left no account behind
+    const refused = responses.filter((response) => response.status !== 204);
+    for (const response of refused) expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
   it("only starts from the app itself", async () => {
     const response = await anonymous.demo.$post(undefined, {
       headers: { origin: "https://evil.example" },
@@ -137,6 +162,23 @@ describe("starting the demo", () => {
 });
 
 describe("the demo household", () => {
+  it("gets no notifications, so demos can't send pushes on the server's behalf", async () => {
+    const { api } = await startDemo();
+    const status = await json(await api.reminders.$get(), 200);
+    expect(status).toMatchObject({ available: false, publicKey: null });
+    const subscribed = await api.reminders.subscription.$put({
+      json: {
+        subscription: {
+          endpoint: "https://fcm.googleapis.com/fcm/send/demo-device",
+          keys: { p256dh: "BPublicKey-x_1", auth: "secret_1" },
+        },
+        timeZone: "UTC",
+      },
+    });
+    expect(await errorCode(subscribed, 403)).toBe("REMINDERS_NOT_IN_DEMO");
+    expect(await errorCode(await api.reminders.test.$post(), 403)).toBe("REMINDERS_NOT_IN_DEMO");
+  });
+
   it("can't be joined with its invite code", async () => {
     const { api } = await startDemo();
     const {

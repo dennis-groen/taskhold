@@ -139,6 +139,12 @@ jobs:
             echo "::error::COOLIFY_WEBHOOK must be an https:// URL."
             exit 1
           fi
+          # Logs are public. GitHub masks only the whole webhook URL, and curl's errors ("Could not
+          # resolve host ...") name the Coolify host on its own, so mask that too.
+          api="${COOLIFY_WEBHOOK%%/api/v1/*}/api/v1"
+          host="${api#https://}"
+          host="${host%%/*}"
+          echo "::add-mask::$host"
           auth="Authorization: Bearer $COOLIFY_TOKEN"
 
           if ! response=$(curl --silent --show-error --fail-with-body --max-time 30 \
@@ -155,7 +161,6 @@ jobs:
 
           # Fails the job when the build fails or the container never becomes healthy (for
           # example a migration that errors on start), so main shows red in GitHub too.
-          api="${COOLIFY_WEBHOOK%%/api/v1/*}/api/v1"
           for _ in $(seq 1 100); do
             sleep 15
             status=$(curl --silent --show-error --fail --max-time 30 --header "$auth" \

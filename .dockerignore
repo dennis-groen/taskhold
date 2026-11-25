@@ -8,3 +8,7 @@
 .git
 .claude
 .vscode
+# Not part of the build; leaving them out keeps doc edits from busting the build cache
+.github
+docs
+**/*.md
