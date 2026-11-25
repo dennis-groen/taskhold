@@ -1,8 +1,9 @@
 // The demo: visitors try the app without signing in. Each gets an anonymous account and a sealed
 // household of their own with two made-up housemates, seeded so every screen has something on it,
 // and deleted a day later. Off unless DEMO_MODE is set.
-import { transaction } from "../../db/db.ts";
+import { transaction, type Executor } from "../../db/db.ts";
 import { env } from "../../env.ts";
+import { oneAtATime } from "../../lib/one-at-a-time.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as authService from "../auth/auth.service.ts";
 import * as householdsService from "../households/households.service.ts";
@@ -55,14 +56,17 @@ export async function startDemo(
 ): Promise<{ cookies: string[] }> {
   if (!env.DEMO_MODE) throw demoOff();
   if (currentUserId && (await authService.isAnonymous(currentUserId))) throw alreadyInDemo();
-  if ((await demoRepo.countDemoHouseholds()) >= MAX_DEMOS) throw demoFull();
-  // Before anything is written, so refused requests cost one query
-  await refuseIfTooMany(headers);
+  // As Better Auth records it (an IPv6 address by its /64, so one machine can't rotate through
+  // them). Visitors whose address can't be told share one allowance, rather than having none.
+  const ip = authService.clientIpOf(headers) ?? "";
+  // Before anything is written, so most refused requests cost two queries. Seeding counts again
+  // under a lock, which settles a burst of starts that all passed here.
+  await refuseIfFull(ip);
 
   const { userId, cookies } = await authService.signInAnonymously(headers);
   annotate("demo", { user_id: userId });
   try {
-    await seed(userId);
+    await seed(userId, ip);
   } catch (err) {
     // Nothing of a demo that didn't start is left behind, cookies included
     await transaction((tx) => demoRepo.deleteDemos({ householdIds: [], userIds: [userId] }, tx));
@@ -71,15 +75,13 @@ export async function startDemo(
   return { cookies };
 }
 
-/** Counted after signing in, so the address is the one Better Auth recorded for the session */
 /**
- * Counts the demos running from the visitor's address, as Better Auth records it on sessions (an
- * IPv6 address by its /64, so one machine can't rotate through them). Visitors whose address
- * can't be told share one allowance, rather than having none.
+ * Refuses a new demo when MAX_DEMOS exist, or DEMOS_PER_IP started from `ip`. Demos are counted
+ * by household, so one stays counted until it ends or expires, signed in or not.
  */
-async function refuseIfTooMany(headers: Headers): Promise<void> {
-  const ip = authService.clientIpOf(headers);
-  const running = await demoRepo.countDemoSessionsFrom(ip);
+async function refuseIfFull(ip: string, executor?: Executor): Promise<void> {
+  if ((await demoRepo.countDemoHouseholds(executor)) >= MAX_DEMOS) throw demoFull();
+  const running = await demoRepo.countDemoHouseholdsFrom(ip, executor);
   annotate("demo", { running_from_ip: running });
   if (running >= DEMOS_PER_IP) throw tooManyDemos();
 }
@@ -95,24 +97,31 @@ export async function spendDemoWrite(userId: string): Promise<void> {
   if (spent > DEMO_WRITE_BUDGET) throw demoBudgetSpent();
 }
 
-async function seed(visitorId: string): Promise<void> {
+async function seed(visitorId: string, ip: string): Promise<void> {
   const now = Temporal.Now.instant();
   const today = now.toZonedDateTimeISO("UTC").toPlainDate();
-  const householdId = await transaction(async (tx) => {
-    const [noor, sam] = await demoRepo.insertHousemates(["Noor", "Sam"], tx);
-    if (!noor || !sam) throw new Error("Couldn't make the demo housemates");
-    const id = await householdsService.createDemoHousehold(
-      { name: "The Flat", ownerId: visitorId, memberIds: [noor, sam] },
-      tx,
-    );
-    const people = { you: visitorId, noor, sam };
-    await demoRepo.insertSeed(
-      { householdId: id, visitorId },
-      buildDemoSeed(people, now, today),
-      tx,
-    );
-    return id;
-  });
+  // One start at a time, so concurrent starts can't all pass the limits: queued here within this
+  // instance first, holding no database connection while they wait, then locked across instances
+  const householdId = await oneAtATime("demo-start", () =>
+    transaction(async (tx) => {
+      await demoRepo.lockDemoStarts(tx);
+      await refuseIfFull(ip, tx);
+      const [noor, sam] = await demoRepo.insertHousemates(["Noor", "Sam"], tx);
+      if (!noor || !sam) throw new Error("Couldn't make the demo housemates");
+      const id = await householdsService.createDemoHousehold(
+        { name: "The Flat", ownerId: visitorId, memberIds: [noor, sam] },
+        tx,
+      );
+      await demoRepo.recordDemoIp(id, ip, tx);
+      const people = { you: visitorId, noor, sam };
+      await demoRepo.insertSeed(
+        { householdId: id, visitorId },
+        buildDemoSeed(people, now, today),
+        tx,
+      );
+      return id;
+    }),
+  );
   annotate("demo", { household_id: householdId });
 }
 

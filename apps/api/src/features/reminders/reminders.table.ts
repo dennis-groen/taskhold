@@ -35,7 +35,7 @@ export const reminderSetting = pgTable("reminder_setting", {
   timeZone: text("time_zone").notNull(),
   // Whether the person wants the daily summary. Off still keeps their devices for other notifications.
   dailySummary: boolean("daily_summary").default(true).notNull(),
-  // Whether the person hears when someone in the household goes shopping (plans/002)
+  // Whether the person hears when someone in the household goes shopping
   shoppingTrips: boolean("shopping_trips").default(true).notNull(),
   // The local date of the last summary, so each day gets at most one
   lastSentOn: plainDate("last_sent_on"),

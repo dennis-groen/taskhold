@@ -6,6 +6,7 @@ import { transaction } from "../../db/db.ts";
 import { logger } from "../../lib/logger.ts";
 import { pushConfigured, sendPush, type PushMessage, type SendPush } from "../../lib/push.ts";
 import { annotate, describeError } from "../../lib/wide-event.ts";
+import * as authService from "../auth/auth.service.ts";
 import * as choresService from "../chores/chores.service.ts";
 import * as householdsService from "../households/households.service.ts";
 import * as todosService from "../todos/todos.service.ts";
@@ -14,6 +15,7 @@ import * as remindersRepo from "./reminders.repo.ts";
 import {
   noReminderDevices,
   pushDeviceTaken,
+  remindersNotInDemo,
   remindersOff,
   remindersUnavailable,
   testSentRecently,
@@ -31,10 +33,11 @@ const TEST_INTERVAL = Temporal.Duration.from({ minutes: 1 });
 
 export async function getStatus(userId: string) {
   const setting = await remindersRepo.findSetting(userId);
+  const available = pushConfigured && !(await authService.isAnonymous(userId));
   return {
-    available: pushConfigured,
+    available,
     // The key browsers need to subscribe; public by design
-    publicKey: pushConfigured ? (env.VAPID_PUBLIC_KEY ?? null) : null,
+    publicKey: available ? (env.VAPID_PUBLIC_KEY ?? null) : null,
     settings: setting && {
       remindAt: setting.remindAt.toString({ smallestUnit: "minute" }),
       timeZone: setting.timeZone,
@@ -47,6 +50,7 @@ export async function getStatus(userId: string) {
 /** Turns reminders on for this device. The first device sets the time to 08:00. */
 export async function subscribe(userId: string, input: SubscribeInput): Promise<void> {
   if (!pushConfigured) throw remindersUnavailable();
+  await refuseDemo(userId);
   const { endpoint, keys } = input.subscription;
   await transaction(async (tx) => {
     const saved = await remindersRepo.upsertSubscription({ userId, endpoint, ...keys }, tx);
@@ -59,6 +63,15 @@ export async function subscribe(userId: string, input: SubscribeInput): Promise<
     );
   });
   annotate("reminders", { subscribed: true });
+}
+
+/**
+ * Demo accounts get no notifications: a demo lasts a day, and every device is a request to a push
+ * service on this server's behalf, so many demos could get the server's key throttled. Without a
+ * subscription, the daily summaries and shopping-trip pushes skip them too.
+ */
+async function refuseDemo(userId: string): Promise<void> {
+  if (await authService.isAnonymous(userId)) throw remindersNotInDemo();
 }
 
 /** Turns reminders off for this device. Unsubscribing one that's already gone succeeds. */
@@ -75,6 +88,7 @@ export async function updateSettings(userId: string, input: SettingsInput): Prom
 /** Sends a notification to each of the person's devices, so they can see reminders work */
 export async function sendTest(userId: string, send: SendPush = sendPush): Promise<number> {
   if (!pushConfigured) throw remindersUnavailable();
+  await refuseDemo(userId);
   const devices = await remindersRepo.findSubscriptions(userId);
   if (devices.length === 0) throw noReminderDevices();
   const sentBefore = Temporal.Now.instant().subtract(TEST_INTERVAL);

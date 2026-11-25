@@ -15,7 +15,9 @@ The root `Dockerfile` builds one image for the whole app. The API serves the web
   - `BETTER_AUTH_SECRET`;
   - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`;
   - `TRUSTED_PROXIES`, the reverse proxy's addresses;
-  - `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` for chore reminders (optional: without them reminders are off).
+  - `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` for chore reminders (optional: without them reminders are off), and `VAPID_SUBJECT`, the contact push services see (optional: defaults to `BETTER_AUTH_URL`);
+  - `DEMO_MODE=true` to offer the demo on the sign-in page (optional: off by default);
+  - `LOG_LEVEL`, `LOG_FORMAT` and `LOG_SAMPLE_RATE` (optional, see [Logging](#logging)).
 
   `.dockerignore` keeps `.env` files out of the image.
 

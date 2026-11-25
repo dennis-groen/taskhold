@@ -23,7 +23,7 @@ Built as a TypeScript monorepo with a Hono API, Drizzle ORM on PostgreSQL 18, an
 - **Offline-first mutations & idempotency:** Declarative write queue (`defineChange`) persisted to `localStorage` with optimistic UI updates, client-chosen UUIDs so retried creates never duplicate, and versioned schema guards.
 - **Concurrency & integrity:** Row-level `FOR UPDATE` locking for household membership transitions, per-identity invite brute-force throttling, and database-claimed daily reminder sends so overlapping runs or multiple instances never double-notify.
 - **Defense-in-depth security:** `__Host-` session cookies over HTTPS, same-origin CSRF checks, unused Better Auth endpoints switched off, build-time SHA-256 Content Security Policy Vite plugin, SSRF-hardened Web Push endpoint allowlist with secret-verified device ownership, and trusted-proxy IP chain parsing.
-- **Observability & guardrails:** Wide-event canonical JSON logging with Pino (tail-sampled, secret-redacted), end-to-end typed Hono RPC, 169 strict `oxlint` layer rules, `knip` dead-code checks, and cross-package architectural invariant tests (`test/repo-invariants.test.ts`).
+- **Observability & guardrails:** Wide-event canonical JSON logging with Pino (tail-sampled, secret-redacted), end-to-end typed Hono RPC, strict `oxlint` rules (about 170, including import boundaries between layers and features), `knip` dead-code checks, and cross-package architectural invariant tests (`test/repo-invariants.test.ts`).
 
 ## Tech stack
 
@@ -88,12 +88,16 @@ With `DEMO_MODE=true`, the sign-in page offers **Try the demo**. `POST /api/demo
 
 - **"The Flat"**, with two made-up housemates, Noor and Sam, who have no way to sign in. Four lists with Noor out shopping, two months of shopping trips for _Buy again_, ten chores with history (overdue, due today, one-offs), and six private to-dos, all dated from today.
 - **Housemate's turn** in the demo banner has Noor tick the oldest item off (or add one), through the shopping service and live updates as a real person's change would arrive.
-- **Sealed:** a demo account can't start, join or leave a household, and nobody can join a demo household with its code. _End the demo_ (Household or Account) deletes it at once; otherwise the API deletes demos after 24 hours (`demo.scheduler.ts`, every 10 minutes).
+- **Sealed:** a demo account can't start, join or leave a household or turn on notifications, and nobody can join a demo household with its code. _End the demo_ (Household or Account) deletes it at once; otherwise the API deletes demos after 24 hours (`demo.scheduler.ts`, every 10 minutes).
 - **Separate:** each demo is its own household with its own housemates, so the usual household scoping keeps demos apart; a test checks that one demo can't see or change another's.
 - **Limits**, counted in Postgres so they hold across instances:
-  - five demos running at once per client IP (an IPv6 address by its /64), checked before anything is written (`TOO_MANY_DEMOS`, 429);
-  - 500 demo households at once (`DEMO_FULL`, 503);
+  - five demos at once per client IP (an IPv6 address by its /64), counted by household so signing out doesn't free one (`TOO_MANY_DEMOS`, 429);
+  - 500 demo households at once (`DEMO_FULL`, 503). Both are checked before anything is written, and again under a Postgres advisory lock while seeding, so a burst of requests can't slip past them;
   - 1,000 changes per demo (`DEMO_BUDGET_SPENT`, 429), on top of the usual caps. Every change writes at most a couple of rows and no endpoint takes a batch, so one demo stays at a few thousand rows however it's driven. Reading and ending a demo aren't counted.
+
+## Contributing
+
+taskhold is a personal project, but issues and suggestions are welcome. For anything bigger than a small fix, please open an issue before a pull request. [AGENTS.md](AGENTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md) explain the conventions, and `pnpm check` and `pnpm test` must pass. Report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

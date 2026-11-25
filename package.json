@@ -1,7 +1,14 @@
 {
   "name": "taskhold",
   "private": true,
+  "description": "Phone-first PWA for shared households: shopping lists, chores with reminders, private to-dos",
+  "homepage": "https://taskhold.lunexa.dev",
+  "bugs": "https://github.com/dennis-groen/taskhold/issues",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dennis-groen/taskhold.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "pnpm --parallel --recursive run dev",

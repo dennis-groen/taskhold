@@ -1,5 +1,6 @@
-# Only the Docker base image: it's pinned by digest (see Dockerfile), so someone has to propose
-# the next one. npm dependencies and actions are updated by hand.
+# The Docker base image and the GitHub Actions are pinned (by digest and by commit SHA), so
+# someone has to propose the next ones. npm dependencies are updated by hand; Dependabot's
+# security updates still cover them.
 version: 2
 updates:
   - package-ecosystem: docker
@@ -8,3 +9,12 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(docker)"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"

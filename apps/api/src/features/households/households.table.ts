@@ -19,6 +19,9 @@ export const household = pgTable("household", {
   demo: boolean("demo").default(false).notNull(),
   // Changes made in a demo household so far, against its budget (features/demo)
   demoWrites: integer("demo_writes").default(0).notNull(),
+  // The address a demo was started from, as Better Auth records it (an IPv6 address by its /64,
+  // empty when it couldn't be told), for the per-address limit (features/demo)
+  demoIp: text("demo_ip"),
   createdAt: instant("created_at").default(now).notNull(),
   updatedAt: instant("updated_at")
     .default(now)
