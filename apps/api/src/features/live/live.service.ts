@@ -1,8 +1,15 @@
 // Live updates: which announced changes each signed-in person's stream hears about.
 // Their household's changes, and their own (to-dos, joining or leaving, account deletion).
+import { annotate } from "../../lib/wide-event.ts";
 import { watch, type FeedEvent } from "./live-changes.ts";
+import { tooManyStreams } from "./live.errors.ts";
 import type { Topic } from "./live-topics.ts";
 import { findMembership } from "../households/households.service.ts";
+
+// Far above the devices and tabs one person keeps open; keeps one account from tying up the server
+export const MAX_STREAMS_PER_USER = 10;
+
+const activeStreams = new Map<string, number>();
 
 /** What a stream tells the app: refetch a topic, or refetch everything after missed changes */
 export type LiveMessage = Topic | "resync";
@@ -15,6 +22,25 @@ export async function followChanges(
   userId: string,
   { send, close }: { send: (message: LiveMessage) => void; close: () => void },
 ): Promise<() => void> {
+  // Claim the slot before any await, so a burst of parallel requests can't slip past the cap
+  const current = activeStreams.get(userId) ?? 0;
+  if (current >= MAX_STREAMS_PER_USER) {
+    annotate("live", { active_streams: current });
+    throw tooManyStreams();
+  }
+  const active = current + 1;
+  activeStreams.set(userId, active);
+  annotate("live", { active_streams: active });
+
+  let released = false;
+  const releaseSlot = () => {
+    if (released) return;
+    released = true;
+    const remaining = (activeStreams.get(userId) ?? 1) - 1;
+    if (remaining <= 0) activeStreams.delete(userId);
+    else activeStreams.set(userId, remaining);
+  };
+
   let householdId: string | null = null;
   const refreshMembership = async () => {
     householdId = (await findMembership(userId))?.id ?? null;
@@ -45,15 +71,22 @@ export async function followChanges(
     send(change.topic);
   }
 
-  // Listening starts before membership is read, so a join in between isn't missed
-  const stop = await watch(handle);
+  let stopWatch: (() => void) | null = null;
   try {
+    // Listening starts before membership is read, so a join in between isn't missed
+    stopWatch = await watch(handle);
     queue = queue.then(refreshMembership);
     await queue;
   } catch (err) {
-    // The stream never starts, so nothing else would stop the listener
-    stop();
+    // The stream never starts, so nothing else would stop the listener or free its slot
+    stopWatch?.();
+    releaseSlot();
     throw err;
   }
-  return stop;
+
+  return () => {
+    if (released) return;
+    stopWatch();
+    releaseSlot();
+  };
 }

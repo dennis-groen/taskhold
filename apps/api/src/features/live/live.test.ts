@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import { stopFeed } from "./live-changes.ts";
+import { MAX_STREAMS_PER_USER } from "./live.service.ts";
 import {
   anonymous,
   errorCode,
@@ -164,5 +165,31 @@ describe("live updates", () => {
     const stream = await openStream(person);
     expect((await person.api.viewer.$delete()).status).toBe(204);
     await until(() => !stream.isOpen());
+  });
+
+  it("reject extra streams from the same user with 429 until one closes", async () => {
+    const person = await signUp();
+    const other = await signUp();
+    const streams = await Promise.all(
+      Array.from({ length: MAX_STREAMS_PER_USER }, () => openStream(person)),
+    );
+
+    try {
+      expect(await errorCode(await person.api.live.$get(), 429)).toBe("TOO_MANY_STREAMS");
+
+      // Other users are unaffected
+      const otherStream = await openStream(other);
+      await otherStream.close();
+
+      // Closing one frees a slot for this user
+      const closed = streams.pop();
+      await closed?.close();
+      await until(() => !closed?.isOpen());
+
+      const replacement = await openStream(person);
+      streams.push(replacement);
+    } finally {
+      await Promise.all(streams.map((s) => s.close()));
+    }
   });
 });
