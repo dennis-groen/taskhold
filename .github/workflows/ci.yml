@@ -108,7 +108,7 @@ jobs:
       cancel-in-progress: false
     env:
       # Repository secrets: the app's deploy webhook URL from Coolify (Webhooks tab), and an API
-      # token with the Deploy and Read permissions. See README, "Deploying".
+      # token with the Deploy and Read permissions. See docs/operations.md, "Deploying".
       COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
     steps:

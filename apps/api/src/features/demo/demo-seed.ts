@@ -8,7 +8,7 @@ export type DemoPeople = { you: string; noor: string; sam: string };
 type RepeatRule = { every: number; unit: "day" | "week" };
 
 export type DemoSeed = {
-  lists: { id: string; name: string }[];
+  lists: { id: string; name: string; createdAt: Temporal.Instant }[];
   items: {
     listId: string;
     name: string;
@@ -109,11 +109,12 @@ export function buildDemoSeed(
   });
 
   return {
+    // Lists show oldest first, so the everyday one leads
     lists: [
-      { id: listIds.groceries, name: "Groceries" },
-      { id: listIds.bbq, name: "Saturday BBQ" },
-      { id: listIds.hardware, name: "Hardware store" },
-      { id: listIds.drugstore, name: "Drugstore" },
+      { id: listIds.groceries, name: "Groceries", createdAt: hoursAgo(HISTORY_DAYS * 24 + 4) },
+      { id: listIds.drugstore, name: "Drugstore", createdAt: hoursAgo(HISTORY_DAYS * 24 + 3) },
+      { id: listIds.hardware, name: "Hardware store", createdAt: hoursAgo(60) },
+      { id: listIds.bbq, name: "Saturday BBQ", createdAt: hoursAgo(31) },
     ],
     items: [
       // The oldest unticked item is the one a housemate's turn ticks first

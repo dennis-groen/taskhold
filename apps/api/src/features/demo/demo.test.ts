@@ -58,9 +58,10 @@ describe("starting the demo", () => {
     expect(members.map((member) => member.name)).toEqual(["Alex", "Noor", "Sam"]);
 
     const { lists } = await json(await api.shopping.lists.$get(), 200);
-    expect(lists.map((list) => list.name).toSorted()).toEqual([
-      "Drugstore",
+    // Oldest first, so the everyday list leads
+    expect(lists.map((list) => list.name)).toEqual([
       "Groceries",
+      "Drugstore",
       "Hardware store",
       "Saturday BBQ",
     ]);
