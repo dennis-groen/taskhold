@@ -140,7 +140,8 @@ function toDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
 }
 
-function clientFor(headers: Record<string, string>) {
+/** The API as called from the app's origin with these extra headers, e.g. a cookie */
+export function clientFor(headers: Record<string, string>) {
   return testClient(app, undefined, undefined, {
     // Every state-changing request must come from the app's origin
     headers: { origin: new URL(env.BETTER_AUTH_URL).origin, ...headers },

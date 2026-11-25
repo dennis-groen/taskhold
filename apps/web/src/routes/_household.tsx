@@ -16,6 +16,7 @@ import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { NewChoreForm } from "@/features/chores/components/NewChoreForm.tsx";
 import { useOverdueCount } from "@/features/chores/chores.hooks.ts";
 import { ViewerUnavailableError } from "@/features/auth/auth.api.ts";
+import { DemoBanner } from "@/features/demo/components/DemoBanner.tsx";
 import {
   fetchCurrentHousehold,
   householdSummary,
@@ -37,7 +38,8 @@ export const Route = createFileRoute("/_household")({
     const { user, household } = context.viewer;
     if (!user) throw redirect({ to: "/" });
     if (!household) throw redirect({ to: "/onboarding" });
-    return { user, householdId: household.id };
+    // When the visitor's demo is deleted; null outside the demo
+    return { user, householdId: household.id, demoEndsAt: context.viewer.demo.endsAt };
   },
   loader: async ({ context }): Promise<Household | SavedHousehold> => {
     const { queryClient, offline, householdId } = context;
@@ -60,7 +62,7 @@ export const Route = createFileRoute("/_household")({
 
 function HouseholdLayout() {
   useRefetchOnLiveChanges();
-  const { user } = Route.useRouteContext();
+  const { user, demoEndsAt } = Route.useRouteContext();
   const household = Route.useLoaderData();
   const overdue = useOverdueCount();
   const rail = useRailInfo(household.name, user, overdue);
@@ -102,6 +104,7 @@ function HouseholdLayout() {
       foldAddOnScroll={Boolean(matchRoute({ to: "/lists/$listId" }))}
       badges={{ chores: overdue }}
       rail={rail}
+      banner={demoEndsAt && <DemoBanner endsAt={demoEndsAt} />}
     >
       <Outlet />
       <Drawer open={adding !== null} onOpenChange={(open) => !open && setAdding(null)}>

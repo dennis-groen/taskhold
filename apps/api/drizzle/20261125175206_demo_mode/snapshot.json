@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "95f31ab3-16b8-421a-8197-09258fda22a7",
+  "prevIds": [
+    "e5c3c678-e5b9-4a45-b635-97f390a3f571"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "user",
+        "is_anonymous"
+      ],
+      "writes": [
+        "s|col|public.user.is_anonymous",
+        "n|col|public.user.is_anonymous",
+        "e|col|public.user.is_anonymous"
+      ],
+      "reads": [
+        "n|tbl|public.user",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "household",
+        "demo"
+      ],
+      "writes": [
+        "s|col|public.household.demo",
+        "n|col|public.household.demo",
+        "e|col|public.household.demo"
+      ],
+      "reads": [
+        "n|tbl|public.household",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user",
+        "name": "is_anonymous",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "household",
+        "name": "demo",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

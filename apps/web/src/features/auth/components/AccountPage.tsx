@@ -5,6 +5,7 @@ import { SettingsPage } from "@/components/layout/SettingsPage.tsx";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 
 import { DeleteAccountButton, type HouseholdSummary } from "./DeleteAccountButton.tsx";
+import { GoogleSignInButton } from "./GoogleSignInButton.tsx";
 import { SignOutButton } from "./SignOutButton.tsx";
 import { SignOutElsewhereButton } from "./SignOutElsewhereButton.tsx";
 
@@ -16,12 +17,15 @@ export function AccountPage({
   user,
   household,
   offline,
+  demo,
 }: {
   user: { id: string; name: string; email: string; image: string | null };
   /** Null when the person isn't in a household */
   household: HouseholdSummary | null;
   /** In place of the actions while the app has no connection, since they all need the server */
   offline?: ReactNode;
+  /** In the demo, ending it, in place of signing out and deleting the account */
+  demo?: ReactNode;
 }) {
   return (
     <SettingsPage title="Account">
@@ -37,27 +41,40 @@ export function AccountPage({
             {user.name}
           </p>
           <p className="text-[0.9375rem] [overflow-wrap:anywhere] text-muted-foreground">
-            {user.email}
+            {demo ? "Demo visitor" : user.email}
           </p>
-          <p className="text-[0.8125rem] text-muted-foreground">Signed in with Google</p>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            {demo ? "No account: this demo is deleted after a day" : "Signed in with Google"}
+          </p>
         </div>
       </div>
 
-      {offline ?? (
-        <>
-          <Group className="mt-4">
-            <SignOutButton />
-            <SignOutElsewhereButton />
-          </Group>
+      {offline ??
+        (demo ? (
+          <>
+            <p className="mt-6 px-1 text-[0.9375rem] text-pretty text-muted-foreground">
+              Like it? Sign in with Google to start a household of your own. The demo stays behind.
+            </p>
+            <GoogleSignInButton callbackURL="/onboarding" className="mt-4" />
+            <Group className="mt-10">
+              <div className="border-y border-border py-1">{demo}</div>
+            </Group>
+          </>
+        ) : (
+          <>
+            <Group className="mt-4">
+              <SignOutButton />
+              <SignOutElsewhereButton />
+            </Group>
 
-          {/* Apart from the everyday rows, so it's never hit on the way to Sign out */}
-          <Group className="mt-10">
-            <div className="border-y border-border py-1">
-              <DeleteAccountButton household={household} currentUserId={user.id} />
-            </div>
-          </Group>
-        </>
-      )}
+            {/* Apart from the everyday rows, so it's never hit on the way to Sign out */}
+            <Group className="mt-10">
+              <div className="border-y border-border py-1">
+                <DeleteAccountButton household={household} currentUserId={user.id} />
+              </div>
+            </Group>
+          </>
+        ))}
     </SettingsPage>
   );
 }

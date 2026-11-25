@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { SignInPage } from "@/features/auth/components/SignInPage.tsx";
+import { TryDemoButton } from "@/features/demo/components/TryDemoButton.tsx";
 import { safeRedirect } from "@/features/auth/redirect.ts";
 
 export const Route = createFileRoute("/")({
@@ -9,5 +10,10 @@ export const Route = createFileRoute("/")({
   beforeLoad: ({ context, search }) => {
     if (context.viewer.user) throw redirect({ href: search.redirect ?? "/lists", replace: true });
   },
-  component: SignInPage,
+  component: SignInRoute,
 });
+
+function SignInRoute() {
+  const { viewer } = Route.useRouteContext();
+  return <SignInPage demo={viewer.demo.available ? <TryDemoButton /> : undefined} />;
+}

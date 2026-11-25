@@ -32,3 +32,10 @@ export const tooManyInviteAttempts = () =>
     "TOO_MANY_INVITE_ATTEMPTS",
     "Too many codes didn't match. Wait 15 minutes, then check the code with the person who shared it.",
   );
+
+export const demoHouseholdOnly = () =>
+  new AppError(
+    "forbidden",
+    "DEMO_HOUSEHOLD_ONLY",
+    "The demo stays in its own household. Sign in with Google to start yours.",
+  );

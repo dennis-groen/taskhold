@@ -4,6 +4,7 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 
 import { authRoutes } from "./features/auth/auth.routes.ts";
+import { demoRoutes } from "./features/demo/demo.routes.ts";
 import { choreRoutes } from "./features/chores/chores.routes.ts";
 import { householdRoutes } from "./features/households/households.routes.ts";
 import { liveRoutes } from "./features/live/live.routes.ts";
@@ -62,4 +63,5 @@ export const app = new Hono()
   .route("/chores", choreRoutes)
   .route("/todos", todoRoutes)
   .route("/live", liveRoutes)
-  .route("/reminders", reminderRoutes);
+  .route("/reminders", reminderRoutes)
+  .route("/demo", demoRoutes);

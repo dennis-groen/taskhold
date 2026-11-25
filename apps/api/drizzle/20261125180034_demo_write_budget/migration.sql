@@ -1,0 +1,1 @@
+ALTER TABLE "household" ADD COLUMN "demo_writes" integer DEFAULT 0 NOT NULL;

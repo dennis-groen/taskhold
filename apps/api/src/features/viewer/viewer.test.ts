@@ -22,7 +22,7 @@ describe("deleting an account", () => {
     );
 
     // The old cookie no longer works
-    expect(await json(await person.api.viewer.$get(), 200)).toEqual({
+    expect(await json(await person.api.viewer.$get(), 200)).toMatchObject({
       user: null,
       household: null,
     });

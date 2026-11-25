@@ -15,6 +15,16 @@ export async function deleteUser(userId: string, executor: Executor = db): Promi
   return rows.length > 0;
 }
 
+/** Whether the user is one of the demo's anonymous accounts (false for a user that doesn't exist) */
+export async function isAnonymous(userId: string, executor: Executor = db): Promise<boolean> {
+  const rows = await executor
+    .select({ isAnonymous: user.isAnonymous })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  return rows[0]?.isAnonymous === true;
+}
+
 /** The person's oldest sign-in account (provider and the provider's id for them), if any */
 export async function findFirstAccount(
   userId: string,

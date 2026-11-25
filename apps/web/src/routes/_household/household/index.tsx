@@ -2,6 +2,7 @@ import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 
 import { PaletteIcon, UserCircleIcon } from "@/components/icons.ts";
 import { SettingLink } from "@/components/layout/SettingRow.tsx";
+import { EndDemoButton } from "@/features/demo/components/EndDemoButton.tsx";
 import { HouseholdOverviewPage } from "@/features/households/components/HouseholdOverviewPage.tsx";
 import { NotificationsLink } from "@/features/reminders/components/NotificationsLink.tsx";
 import { useTheme, type ThemeChoice } from "@/lib/theme.ts";
@@ -19,11 +20,12 @@ const THEME_NAMES: Record<ThemeChoice, string> = { light: "Light", dark: "Dark",
  * route beside this file.
  */
 function HouseholdRoute() {
-  const { user } = householdRoute.useRouteContext();
+  const { user, demoEndsAt } = householdRoute.useRouteContext();
   const { choice } = useTheme();
 
   return (
     <HouseholdOverviewPage
+      endDemo={demoEndsAt ? <EndDemoButton /> : undefined}
       settings={
         <>
           <NotificationsLink />
@@ -38,7 +40,7 @@ function HouseholdRoute() {
             to="/household/account"
             icon={UserCircleIcon}
             title="Account"
-            sub={<span className="block truncate">{user.email}</span>}
+            sub={<span className="block truncate">{demoEndsAt ? "Demo visitor" : user.email}</span>}
           />
         </>
       }

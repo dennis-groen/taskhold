@@ -67,6 +67,19 @@ Open http://localhost:5173.
 
 In VS Code, install the recommended Oxc extension to format and lint on save.
 
+## Demo
+
+With `DEMO_MODE=true`, the sign-in page offers **Try the demo**. `POST /api/demo` signs the visitor in with a throwaway anonymous account (Better Auth's anonymous plugin, whose own `/sign-in/anonymous` route stays switched off) and seeds a household of their own (`features/demo`):
+
+- **"The Flat"**, with two made-up housemates, Noor and Sam, who have no way to sign in. Four lists with Noor out shopping, two months of shopping trips for _Buy again_, ten chores with history (overdue, due today, one-offs), and six private to-dos, all dated from today.
+- **Housemate's turn** in the demo banner has Noor tick the oldest item off (or add one), through the shopping service and live updates as a real person's change would arrive.
+- **Sealed:** a demo account can't start, join or leave a household, and nobody can join a demo household with its code. _End the demo_ (Household or Account) deletes it at once; otherwise the API deletes demos after 24 hours (`demo.scheduler.ts`, every 10 minutes).
+- **Separate:** each demo is its own household with its own housemates, so the usual household scoping keeps demos apart; a test checks that one demo can't see or change another's.
+- **Limits**, counted in Postgres so they hold across instances:
+  - five demos running at once per client IP (an IPv6 address by its /64), checked before anything is written (`TOO_MANY_DEMOS`, 429);
+  - 500 demo households at once (`DEMO_FULL`, 503);
+  - 1,000 changes per demo (`DEMO_BUDGET_SPENT`, 429), on top of the usual caps. Every change writes at most a couple of rows and no endpoint takes a batch, so one demo stays at a few thousand rows however it's driven. Reading and ending a demo aren't counted.
+
 ## Auth
 
 - Every page requires a signed-in user except the ones in `PUBLIC_PATHS` in `apps/web/src/features/auth/page-access.ts` (only `/` for now).

@@ -5,6 +5,7 @@ import { pool } from "./db/db.ts";
 import { stopFeed } from "./features/live/live-changes.ts";
 import { logger } from "./lib/logger.ts";
 import { describeError } from "./lib/wide-event.ts";
+import { startDemoCleanup } from "./features/demo/demo.scheduler.ts";
 import { startReminders } from "./features/reminders/reminders.scheduler.ts";
 import { createServer } from "./server.ts";
 
@@ -24,12 +25,14 @@ const server = serve({ fetch: createServer(env.WEB_ROOT).fetch, port: env.PORT }
 });
 
 const stopReminders = startReminders();
+const stopDemoCleanup = startDemoCleanup();
 
 // Stop taking requests, let in-flight ones finish, then release database connections. Live
 // streams never finish by themselves, so they're ended first; browsers reconnect to the new server.
 function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, `${signal} received, shutting down`);
   stopReminders();
+  stopDemoCleanup();
   void stopFeed();
   server.close(() => {
     void pool.end().finally(() => process.exit(0));

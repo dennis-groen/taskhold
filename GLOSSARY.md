@@ -12,6 +12,10 @@ _Avoid_: topic, section, module
 Something a person does to the data in an area (ticking an item, adding a chore, marking a chore done, skipping it) that shows straight away and reaches the server once there's a connection, even if the app is closed in between.
 _Avoid_: mutation, action, optimistic update
 
+**Demo**:
+A household a visitor gets without signing in, with made-up housemates, deleted after a day. Sealed: nobody joins it and its visitor can't leave it.
+_Avoid_: sandbox, guest mode
+
 ### Chores
 
 **Chore**:

@@ -72,7 +72,7 @@ export const memberRecordSchema = z.object({
 });
 
 export const householdRecordSchema = householdColumns
-  .pick({ id: true, name: true, inviteCode: true })
+  .pick({ id: true, name: true, inviteCode: true, demo: true })
   .extend({ members: z.array(memberRecordSchema) });
 
 export type Household = z.infer<typeof householdSchema>;

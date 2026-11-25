@@ -4,9 +4,14 @@ import type { Viewer } from "./auth.api.ts";
 import { whereToSend } from "./page-access.ts";
 
 const user = { id: "sam", name: "Sam", email: "sam@example.test", image: null };
-const signedOut: Viewer = { user: null, household: null };
-const withoutHousehold: Viewer = { user, household: null };
-const withHousehold: Viewer = { user, household: { id: "home", name: "Home", role: "member" } };
+const demo = { available: false, endsAt: null };
+const signedOut: Viewer = { user: null, household: null, demo };
+const withoutHousehold: Viewer = { user, household: null, demo };
+const withHousehold: Viewer = {
+  user,
+  household: { id: "home", name: "Home", role: "member" },
+  demo,
+};
 
 describe("who may open which page", () => {
   it("sends signed-out visitors to sign-in from everywhere but the front page", () => {

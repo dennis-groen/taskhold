@@ -21,6 +21,7 @@ export default defineConfig({
       VAPID_PUBLIC_KEY:
         "BJmFp5ljzAvIMoEFfZlOuNcZ6QRA_VZXj1L7ktl1DzUAaPbYH2pkesy-H0FPihV6M7rj0TfOToLKx3DDeOp_12A",
       VAPID_PRIVATE_KEY: "j7G5wqtn5VjmDS6-lmW9LMHTjiawZHI6g-d2fvs9960",
+      DEMO_MODE: "true",
       LOG_LEVEL: "silent",
       LOG_FORMAT: "json",
     },

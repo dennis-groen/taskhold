@@ -1,4 +1,4 @@
-import { index, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 
 import { instant, now } from "../../db/columns.ts";
 
@@ -14,6 +14,11 @@ export const household = pgTable("household", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   inviteCode: text("invite_code").notNull().unique(),
+  // A demo visitor's sandbox (features/demo): nobody joins it with its code, and it's deleted after
+  // a day along with its members
+  demo: boolean("demo").default(false).notNull(),
+  // Changes made in a demo household so far, against its budget (features/demo)
+  demoWrites: integer("demo_writes").default(0).notNull(),
   createdAt: instant("created_at").default(now).notNull(),
   updatedAt: instant("updated_at")
     .default(now)

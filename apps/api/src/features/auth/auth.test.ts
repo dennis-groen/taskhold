@@ -52,7 +52,10 @@ describe("sessions", () => {
   });
 
   it("tells signed-out visitors they aren't signed in, without an error", async () => {
-    expect(await json(await anonymous.viewer.$get(), 200)).toEqual({ user: null, household: null });
+    expect(await json(await anonymous.viewer.$get(), 200)).toMatchObject({
+      user: null,
+      household: null,
+    });
   });
 
   it("knows who is signed in", async () => {

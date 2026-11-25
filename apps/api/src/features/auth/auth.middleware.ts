@@ -3,6 +3,7 @@ import { createMiddleware } from "hono/factory";
 
 import { AppError } from "../../lib/errors.ts";
 import { requireSameOrigin } from "../../lib/same-origin.ts";
+import { limitDemoWrites } from "../demo/demo.middleware.ts";
 import type { Session } from "./auth.ts";
 import { getSession } from "./auth.service.ts";
 
@@ -27,6 +28,8 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
 
 /**
  * A router where every route requires a signed-in user, so `c.get("user")` is always set,
- * and every state-changing request must come from the app's own origin
+ * and every state-changing request must come from the app's own origin. A demo visitor's changes
+ * also count against their demo's budget.
  */
-export const protectedRouter = () => new Hono<AuthEnv>().use(requireSameOrigin).use(requireAuth);
+export const protectedRouter = () =>
+  new Hono<AuthEnv>().use(requireSameOrigin).use(requireAuth).use(limitDemoWrites);

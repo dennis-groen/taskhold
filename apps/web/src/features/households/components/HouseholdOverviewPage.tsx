@@ -19,9 +19,16 @@ const householdRoute = getRouteApi("/_household");
  * account last), each opening a page of its own, and Leave at the foot. A new setting is a new row
  * here, not a new block, so the page stays one calm screen.
  *
- * `settings` are those rows; the route passes them in, since other features own them.
+ * `settings` are those rows; the route passes them in, since other features own them. In the demo,
+ * `endDemo` takes the place of Invite and Leave: its household can't be shared or left.
  */
-export function HouseholdOverviewPage({ settings }: { settings?: ReactNode }) {
+export function HouseholdOverviewPage({
+  settings,
+  endDemo,
+}: {
+  settings?: ReactNode;
+  endDemo?: ReactNode;
+}) {
   const household = householdRoute.useLoaderData();
   const { user } = householdRoute.useRouteContext();
 
@@ -40,7 +47,7 @@ export function HouseholdOverviewPage({ settings }: { settings?: ReactNode }) {
       {isSavedHousehold(household) ? (
         <Offline household={household} />
       ) : (
-        <People household={household} currentUserId={user.id} />
+        <People household={household} currentUserId={user.id} canInvite={!endDemo} />
       )}
 
       {settings && (
@@ -54,7 +61,7 @@ export function HouseholdOverviewPage({ settings }: { settings?: ReactNode }) {
         // Set apart from the rows above, so it's never tapped on the way to something else
         <Group className="mt-10">
           <div className="border-y border-border py-1">
-            <LeaveHouseholdButton household={household} currentUserId={user.id} />
+            {endDemo ?? <LeaveHouseholdButton household={household} currentUserId={user.id} />}
           </div>
         </Group>
       )}
@@ -62,7 +69,15 @@ export function HouseholdOverviewPage({ settings }: { settings?: ReactNode }) {
   );
 }
 
-function People({ household, currentUserId }: { household: Household; currentUserId: string }) {
+function People({
+  household,
+  currentUserId,
+  canInvite,
+}: {
+  household: Household;
+  currentUserId: string;
+  canInvite: boolean;
+}) {
   const isOwner = household.members.some(
     (member) => member.id === currentUserId && member.role === "owner",
   );
@@ -77,17 +92,19 @@ function People({ household, currentUserId }: { household: Household; currentUse
           ) : null
         }
       />
-      <SettingLink
-        to="/invite"
-        icon={UserPlusIcon}
-        tone="accent"
-        title="Invite someone"
-        sub={
-          household.members.length === 1
-            ? "It's just you so far. Share a code to get started."
-            : "Share a code with people you live with"
-        }
-      />
+      {canInvite && (
+        <SettingLink
+          to="/invite"
+          icon={UserPlusIcon}
+          tone="accent"
+          title="Invite someone"
+          sub={
+            household.members.length === 1
+              ? "It's just you so far. Share a code to get started."
+              : "Share a code with people you live with"
+          }
+        />
+      )}
     </Group>
   );
 }

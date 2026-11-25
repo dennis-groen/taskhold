@@ -13,7 +13,7 @@ const routeApi = getRouteApi("/");
  * The first screen: one card for each thing the app does, in that area's colour, stacked like a
  * hand of cards. Round ticks for shared things, a square one for what's yours alone.
  */
-export function SignInPage() {
+export function SignInPage({ demo }: { demo?: ReactNode }) {
   const { redirect } = routeApi.useSearch();
   const joining = redirect?.startsWith("/join/") ?? false;
   const ticked = useTickAfterAMoment();
@@ -91,6 +91,15 @@ export function SignInPage() {
             ? "New here? Signing in creates your account."
             : "Next, you'll join a household or start one."}
         </p>
+        {/* Trying it without an account; the route passes it in when the server offers it */}
+        {demo && !joining && (
+          <div className="mb-4">
+            {demo}
+            <p className="mt-3 text-center text-[0.8125rem] text-muted-foreground">
+              No account needed: a household of your own, with housemates, deleted after a day.
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );

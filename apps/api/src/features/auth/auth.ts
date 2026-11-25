@@ -1,5 +1,6 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { betterAuth } from "better-auth";
+import { anonymous } from "better-auth/plugins";
 
 import { env } from "../../env.ts";
 import { db } from "../../db/db.ts";
@@ -14,6 +15,9 @@ const UNUSED_ENDPOINTS = [
   "/account-info",
   "/change-email",
   "/change-password",
+  // The demo's anonymous accounts: only POST /api/demo makes one (it seeds the demo and limits how
+  // many), and the demo feature deletes them
+  "/delete-anonymous-user",
   "/delete-user",
   "/delete-user/callback",
   "/get-access-token",
@@ -27,6 +31,7 @@ const UNUSED_ENDPOINTS = [
   "/revoke-session",
   "/revoke-sessions",
   "/send-verification-email",
+  "/sign-in/anonymous",
   "/sign-in/email",
   "/sign-up/email",
   "/unlink-account",
@@ -56,6 +61,16 @@ export const auth = betterAuth({
     },
   },
   disabledPaths: UNUSED_ENDPOINTS,
+  plugins: [
+    // Throwaway accounts for the demo (features/demo). Signing in with Google from one starts a
+    // real account and leaves the demo to its cleanup, rather than deleting it here: Better Auth's
+    // own delete would skip the demo household and its housemates.
+    anonymous({
+      emailDomainName: "demo.invalid",
+      generateName: () => "Alex",
+      disableDeleteAnonymousUser: true,
+    }),
+  ],
   // On regardless of NODE_ENV (Better Auth's default is production only). Requests are keyed by
   // the client IP that auth.routes.ts puts in X-Forwarded-For.
   rateLimit: { enabled: env.NODE_ENV !== "test" },

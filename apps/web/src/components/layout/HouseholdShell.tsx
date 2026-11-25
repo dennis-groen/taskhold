@@ -68,6 +68,7 @@ export function HouseholdShell({
   foldAddOnScroll = false,
   badges = {},
   rail,
+  banner,
   children,
 }: {
   area: ShellArea;
@@ -79,6 +80,8 @@ export function HouseholdShell({
   rail?: RailInfo;
   /** The add field for this section, rendered once and placed by the shell. Household has none. */
   addButton: ReactNode;
+  /** A notice above every page, like the demo's */
+  banner?: ReactNode;
   children: ReactNode;
 }) {
   // The theme provider re-reads the status bar colour itself when the theme changes
@@ -146,6 +149,7 @@ export function HouseholdShell({
 
       <div className="lg:pl-64">
         <main className="mx-auto max-w-[680px] px-4 pb-[calc(12.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:pt-8 lg:pb-40">
+          {banner}
           {children}
         </main>
       </div>

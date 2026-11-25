@@ -68,6 +68,7 @@ async function findHousehold(
     id: row.id,
     name: row.name,
     inviteCode: row.inviteCode,
+    demo: row.demo,
     members: row.members.map((member) => ({
       userId: member.user.id,
       name: member.user.name,
@@ -80,7 +81,7 @@ async function findHousehold(
 
 /** Returns null when the invite code is already taken, so the caller can try another */
 export async function insertHousehold(
-  values: Pick<typeof household.$inferInsert, "name" | "inviteCode">,
+  values: Pick<typeof household.$inferInsert, "name" | "inviteCode" | "demo">,
   executor: Executor = db,
 ): Promise<{ id: string } | null> {
   const rows = await executor

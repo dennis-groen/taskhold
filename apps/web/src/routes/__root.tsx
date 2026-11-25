@@ -58,7 +58,9 @@ async function whoIsSignedIn(
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- kept below, from fetchViewer
     const kept = keptForOffline(queryClient, "viewer") as Viewer | undefined;
     if (!kept?.user || !kept.household) throw error;
-    return { viewer: kept, offline: true };
+    // A copy saved before the demo existed has no `demo`; it can't have been a demo either
+    const demo: Viewer["demo"] | undefined = kept.demo;
+    return { viewer: { ...kept, demo: demo ?? { available: false, endsAt: null } }, offline: true };
   }
   // Someone else, or nobody, drops what was saved for the last person
   await openOfflineCache(queryClient, viewer.user?.id ?? null);

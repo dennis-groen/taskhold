@@ -35,6 +35,21 @@ export function forwardedChain(c: Context): string | undefined {
   });
 }
 
+/**
+ * The request with X-Forwarded-For replaced by the chain we can vouch for (see forwardedChain).
+ * Better Auth reads the client IP (for rate limiting and the session record) from X-Forwarded-For
+ * only, so a client could otherwise pick its own IP, or send none and share one bucket with
+ * everyone.
+ */
+export function withClientIp(c: Context): Request {
+  const chain = forwardedChain(c);
+  if (!chain) return c.req.raw;
+
+  const headers = new Headers(c.req.raw.headers);
+  headers.set("x-forwarded-for", chain);
+  return new Request(c.req.raw, { headers });
+}
+
 export function buildForwardedChain(request: {
   peer: string | undefined;
   forwardedFor: string | undefined;

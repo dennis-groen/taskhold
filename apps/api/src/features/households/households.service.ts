@@ -12,6 +12,7 @@ import * as householdsRepo from "./households.repo.ts";
 import {
   alreadyInHousehold,
   cannotRemoveSelf,
+  demoHouseholdOnly,
   inviteNotFound,
   memberNotFound,
   notInHousehold,
@@ -76,8 +77,9 @@ export async function createHousehold(
   userId: string,
   name: CreateHouseholdInput["name"],
 ): Promise<Household> {
+  await refuseDemoUser(userId);
   const householdId = await transaction(async (tx) => {
-    const created = await insertWithFreshInviteCode(name, tx);
+    const created = await insertWithFreshInviteCode({ name, demo: false }, tx);
     const added = await householdsRepo.insertMember(
       { householdId: created.id, userId, role: "owner" },
       tx,
@@ -91,7 +93,29 @@ export async function createHousehold(
   return getHousehold(householdId);
 }
 
+/**
+ * For the demo (features/demo): a sealed household with `ownerId` as owner and `memberIds` in it,
+ * in the caller's transaction. Nobody can join it with its code. Returns its id.
+ */
+export async function createDemoHousehold(
+  input: { name: string; ownerId: string; memberIds: string[] },
+  tx: Transaction,
+): Promise<string> {
+  const created = await insertWithFreshInviteCode({ name: input.name, demo: true }, tx);
+  const members = [
+    { userId: input.ownerId, role: "owner" as const },
+    ...input.memberIds.map((userId) => ({ userId, role: "member" as const })),
+  ];
+  for (const member of members) {
+    const added = await householdsRepo.insertMember({ householdId: created.id, ...member }, tx);
+    if (!added) throw alreadyInHousehold();
+  }
+  await membershipChanged({ userId: input.ownerId }, tx);
+  return created.id;
+}
+
 export async function previewInvite(userId: string, rawCode: string): Promise<InvitePreview> {
+  await refuseDemoUser(userId);
   const household = await findByInviteCode(userId, rawCode);
   return {
     householdName: household.name,
@@ -101,6 +125,7 @@ export async function previewInvite(userId: string, rawCode: string): Promise<In
 
 /** Adds the user to the household behind the code. Fails if they're already in one. */
 export async function acceptInvite(userId: string, rawCode: string): Promise<Household> {
+  await refuseDemoUser(userId);
   const household = await findByInviteCode(userId, rawCode);
   await transaction(async (tx) => {
     // The household may have been deleted, or its code replaced, since we looked it up
@@ -124,6 +149,8 @@ export async function acceptInvite(userId: string, rawCode: string): Promise<Hou
  * a new invite code, as when someone is removed.
  */
 export async function leaveHousehold(userId: string): Promise<{ householdDeleted: boolean }> {
+  // A demo visitor ends the demo instead (DELETE /api/demo)
+  await refuseDemoUser(userId);
   return transaction((tx) => leave(userId, tx));
 }
 
@@ -239,7 +266,9 @@ async function findByInviteCode(userId: string, rawCode: string) {
       if (failures >= INVITE_GUESS_LIMIT) throw tooManyInviteAttempts();
 
       const code = normalizeInviteCode(rawCode);
-      const found = code ? await householdsRepo.findHouseholdByInviteCode(code, tx) : null;
+      const match = code ? await householdsRepo.findHouseholdByInviteCode(code, tx) : null;
+      // A demo household's code is on show to its visitor, but it isn't a way in
+      const found = match?.demo ? null : match;
       annotate("invite", { matched: found !== null });
       // Recorded, not thrown, so the miss commits
       if (!found) await householdsRepo.recordFailedInviteAttempt(identity, windowStart, tx);
@@ -258,15 +287,23 @@ async function replaceInviteCode(householdId: string, tx: Transaction) {
   throw new Error("Could not generate a unique invite code");
 }
 
-async function insertWithFreshInviteCode(name: string, tx: Transaction) {
+async function insertWithFreshInviteCode(values: { name: string; demo: boolean }, tx: Transaction) {
   for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
     const created = await householdsRepo.insertHousehold(
-      { name, inviteCode: generateInviteCode() },
+      { ...values, inviteCode: generateInviteCode() },
       tx,
     );
     if (created) return created;
   }
   throw new Error("Could not generate a unique invite code");
+}
+
+/**
+ * Demo accounts stay in the demo household they were made with: they can't start, join or leave
+ * one, so a demo account never ends up in a real household that its cleanup would then disturb
+ */
+async function refuseDemoUser(userId: string): Promise<void> {
+  if (await authService.isAnonymous(userId)) throw demoHouseholdOnly();
 }
 
 /**

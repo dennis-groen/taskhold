@@ -38,6 +38,12 @@ const envSchema = z.object({
   // Who push services can contact about this sender: a mailto: or https: URL. Defaults to
   // BETTER_AUTH_URL when that's https.
   VAPID_SUBJECT: optionalString(),
+  // "true" lets visitors try the app without signing in: each gets a seeded demo household of their
+  // own, deleted after a day (features/demo). Off unless set.
+  DEMO_MODE: z
+    .enum(["true", "false", ""])
+    .default("false")
+    .transform((value) => value === "true"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   // json for log collectors; pretty is readable in a terminal. Defaults to pretty in development.
   LOG_FORMAT: z.enum(["json", "pretty"]).optional(),

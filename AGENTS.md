@@ -41,6 +41,7 @@ Folder names match in both apps and follow the API path (`/api/<feature>`). The 
 - chores: shared chores with repeat rules, marking done, skipping a time or putting it off to tomorrow, history
 - todos: private to-dos, can be moved to chores
 - reminders: push reminders for chores (API scheduler and device settings)
+- demo: try the app without signing in (`DEMO_MODE`). Each visitor gets an anonymous account and a sealed, seeded household with two made-up housemates, deleted after a day; a button has a housemate tick something off
 - live (API only): server-sent change notifications. The web side is `lib/live-updates.ts`, which every feature may use
 - viewer (API only): `GET /api/viewer`, who is signed in and their household, and account deletion. The web side is `features/auth/auth.api.ts`
 
