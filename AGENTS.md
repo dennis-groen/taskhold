@@ -14,7 +14,7 @@ A phone-first PWA for people who share a household: shared shopping lists, chore
 - `pnpm test:invariants`: fast cross-package repo-invariant tests (also run by `pnpm check`)
 - `pnpm test <feature>`: one feature's tests in both apps, e.g. `pnpm test chores`
 - `pnpm test:ci`: all tests, failing if a package runs none (what CI runs)
-- `pnpm test:e2e`: Playwright browser test against a running Docker image (`e2e/`; how to start it: `docs/development.md`)
+- `pnpm test:e2e`: builds and starts the Docker image, then runs the Playwright browser test against it (`e2e/`; needs `pnpm db:up` and Docker)
 - `pnpm knip`: dead-code and unused dependency check (also run by `pnpm check`)
 - `pnpm db:generate` then `pnpm db:migrate`: after changing a `*.table.ts`
 - `pnpm auth:generate`: after changing Better Auth's config; rewrites `auth.table.ts`
