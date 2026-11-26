@@ -1,5 +1,6 @@
 # Runs the same checks as `pnpm check` and `pnpm test` on every pull request and on main, builds
-# the Docker image, then deploys main to production through Coolify once all three pass.
+# the Docker image and drives it in a browser, then deploys main to production through Coolify
+# once all three pass.
 # Coolify's own auto-deploy is off, so a red build never ships. Actions are pinned to commit SHAs
 # (tag in the comment).
 name: CI
@@ -82,9 +83,23 @@ jobs:
       - run: pnpm test:ci
 
   image:
-    name: Docker image builds
+    name: Docker image and browser test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: taskhold
+          POSTGRES_PASSWORD: taskhold
+          POSTGRES_DB: taskhold
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U taskhold -d taskhold"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -92,6 +107,50 @@ jobs:
       # The Dockerfile is its own build: its COPY list and pnpm deploy aren't run by the other
       # jobs, and Coolify would only find a mistake in them after the merge
       - run: docker build -t taskhold:ci .
+
+      # The image as it ships, on an empty database: it migrates on start and serves the web build.
+      # Throwaway values for what the demo doesn't use.
+      - name: Start the image
+        run: |
+          docker run --detach --name taskhold --network host \
+            --env DATABASE_URL=postgres://taskhold:taskhold@localhost:5432/taskhold \
+            --env BETTER_AUTH_URL=http://localhost:3000 \
+            --env BETTER_AUTH_SECRET="$(openssl rand -hex 32)" \
+            --env GOOGLE_CLIENT_ID=unused \
+            --env GOOGLE_CLIENT_SECRET=unused \
+            --env DEMO_MODE=true \
+            taskhold:ci
+          for _ in $(seq 1 30); do
+            if curl --silent --fail http://localhost:3000/api/health > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::The image didn't become healthy within a minute."
+          docker logs taskhold
+          exit 1
+
+      # Only the browser test's own tooling; the app is the image above
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
+      - run: pnpm test:e2e
+        env:
+          CI: true
+
+      - name: Server logs
+        if: failure()
+        run: docker logs taskhold
+      # A trace of the failed run (open with `pnpm exec playwright show-trace`): a throwaway demo
+      # in a throwaway database, so nothing in it is secret
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: playwright-traces
+          path: e2e/test-results
+          retention-days: 7
 
   deploy:
     name: Deploy to production

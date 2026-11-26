@@ -12,3 +12,7 @@
 .github
 docs
 **/*.md
+# The browser test runs against the image, not in it
+e2e
+test-results
+playwright-report

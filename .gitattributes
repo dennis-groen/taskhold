@@ -1,0 +1,7 @@
+# LF everywhere, whatever a contributor's core.autocrlf says: oxfmt fails on CRLF
+* text=auto eol=lf
+
+# Generated files: collapsed in GitHub's diffs. Migrations' SQL stays visible for review.
+apps/api/drizzle/**/snapshot.json linguist-generated
+apps/api/src/features/auth/auth.table.ts linguist-generated
+apps/web/src/routeTree.gen.ts linguist-generated

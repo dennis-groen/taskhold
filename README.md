@@ -27,12 +27,12 @@ Built as a TypeScript monorepo with a Hono API, Drizzle ORM on PostgreSQL 18, an
 
 ## Tech stack
 
-| Layer            | Stack                                                                                                            |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **API**          | Node.js 26 (`Temporal`), TypeScript, Hono, Drizzle ORM, PostgreSQL 18, Zod                                       |
-| **Auth & Push**  | Better Auth (Google OAuth), Web Push (VAPID), Pino wide-event logging                                            |
-| **Web**          | Vite 8, React 19 (React Compiler), TanStack Router & Query, Tailwind v4, shadcn/Base UI, `vite-plugin-pwa`       |
-| **Quality & CI** | Vitest (real Postgres API integration tests + web unit tests), `oxlint`, `oxfmt`, `knip`, GitHub Actions, Docker |
+| Layer            | Stack                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **API**          | Node.js 26 (`Temporal`), TypeScript, Hono, Drizzle ORM, PostgreSQL 18, Zod                                                   |
+| **Auth & Push**  | Better Auth (Google OAuth), Web Push (VAPID), Pino wide-event logging                                                        |
+| **Web**          | Vite 8, React 19 (React Compiler), TanStack Router & Query, Tailwind v4, shadcn/Base UI, `vite-plugin-pwa`                   |
+| **Quality & CI** | Vitest (real Postgres API integration tests + web unit tests), Playwright, `oxlint`, `oxfmt`, `knip`, GitHub Actions, Docker |
 
 ## Structure
 
