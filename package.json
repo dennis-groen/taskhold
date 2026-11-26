@@ -21,7 +21,7 @@
     "test:web": "pnpm --filter @taskhold/web test",
     "test:invariants": "vitest run --config vitest.config.ts",
     "test:ci": "pnpm test:invariants && pnpm --recursive run test:ci",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "knip": "knip",
