@@ -34,6 +34,19 @@ pnpm db:migrate
   - The tests cover who can see and change what: other households and other people get 404s, the owner-only actions, and the invite-guess limit. They also cover the chore due-date and undo rules, retries with client-chosen ids, and moving a to-do to chores.
 - **Web** (`apps/web/src/**/*.test.ts`): unit tests for the date helpers, offline changes and the copy kept on the device (`lib/`), each feature's changes (`features/*/*.changes.test.ts`), and shopping's quick-add parsing, categories, sorting and buy-again ranking. The date helpers run twice, on native Temporal and on `temporal-polyfill`, because browsers without Temporal use the polyfill.
 - Vitest is installed once, at the workspace root.
+- **Browser** (`e2e/`, [Playwright](https://playwright.dev)): one smoke test of the production build in a phone-sized Chromium. It starts a demo, has a housemate tick an item and waits for the change to arrive over live updates, checks the service worker installs, and fails on any console error, so a Content Security Policy violation or a broken bundle shows up before the deploy. It runs against the Docker image rather than the dev server. To run it locally, start Postgres (`pnpm db:up`), then:
+
+  ```sh
+  docker compose exec postgres createdb -U taskhold taskhold_e2e   # once
+  docker build -t taskhold:e2e .
+  docker run --rm -d --name taskhold-e2e -p 127.0.0.1:3100:3000 \
+    -e DATABASE_URL=postgres://taskhold:taskhold@host.docker.internal:5432/taskhold_e2e \
+    -e BETTER_AUTH_URL=http://localhost:3100 -e BETTER_AUTH_SECRET="$(openssl rand -hex 32)" \
+    -e GOOGLE_CLIENT_ID=unused -e GOOGLE_CLIENT_SECRET=unused -e DEMO_MODE=true taskhold:e2e
+  pnpm exec playwright install chromium                            # once
+  E2E_BASE_URL=http://localhost:3100 pnpm test:e2e
+  docker stop taskhold-e2e
+  ```
 
 ### CI
 
@@ -41,7 +54,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every
 
 - **Format, lint, typecheck, build:** `pnpm check`, then `pnpm build`, then `pnpm db:generate` must produce no new files in `apps/api/drizzle`, so a `*.table.ts` change can't reach production without its migration.
 - **Tests:** `pnpm test:ci` (the repo invariants, then both apps' tests, failing if a package runs none) against a Postgres 18 service container, with `TEST_DATABASE_URL` pointing at `taskhold_test`.
-- **Docker image builds:** `docker build`, so a mistake in the `Dockerfile`'s copy list or `pnpm deploy` shows up before the merge rather than in Coolify.
+- **Docker image and browser test:** `docker build`, so a mistake in the `Dockerfile`'s copy list or `pnpm deploy` shows up before the merge rather than in Coolify. Then it starts the image on an empty Postgres 18 service container, as production runs it, and runs the browser test against it. A failed run uploads the Playwright trace and prints the server's logs.
 
 On a push to `main`, a fourth job deploys once all three pass (see [Deploying](operations.md#deploying)), so a red build never reaches production. Actions are pinned to commit SHAs, with the tag in a comment; update both together.
 
@@ -58,6 +71,7 @@ On a push to `main`, a fourth job deploys once all three pass (see [Deploying](o
 | `pnpm test:web`       | Run only web tests (fast, no Postgres needed)          |
 | `pnpm test:api`       | Run only API tests (needs Postgres: `pnpm db:up`)      |
 | `pnpm test <feature>` | Run one feature's tests, e.g. `pnpm test chores`       |
+| `pnpm test:e2e`       | Browser test against a running image (see Tests)       |
 | `pnpm lint`           | Lint everything with oxlint                            |
 | `pnpm format`         | Format everything with oxfmt                           |
 | `pnpm check`          | Format check, lint, typecheck, repo invariants, `knip` |

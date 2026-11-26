@@ -15,12 +15,13 @@
     "dev:api": "pnpm --filter @taskhold/api dev",
     "dev:web": "pnpm --filter @taskhold/web dev",
     "build": "pnpm --recursive run build",
-    "typecheck": "pnpm --recursive run typecheck",
+    "typecheck": "pnpm --recursive run typecheck && tsc -p e2e",
     "test": "pnpm --recursive run test",
     "test:api": "pnpm --filter @taskhold/api test",
     "test:web": "pnpm --filter @taskhold/web test",
     "test:invariants": "vitest run --config vitest.config.ts",
     "test:ci": "pnpm test:invariants && pnpm --recursive run test:ci",
+    "test:e2e": "playwright test",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "knip": "knip",
@@ -35,10 +36,13 @@
     "auth:generate": "pnpm --filter @taskhold/api auth:generate"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "^26.6.6",
     "knip": "^6.48.0",
     "oxfmt": "^0.79.0",
     "oxlint": "^1.94.0",
     "oxlint-tsgolint": "^7.0.2007",
+    "typescript": "~7.0.2",
     "vitest": "^5.1.1"
   },
   "engines": {
