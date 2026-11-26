@@ -34,19 +34,7 @@ pnpm db:migrate
   - The tests cover who can see and change what: other households and other people get 404s, the owner-only actions, and the invite-guess limit. They also cover the chore due-date and undo rules, retries with client-chosen ids, and moving a to-do to chores.
 - **Web** (`apps/web/src/**/*.test.ts`): unit tests for the date helpers, offline changes and the copy kept on the device (`lib/`), each feature's changes (`features/*/*.changes.test.ts`), and shopping's quick-add parsing, categories, sorting and buy-again ranking. The date helpers run twice, on native Temporal and on `temporal-polyfill`, because browsers without Temporal use the polyfill.
 - Vitest is installed once, at the workspace root.
-- **Browser** (`e2e/`, [Playwright](https://playwright.dev)): one smoke test of the production build in a phone-sized Chromium. It starts a demo, has a housemate tick an item and waits for the change to arrive over live updates, checks the service worker installs, and fails on any console error, so a Content Security Policy violation or a broken bundle shows up before the deploy. It runs against the Docker image rather than the dev server. To run it locally, start Postgres (`pnpm db:up`), then:
-
-  ```sh
-  docker compose exec postgres createdb -U taskhold taskhold_e2e   # once
-  docker build -t taskhold:e2e .
-  docker run --rm -d --name taskhold-e2e -p 127.0.0.1:3100:3000 \
-    -e DATABASE_URL=postgres://taskhold:taskhold@host.docker.internal:5432/taskhold_e2e \
-    -e BETTER_AUTH_URL=http://localhost:3100 -e BETTER_AUTH_SECRET="$(openssl rand -hex 32)" \
-    -e GOOGLE_CLIENT_ID=unused -e GOOGLE_CLIENT_SECRET=unused -e DEMO_MODE=true taskhold:e2e
-  pnpm exec playwright install chromium                            # once
-  E2E_BASE_URL=http://localhost:3100 pnpm test:e2e
-  docker stop taskhold-e2e
-  ```
+- **Browser** (`e2e/`, [Playwright](https://playwright.dev)): one smoke test of the production build in a phone-sized Chromium. It starts a demo, has a housemate tick an item and waits for the change to arrive over live updates, checks the service worker installs, and fails on any console error, so a Content Security Policy violation or a broken bundle shows up before the deploy. It runs against the Docker image rather than the dev server: `pnpm test:e2e` builds the image, starts it on port 3100 on a fresh `taskhold_e2e` database in the Docker Postgres (`e2e/serve-image.sh`), and stops it afterwards. Postgres must be running (`pnpm db:up`), and Playwright's browser installed once (`pnpm exec playwright install chromium`). Set `E2E_BASE_URL` to test an app that's already running instead.
 
 ### CI
 
@@ -71,7 +59,7 @@ On a push to `main`, a fourth job deploys once all three pass (see [Deploying](o
 | `pnpm test:web`       | Run only web tests (fast, no Postgres needed)          |
 | `pnpm test:api`       | Run only API tests (needs Postgres: `pnpm db:up`)      |
 | `pnpm test <feature>` | Run one feature's tests, e.g. `pnpm test chores`       |
-| `pnpm test:e2e`       | Browser test against a running image (see Tests)       |
+| `pnpm test:e2e`       | Build and start the Docker image, test it in a browser |
 | `pnpm lint`           | Lint everything with oxlint                            |
 | `pnpm format`         | Format everything with oxfmt                           |
 | `pnpm check`          | Format check, lint, typecheck, repo invariants, `knip` |

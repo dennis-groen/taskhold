@@ -136,9 +136,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps --only-shell chromium
+      # Against the image started above, instead of the one Playwright builds locally
       - run: pnpm test:e2e
         env:
           CI: true
+          E2E_BASE_URL: http://localhost:3000
 
       - name: Server logs
         if: failure()
