@@ -1,3 +1,5 @@
+import { isUnreachable } from "@/lib/api.ts";
+
 import type { ShoppingItem, ShoppingTrip } from "./shopping.api.ts";
 
 /** How many items other people added after the trip started */
@@ -20,4 +22,14 @@ export function leftAgo(trip: Pick<ShoppingTrip, "startedAt">, now: Temporal.Ins
     now.since(Temporal.Instant.from(trip.startedAt), { largestUnit: "minute" }).minutes,
   );
   return minutes < 1 ? "left just now" : `left ${minutes} min ago`;
+}
+
+/**
+ * What to say when "I'm going shopping" fails. The app can think it's online with no signal in a
+ * shop, so a request that never got through says so, rather than sounding like the push failed.
+ */
+export function tripStartFailure(error: unknown): string {
+  return isUnreachable(error)
+    ? "No connection, so nobody was told. Check your signal and try again."
+    : "Couldn't start your trip, so nobody was told. Try again.";
 }

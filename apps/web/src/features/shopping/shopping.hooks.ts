@@ -20,6 +20,7 @@ import {
   type ShoppingListSummary,
   type ShoppingTrip,
 } from "./shopping.api.ts";
+import { tripStartFailure } from "./shopping-trip.ts";
 import { shoppingChanges, type ItemChanges } from "./shopping.changes.ts";
 import {
   browseBuyAgain,
@@ -101,7 +102,7 @@ export function useShoppingTrip(listId: string, viewer: PersonSummary) {
           });
         }
       } catch (err) {
-        changeFailed(err, "Couldn't let everyone know. Try again.");
+        changeFailed(err, tripStartFailure(err));
       } finally {
         setStarting(false);
       }
