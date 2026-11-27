@@ -498,7 +498,7 @@ export function useBuyAgainSession({
   }
 
   return {
-    addedCount: pinnedIds.size,
+    addedIds: pinnedIds,
     addedIdFor,
     untickedByKey,
     bulkUndo,

@@ -16,6 +16,8 @@ const COLORS: CSSProperties & Record<`--${string}`, string> = {
   "--normal-text": "var(--popover-foreground)",
   "--normal-border": "var(--border)",
   "--border-radius": "var(--radius)",
+  // As wide as the dock on a phone, narrower on a desktop (styles/globals.css)
+  "--width": "var(--toast-width)",
 };
 
 // shadcn's Sonner wrapper, reading the theme from the app's ThemeProvider instead of next-themes

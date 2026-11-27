@@ -175,6 +175,8 @@ export const choreChanges = {
     apply: (list, choreId) => list.filter((item) => item.id !== choreId),
   }),
 
+  // No longer run: Clear done now deletes each chore it shows (chores.hooks.ts). Kept registered
+  // so a Clear done still waiting on someone's phone from an older version replays.
   clearDone: defineChange("chores", "clear-done", {
     idempotent: true,
     ordered: true,

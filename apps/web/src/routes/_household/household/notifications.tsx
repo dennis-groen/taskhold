@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 
 import { SettingsPage } from "@/components/layout/SettingsPage.tsx";
-import { choresQuery } from "@/features/chores/chores.queries.ts";
+import { useChoreList } from "@/features/chores/chores.hooks.ts";
 import {
   ChoreReminders,
   type ReminderPreview,
@@ -34,7 +34,7 @@ const NAMES_SHOWN = 4;
  */
 function useReminderPreview(): ReminderPreview | null {
   const { user } = householdRoute.useRouteContext();
-  const { data: chores = [] } = useQuery(choresQuery());
+  const chores = useChoreList();
   const { data: todos = [] } = useQuery(todosQuery());
   const on = today();
   const due = [

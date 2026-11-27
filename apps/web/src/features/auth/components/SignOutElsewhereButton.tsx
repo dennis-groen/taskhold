@@ -1,8 +1,7 @@
-import { toast } from "sonner";
-
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { DevicesIcon } from "@/components/icons.ts";
 import { SettingButton } from "@/components/layout/SettingRow.tsx";
+import { notify } from "@/lib/feedback.ts";
 
 import { signOutElsewhere } from "../auth.api.ts";
 
@@ -23,7 +22,7 @@ export function SignOutElsewhereButton() {
       confirmLabel="Sign out the others"
       onConfirm={async () => {
         const ended = await signOutElsewhere();
-        toast(
+        notify(
           ended === 0
             ? "You weren't signed in anywhere else"
             : `Signed out of ${ended === 1 ? "1 other device" : `${ended} other devices`}`,

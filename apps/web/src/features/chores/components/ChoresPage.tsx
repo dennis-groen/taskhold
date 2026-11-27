@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { CheckCircleIcon, PlusIcon, UserCircleDashedIcon } from "@/components/icons.ts";
 import { AreaHeader, Count, Segments } from "@/components/layout/AreaHeader.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
@@ -196,27 +195,23 @@ export function ChoresPage({
         <section aria-labelledby="chores-done" className="-mx-4 mt-2 sm:-mx-6 lg:mx-0">
           <h2 id="chores-done" className="flex items-center justify-between px-5 pt-4 pb-1">
             <span className="text-sm font-[750]">Done</span>
-            {/* Unlike your own to-dos this can't be undone, and it goes for everyone: ask first */}
-            <ConfirmDialog
-              trigger={
-                <button
-                  type="button"
-                  className="-my-3 -mr-2 min-h-11 rounded-lg px-2 text-sm font-[750] text-area-fg outline-none focus-visible:ring-3 focus-visible:ring-ring/80 active:opacity-60"
-                >
-                  Clear done
-                </button>
-              }
-              title="Clear done chores?"
-              description="Done one-off chores are removed for everyone in the household. Repeating chores stay."
-              confirmLabel="Clear done"
-              onConfirm={async () => clearDone()}
-            />
+            {/* Every done one-off chore goes, for everyone, not only the ones this filter shows */}
+            <button
+              type="button"
+              onClick={() => clearDone(chores.filter((chore) => chore.done))}
+              className="-my-3 -mr-2 min-h-11 rounded-lg px-2 text-sm font-[750] text-area-fg outline-none focus-visible:ring-3 focus-visible:ring-ring/80 active:opacity-60"
+            >
+              Clear done
+            </button>
           </h2>
           <ul>
             {done.map((chore) => (
               <ChoreRow key={chore.id} {...rowProps(chore)} />
             ))}
           </ul>
+          <p className="px-5 pt-2 text-[0.8125rem] text-muted-foreground">
+            Clearing deletes them for everyone, after a moment to undo.
+          </p>
         </section>
       )}
 

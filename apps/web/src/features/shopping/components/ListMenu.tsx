@@ -22,14 +22,17 @@ type ListInfo = { id: string; name: string; itemCount: number };
 export function ListMenu({
   list,
   onSlab = false,
-  beforeDelete,
+  leaveList,
   className,
 }: {
   list: ListInfo;
   onSlab?: boolean;
   className?: string;
-  /** Runs before the list goes, e.g. leaving its page so it doesn't look for what's gone */
-  beforeDelete?: () => Promise<void>;
+  /**
+   * On the list's own page: takes the person off it before it goes, so the page doesn't look for
+   * what's gone. They're told it went, since they no longer see it go.
+   */
+  leaveList?: () => Promise<void>;
 }) {
   const { remove } = useManageLists();
   const [renaming, setRenaming] = useState(false);
@@ -76,10 +79,11 @@ export function ListMenu({
         confirmLabel="Delete list"
         destructive
         onConfirm={async () => {
-          await beforeDelete?.();
+          await leaveList?.();
           // Gone from the overview straight away, and sent once there is a connection
           remove(list.id);
-          notify(`${list.name} deleted`);
+          // On the overview they watched the row go
+          if (leaveList) notify(`${list.name} deleted`);
         }}
       />
     </>

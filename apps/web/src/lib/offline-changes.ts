@@ -345,7 +345,7 @@ export function runChange<Vars>(
         offer.onUndo?.();
         undo().catch(() => {});
       },
-      offer.detail,
+      { detail: offer.detail },
     );
   }
   return sent;

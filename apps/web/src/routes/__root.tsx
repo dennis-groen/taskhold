@@ -100,11 +100,14 @@ function RootLayout() {
     <>
       <Outlet />
       <UpdatePrompt />
-      {/* Brief notices after an action: undo, failed saves, a new version. Not for form errors. */}
+      {/* Brief notices after an action: undo, failed saves, a new version. Not for form errors.
+          Shown through lib/feedback.ts, one at a time, as wide as the dock (styles/globals.css). */}
       <Toaster
         position="bottom-center"
+        visibleToasts={1}
+        swipeDirections={["left", "right", "bottom"]}
         offset={{ bottom: "var(--toast-bottom)" }}
-        mobileOffset={{ bottom: "var(--toast-bottom)" }}
+        mobileOffset={{ bottom: "var(--toast-bottom)", left: 0, right: 0 }}
       />
     </>
   );
