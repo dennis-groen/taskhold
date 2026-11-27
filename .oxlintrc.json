@@ -159,6 +159,49 @@
       }
     },
     {
+      // Chores and shopping write through householdWrites, which holds the household for the
+      // write and announces it on commit. Same rules as other services, plus no way around it.
+      "files": [
+        "apps/api/src/features/chores/chores.service.ts",
+        "apps/api/src/features/shopping/shopping.service.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["drizzle-orm", "drizzle-orm/*"],
+                "message": "Services hold business rules. Build queries in the feature's repo."
+              },
+              {
+                "regex": "\\.table(\\.ts)?$",
+                "allowTypeImports": true,
+                "message": "Services hold business rules. Build queries in the feature's repo."
+              },
+              {
+                "regex": "/db/db(\\.ts)?$",
+                "importNames": ["db", "pool", "transaction"],
+                "message": "Write through householdWrites, which opens the transaction for you."
+              },
+              {
+                "regex": "/live/live-changes(\\.ts)?$",
+                "message": "Call scope.changed() inside householdWrites; it announces on commit."
+              },
+              {
+                "regex": "\\.(routes|middleware)(\\.ts)?$",
+                "message": "Services can't depend on the HTTP layer."
+              },
+              {
+                "regex": "^\\.\\./[^/]+/[^/]+\\.(repo|routes)(\\.ts)?$",
+                "message": "Call the other feature's service, never its repo or routes."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["apps/api/src/features/**/*.repo.ts"],
       "rules": {
         "no-restricted-imports": [

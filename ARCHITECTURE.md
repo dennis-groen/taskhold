@@ -29,7 +29,7 @@ features/<name>/          one folder per feature; AGENTS.md lists them. For exam
 Files worth knowing that their names don't give away:
 
 - `features/auth/auth.ts` is the Better Auth instance; `auth.middleware.ts` has `requireAuth` and `protectedRouter()`.
-- `features/live/live-changes.ts` has `announce()`, which services call after a write, and the Postgres LISTEN/NOTIFY feed behind `/api/live`. `live-topics.ts` lists what a live update can be about.
+- `features/live/live-changes.ts` has `announce()`, which services call after a write (chores and shopping through `householdWrites` instead, which lint enforces), and the Postgres LISTEN/NOTIFY feed behind `/api/live`. `live-topics.ts` lists what a live update can be about.
 - `features/reminders/reminders.scheduler.ts` sends due reminders through `lib/push.ts`.
 
 ### Layers
@@ -45,7 +45,7 @@ Requests flow `routes → service → repo → database`, never backwards.
 - Services throw `AppError(kind, code, message)`. `lib/error-handler.ts` maps the `kind` to a status code and responds with `{ error: { code, message } }`.
 - Every request is logged as one wide event (`lib/request-logger.ts`). Services add what they know about the request with `annotate(group, fields)` from `lib/wide-event.ts`, using ids and counts, never names, codes or other user content. Don't log separate lines during a request: add to its event instead.
 - A rule the web app needs too (what marking a chore done or skipping it does to its due date) lives once in the API and is exported for the web app in `package.json`, like the RPC client: `features/chores/chore-schedule.ts` is `@taskhold/api/chore-schedule`. The web app bundles that file, so it may import types only (lint enforces it), and it stays free of HTTP and the database: the service applies its answers inside its transaction. The invite code's alphabet and length (`@taskhold/api/invite-code`) and the live topics (`@taskhold/api/live-topics`) are shared the same way.
-- A feature may call another feature's service, never its repo or routes. Services also call `announce()` from `live/live-changes.ts`. `viewer` uses `auth` and `households` this way, `shopping` asks `householdsService.getMembershipOf()` which household a user is in, and `todos` calls `choresService.createChore()` to move a to-do to chores.
+- A feature may call another feature's service, never its repo or routes. Services also call `announce()` from `live/live-changes.ts`. `viewer` uses `auth` and `households` this way, `chores` and `shopping` write through `householdsService.householdWrites()`, which runs the write for a member only, in one transaction that holds the household so nobody leaves meanwhile, and announces it on commit. Reads ask `householdsService.getMembershipOf()`. `todos` moves a to-do to chores inside `choresService.writeChores()` with `choresService.createChoreIn()`.
 - Data that belongs to a household is always queried with the household id in the `WHERE` clause, so an id from another household reads as missing (404) and never leaks.
 - Table files may import other features' tables, because foreign keys cross features.
 - The one repo that writes other features' tables is `demo.repo.ts`: it seeds a demo household with backdated history (which no service would accept) and deletes a whole demo when it ends. What a visitor does inside the demo goes through the usual services.
