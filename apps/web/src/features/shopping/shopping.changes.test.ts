@@ -195,27 +195,114 @@ describe("shopping changes", () => {
   it("takes a new list back off the overview when the API turns it down", async () => {
     const queryClient = appClient();
     api.createList.mockRejectedValueOnce(new Error("LIST_LIMIT_REACHED"));
-    await expect(
-      runChange(queryClient, shoppingChanges.createList, { id: "new", name: "Market" }),
-    ).rejects.toThrow();
+    const made = runChange(queryClient, shoppingChanges.createList, { id: "new", name: "Market" });
+    // Seeded synchronously so navigating to the new list straight away sees it
+    expect(queryClient.getQueryData(listQuery("new").queryKey)).toEqual({
+      id: "new",
+      name: "Market",
+      items: [],
+      trip: null,
+    });
+
+    await expect(made).rejects.toThrow();
     expect(listNames(queryClient)).toEqual(["Groceries"]);
+    expect(queryClient.getQueryData(listQuery("new").queryKey)).toBeUndefined();
   });
 
-  it("shows a list's new name straight away", async () => {
+  it("shows a list's new name on both the list and overview, and rolls both back on failure", async () => {
     const queryClient = appClient();
     await runChange(queryClient, shoppingChanges.renameList, { listId: "list", name: "Market" });
 
     expect(queryClient.getQueryData(listQuery("list").queryKey)?.name).toBe("Market");
+    expect(listNames(queryClient)).toEqual(["Market"]);
     expect(api.renameList).toHaveBeenCalledExactlyOnceWith("list", "Market");
+
+    api.renameList.mockRejectedValueOnce(new Error("Nope"));
+    await expect(
+      runChange(queryClient, shoppingChanges.renameList, { listId: "list", name: "Broken" }),
+    ).rejects.toThrow();
+    expect(queryClient.getQueryData(listQuery("list").queryKey)?.name).toBe("Market");
+    expect(listNames(queryClient)).toEqual(["Market"]);
   });
 
-  it("takes a deleted list off the overview, and keeps the delete across a restart", async () => {
+  it("takes a deleted list off the overview and cache, and restores both on failure", async () => {
     const queryClient = appClient();
-    await runChange(queryClient, shoppingChanges.deleteList, { listId: "list" });
-
+    api.deleteList.mockRejectedValueOnce(new Error("Nope"));
+    const failed = runChange(queryClient, shoppingChanges.deleteList, { listId: "list" });
     expect(listNames(queryClient)).toEqual([]);
-    expect(api.deleteList).toHaveBeenCalledExactlyOnceWith("list");
+    expect(queryClient.getQueryData(listQuery("list").queryKey)).toBeUndefined();
+
+    await expect(failed).rejects.toThrow();
+    expect(listNames(queryClient)).toEqual(["Groceries"]);
+    expect(queryClient.getQueryData(listQuery("list").queryKey)).toEqual(list);
+
+    await runChange(queryClient, shoppingChanges.deleteList, { listId: "list" });
+    expect(listNames(queryClient)).toEqual([]);
+    expect(queryClient.getQueryData(listQuery("list").queryKey)).toBeUndefined();
+    expect(api.deleteList).toHaveBeenLastCalledWith("list");
     expect(shoppingChanges.deleteList.options(queryClient).meta.idempotent).toBe(true);
+  });
+
+  it("keeps overview counts in sync across add, toggle, remove, clearChecked and restore", async () => {
+    const queryClient = appClient();
+    const summary = () => queryClient.getQueryData(listsQuery().queryKey)?.[0];
+
+    await runChange(queryClient, shoppingChanges.add, {
+      listId: "list",
+      id: "eggs",
+      name: "Eggs",
+      quantity: null,
+      by: me,
+    });
+    expect(summary()).toMatchObject({ itemCount: 3, openCount: 2 });
+
+    await runChange(queryClient, shoppingChanges.toggle, {
+      listId: "list",
+      itemId: "eggs",
+      checked: true,
+      by: me,
+    });
+    expect(summary()).toMatchObject({ itemCount: 3, openCount: 1 });
+
+    // Removing a checked item drops itemCount only, leaving openCount intact
+    await runChange(
+      queryClient,
+      shoppingChanges.remove,
+      { listId: "list", itemId: "milk" },
+      { message: "Milk removed" },
+    );
+    expect(summary()).toMatchObject({ itemCount: 2, openCount: 1 });
+
+    // Undoing via restore brings the checked item back into itemCount only
+    vi.mocked(offerUndo).mock.lastCall?.[1]();
+    await vi.waitFor(() => expect(summary()).toMatchObject({ itemCount: 3, openCount: 1 }));
+
+    await runChange(queryClient, shoppingChanges.clearChecked, { listId: "list" });
+    expect(summary()).toMatchObject({ itemCount: 1, openCount: 1 });
+  });
+
+  it("adjusts overview counts when the list isn't cached, and rolls back on failure", async () => {
+    const queryClient = new QueryClient();
+    registerChanges(queryClient, shoppingChanges);
+    queryClient.setQueryData(listsQuery().queryKey, [
+      { id: "list", name: "Groceries", itemCount: 2, openCount: 1 },
+    ]);
+    const summary = () => queryClient.getQueryData(listsQuery().queryKey)?.[0];
+
+    api.addItem.mockRejectedValueOnce(new Error("Full"));
+    const failedAdd = runChange(queryClient, shoppingChanges.add, {
+      listId: "list",
+      id: "eggs",
+      name: "Eggs",
+      quantity: null,
+      by: me,
+    });
+    expect(summary()).toMatchObject({ itemCount: 3, openCount: 2 });
+    await expect(failedAdd).rejects.toThrow();
+    expect(summary()).toMatchObject({ itemCount: 2, openCount: 1 });
+
+    await runChange(queryClient, shoppingChanges.remove, { listId: "list", itemId: "bread" });
+    expect(summary()).toMatchObject({ itemCount: 1, openCount: 0 });
   });
 
   it("takes forgotten items out of Buy again history straight away", async () => {

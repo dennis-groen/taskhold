@@ -49,6 +49,51 @@ function onItems<Vars>(change: (items: ShoppingItem[], vars: Vars) => ShoppingIt
   });
 }
 
+/** Updates one list's summary in the cached overview, leaving other lists untouched */
+function updateSummary(
+  lists: ShoppingListSummary[] | undefined,
+  listId: string,
+  change: (summary: ShoppingListSummary) => ShoppingListSummary,
+): ShoppingListSummary[] | undefined {
+  return lists?.map((summary) => (summary.id === listId ? change(summary) : summary));
+}
+
+/** Keeps the overview and sidebar counts in step with the updated list */
+function syncCounts(
+  lists: ShoppingListSummary[] | undefined,
+  listId: string,
+  list: ShoppingList,
+): ShoppingListSummary[] | undefined {
+  const itemCount = list.items.length;
+  const openCount = list.items.filter((item) => !item.checked).length;
+  return updateSummary(lists, listId, (summary) => ({ ...summary, itemCount, openCount }));
+}
+
+/** Adjusts overview counts when the list itself isn't cached (e.g. quick-adding from the overview) */
+function shiftCounts(
+  lists: ShoppingListSummary[] | undefined,
+  listId: string,
+  delta: { itemCount: number; openCount: number },
+): ShoppingListSummary[] | undefined {
+  return updateSummary(lists, listId, (summary) => ({
+    ...summary,
+    itemCount: Math.max(0, summary.itemCount + delta.itemCount),
+    openCount: Math.max(0, summary.openCount + delta.openCount),
+  }));
+}
+
+/** Keeps the overview counts in step after an item change, with an optional fallback when uncached */
+function withListCounts(fallback?: { itemCount: number; openCount: number }) {
+  return (
+    lists: ShoppingListSummary[] | undefined,
+    { listId }: { listId: string },
+    after: ShoppingList | undefined,
+  ) => {
+    if (after) return syncCounts(lists, listId, after);
+    return fallback ? shiftCounts(lists, listId, fallback) : lists;
+  };
+}
+
 // Puts removed items back as they were, keeping their ids so open screens still match
 const restore = defineChange("shopping", "restore", {
   idempotent: true,
@@ -61,6 +106,7 @@ const restore = defineChange("shopping", "restore", {
   },
   target: onList,
   apply: onItems((current, { items: restored }) => [...restored, ...current]),
+  also: (update) => [update(theLists, withListCounts())],
 });
 
 export const shoppingChanges = {
@@ -76,6 +122,13 @@ export const shoppingChanges = {
       ...current,
       { id, name, itemCount: 0, openCount: 0 },
     ],
+    // The new list opens before the API has it, offline too
+    also: (update) => [
+      update(
+        ({ id }) => listQuery(id).queryKey,
+        (_current, { id, name }) => ({ id, name, items: [], trip: null }),
+      ),
+    ],
   }),
 
   // Renaming to the same name twice does the same as once
@@ -86,6 +139,11 @@ export const shoppingChanges = {
     target: onList,
     describe: ({ name }) => `Renamed a list to ${name}`,
     apply: (current, { name }) => ({ ...current, name }),
+    also: (update) => [
+      update(theLists, (lists, { listId, name }) =>
+        updateSummary(lists, listId, (list) => ({ ...list, name })),
+      ),
+    ],
   }),
 
   // A second delete does the same as the first, so this is kept across a restart. Ordered, so
@@ -97,6 +155,7 @@ export const shoppingChanges = {
     target: theLists,
     describe: () => "Deleted a list",
     apply: (current, { listId }) => current.filter((list) => list.id !== listId),
+    also: (update) => [update(onList, () => undefined)],
   }),
 
   // Ordered, so a tick and its untick arrive as they were made, and never before the item's add
@@ -119,6 +178,7 @@ export const shoppingChanges = {
           : item,
       ),
     ),
+    also: (update) => [update(theLists, withListCounts())],
   }),
 
   // Sends only the fields that changed, so a housemate's edit to the other one stays. Ordered, so
@@ -156,6 +216,7 @@ export const shoppingChanges = {
       },
       ...current,
     ]),
+    also: (update) => [update(theLists, withListCounts({ itemCount: 1, openCount: 1 }))],
   }),
 
   // A second delete fails, as the item is gone
@@ -166,6 +227,7 @@ export const shoppingChanges = {
     target: onList,
     describe: () => "Removed an item",
     apply: onItems((current, { itemId }) => current.filter((item) => item.id !== itemId)),
+    also: (update) => [update(theLists, withListCounts({ itemCount: -1, openCount: -1 }))],
     undo: {
       by: restore,
       vars: ({ listId, itemId }, before) => {
@@ -182,6 +244,7 @@ export const shoppingChanges = {
     target: onList,
     describe: () => "Cleared ticked items",
     apply: onItems((current) => current.filter((item) => !item.checked)),
+    also: (update) => [update(theLists, withListCounts())],
     undo: {
       by: restore,
       vars: ({ listId }, before) => {

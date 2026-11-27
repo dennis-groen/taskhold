@@ -415,3 +415,125 @@ describe("refetchEverything", () => {
     await sent;
   });
 });
+
+const countQuery = () =>
+  queryOptions({
+    queryKey: ["todos", "count"],
+    queryFn: (): Promise<number> => Promise.resolve(0),
+  });
+const detailQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["todos", "detail", id],
+    queryFn: (): Promise<Note> => Promise.resolve(milk),
+  });
+
+describe("secondary queries (also)", () => {
+  it("updates a secondary query synchronously and rolls it back on error", async () => {
+    const addWithCount = defineChange("todos", "add-with-count", {
+      idempotent: true,
+      send: (note: Note) => api.add(note),
+      target: () => notesQuery().queryKey,
+      apply: (notes, note) => [...notes, note],
+      also: (update) => [
+        update(
+          () => countQuery().queryKey,
+          (count, _note, after) => (count === undefined ? undefined : (after?.length ?? count)),
+        ),
+      ],
+    });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(notesQuery().queryKey, [milk]);
+    queryClient.setQueryData(countQuery().queryKey, 1);
+    api.add.mockRejectedValueOnce(new Error("Rejected"));
+
+    const sent = runChange(queryClient, addWithCount, bread);
+    // Synchronous: visible before the first microtask yields
+    expect(queryClient.getQueryData(notesQuery().queryKey)).toEqual([milk, bread]);
+    expect(queryClient.getQueryData(countQuery().queryKey)).toBe(2);
+
+    await expect(sent).rejects.toThrow("Rejected");
+    expect(queryClient.getQueryData(notesQuery().queryKey)).toEqual([milk]);
+    expect(queryClient.getQueryData(countQuery().queryKey)).toBe(1);
+  });
+
+  it("seeds an absent secondary query synchronously and removes it on rollback", async () => {
+    const addWithDetail = defineChange("todos", "add-with-detail", {
+      idempotent: true,
+      send: (note: Note) => api.add(note),
+      target: () => notesQuery().queryKey,
+      apply: (notes, note) => [...notes, note],
+      also: (update) => [
+        update(
+          (note) => detailQuery(note.id).queryKey,
+          (_current, note) => note,
+        ),
+      ],
+    });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(notesQuery().queryKey, [milk]);
+    api.add.mockRejectedValueOnce(new Error("Rejected"));
+
+    const sent = runChange(queryClient, addWithDetail, bread);
+    expect(queryClient.getQueryData(detailQuery("bread").queryKey)).toEqual(bread);
+
+    await expect(sent).rejects.toThrow("Rejected");
+    expect(queryClient.getQueryData(detailQuery("bread").queryKey)).toBeUndefined();
+  });
+
+  it("removes a cached secondary query and restores it on rollback", async () => {
+    const removeWithDetail = defineChange("todos", "remove-with-detail", {
+      idempotent: false,
+      send: (id: string) => api.remove(id),
+      target: () => notesQuery().queryKey,
+      apply: (notes, id) => notes.filter((note) => note.id !== id),
+      also: (update) => [
+        update(
+          (id) => detailQuery(id).queryKey,
+          () => undefined,
+        ),
+      ],
+    });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(notesQuery().queryKey, [milk]);
+    queryClient.setQueryData(detailQuery("milk").queryKey, milk);
+    api.remove.mockRejectedValueOnce(new Error("Rejected"));
+
+    const sent = runChange(queryClient, removeWithDetail, "milk");
+    expect(queryClient.getQueryData(detailQuery("milk").queryKey)).toBeUndefined();
+
+    await expect(sent).rejects.toThrow("Rejected");
+    expect(queryClient.getQueryData(detailQuery("milk").queryKey)).toEqual(milk);
+  });
+
+  it("leaves untouched secondary queries alone on apply and rollback", async () => {
+    const addMaybeCount = defineChange("todos", "add-maybe-count", {
+      idempotent: true,
+      send: (note: Note) => api.add(note),
+      target: () => notesQuery().queryKey,
+      apply: (notes, note) => [...notes, note],
+      also: (update) => [
+        update(
+          () => countQuery().queryKey,
+          (count) => count,
+        ),
+      ],
+    });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(notesQuery().queryKey, [milk]);
+
+    // Absent + returns undefined -> stays absent
+    api.add.mockRejectedValueOnce(new Error("Rejected"));
+    await expect(runChange(queryClient, addMaybeCount, bread)).rejects.toThrow("Rejected");
+    expect(queryClient.getQueryData(countQuery().queryKey)).toBeUndefined();
+
+    // Present + returns previous unchanged -> rollback doesn't clobber later writes
+    queryClient.setQueryData(countQuery().queryKey, 1);
+    const request = deferred();
+    api.add.mockReturnValueOnce(request.promise);
+    const sent = runChange(queryClient, addMaybeCount, bread);
+    queryClient.setQueryData(countQuery().queryKey, 99);
+    request.resolve(Promise.reject(new Error("Rejected")));
+    await expect(sent).rejects.toThrow("Rejected");
+    expect(queryClient.getQueryData(countQuery().queryKey)).toBe(99);
+  });
+});
