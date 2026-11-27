@@ -338,4 +338,31 @@ describe("household writes", () => {
       code: "NOT_IN_HOUSEHOLD",
     });
   });
+
+  it("makes leaving wait for the member's own write in progress, and refuses them after", async () => {
+    const owner = await signUp();
+    const member = await signUp();
+    await householdWith(owner, member);
+
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const writing = write(member.id, () => held);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    let left = false;
+    const leaving = member.api.households.current.leave.$post().then((response) => {
+      left = true;
+      return response;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(left).toBe(false);
+
+    release?.();
+    await writing;
+    expect((await leaving).status).toBe(200);
+
+    await expect(write(member.id, async () => {})).rejects.toMatchObject({
+      code: "NOT_IN_HOUSEHOLD",
+    });
+  });
 });

@@ -161,6 +161,7 @@
     {
       // Chores and shopping write through householdWrites, which holds the household for the
       // write and announces it on commit. Same rules as other services, plus no way around it.
+      // An override replaces the rule's options rather than adding to them, hence the repeats.
       "files": [
         "apps/api/src/features/chores/chores.service.ts",
         "apps/api/src/features/shopping/shopping.service.ts"

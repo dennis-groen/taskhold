@@ -237,7 +237,7 @@ export async function startTrip(
   const outcome = await writeShopping(userId, async (scope) => {
     const { householdId, tx } = scope;
     const list = await findListIn(scope, listId);
-    const was = { list, householdId, notify: false };
+    const base = { list, householdId, notify: false };
 
     // A retry of a start that already got in answers with the trip as it is now, and tells no one
     const existing = await shoppingRepo.findTripById(input.id, tx);
@@ -246,14 +246,14 @@ export async function startTrip(
       annotate("shopping", { retried: true });
       const running = await shoppingRepo.findRunningTrip(list.id, since, tx);
       const { id, shopper, startedAt } = existing;
-      return { ...was, started: running ?? { id, shopper, startedAt } };
+      return { ...base, started: running ?? { id, shopper, startedAt } };
     }
 
     await shoppingRepo.lockList({ householdId, listId: list.id }, tx);
     // Close forgotten trips, so the one-running-per-list index lets a new one in
     await shoppingRepo.endTrips(list.id, now, { startedBefore: since }, tx);
     const running = await shoppingRepo.findRunningTrip(list.id, since, tx);
-    if (running) return { ...was, started: running };
+    if (running) return { ...base, started: running };
 
     const shouldNotify = !(await shoppingRepo.wasNotifiedSince(
       list.id,
@@ -266,7 +266,7 @@ export async function startTrip(
     );
     scope.changed();
     const trip = await shoppingRepo.findRunningTrip(list.id, since, tx);
-    return { ...was, notify: shouldNotify, started: trip };
+    return { ...base, notify: shouldNotify, started: trip };
   });
   const { list, householdId, notify, started } = outcome;
   if (!started) throw tripIdTaken();
