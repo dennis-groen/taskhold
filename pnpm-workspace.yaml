@@ -2,8 +2,6 @@ packages:
   - apps/*
 allowBuilds:
   esbuild: false
-# Security fixes the packages that depend on these haven't picked up yet: workbox-build pins glob
-# ^11 and @ts-morph/common (via shadcn) pins minimatch ^10. Drop each once its parent allows the fix.
+# A security fix workbox-build hasn't picked up yet: it pins glob ^11. Drop this once it allows the fix.
 overrides:
   glob@>=9.0.0 <14.0.2: ^14.0.2
-  minimatch@>=7.0.0 <11.0.1: ^11.0.1

@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { forgetPushDevice, pushRegistration } from "@/lib/push-device.ts";
@@ -18,20 +18,20 @@ export function useDeviceReminders(publicKey: string | null) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<DeviceState>("loading");
 
-  const saved = (status: ReminderStatus) => queryClient.setQueryData(reminderKeys.status(), status);
+  const saved = (status: ReminderStatus) => savedTo(queryClient, status);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const next = await currentState(publicKey, saved).catch((): DeviceState => "unsupported");
+      const next = await currentState(publicKey, (status) => savedTo(queryClient, status)).catch(
+        (): DeviceState => "unsupported",
+      );
       if (!cancelled) setState(next);
     })();
     return () => {
       cancelled = true;
     };
-    // `saved` only writes to the query cache
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [publicKey]);
+  }, [publicKey, queryClient]);
 
   async function turnOn() {
     const registration = await pushRegistration();
@@ -103,4 +103,8 @@ function isInstalled(): boolean {
     matchMedia("(display-mode: standalone)").matches ||
     ("standalone" in navigator && navigator.standalone === true)
   );
+}
+
+function savedTo(queryClient: QueryClient, status: ReminderStatus) {
+  queryClient.setQueryData(reminderKeys.status(), status);
 }
