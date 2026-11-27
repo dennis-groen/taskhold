@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { browseBuyAgain, filterEnterTarget, lastBoughtCue, suggestBuyAgain } from "./buy-again.ts";
-import type { BoughtItem } from "./shopping.api.ts";
+import {
+  browseBuyAgain,
+  buyAgainFor,
+  filterEnterTarget,
+  lastBoughtCue,
+  suggestBuyAgain,
+} from "./buy-again.ts";
+import type { BoughtItem, ShoppingItem, ShoppingList } from "./shopping.api.ts";
 
 const now = Temporal.Instant.from("2026-11-05T12:00:00Z");
 const daysAgo = (days: number) => now.subtract({ hours: 24 * days }).toString();
@@ -205,7 +211,7 @@ describe("browseBuyAgain", () => {
     ];
 
     const scoped = browseBuyAgain(items, { now, listId: "groceries" });
-    expect(scoped.due.map((item) => item.name)).toEqual(["Milk"]);
+    expect(scoped.runningLow.map((item) => item.name)).toEqual(["Milk"]);
     expect(scoped.sections.map((section) => section.category)).toEqual(["Produce", "Drinks"]);
     expect(scoped.sections[0]?.items.map((item) => item.name)).toEqual(["Apples"]);
     expect(scoped.sections[1]?.items.map((item) => item.name)).toEqual(["Coffee"]);
@@ -214,7 +220,7 @@ describe("browseBuyAgain", () => {
 
     // Including other lists reveals Batteries under Household without putting it in groceries' Running low
     const allLists = browseBuyAgain(items, { now, listId: "groceries", includeOtherLists: true });
-    expect(allLists.due.map((item) => item.name)).toEqual(["Milk"]);
+    expect(allLists.runningLow.map((item) => item.name)).toEqual(["Milk"]);
     expect(allLists.sections.map((section) => section.category)).toEqual([
       "Produce",
       "Drinks",
@@ -237,7 +243,11 @@ describe("browseBuyAgain", () => {
       onList: ["Pasta"],
       inBasket: ["Pasta"],
     });
-    expect(catalog.due.map((item) => item.name).toSorted()).toEqual(["Eggs", "Milk", "Parmesan"]);
+    expect(catalog.runningLow.map((item) => item.name).toSorted()).toEqual([
+      "Eggs",
+      "Milk",
+      "Parmesan",
+    ]);
     // The chips still offer Minced beef: suggesting it early is fine, calling it "due" isn't
     expect(namesOf(items, { now, listId: "groceries" })).toContain("Minced beef");
   });
@@ -249,7 +259,7 @@ describe("browseBuyAgain", () => {
       bought("Batteries", 4, 14, 15, { listIds: ["hardware"] }),
     ];
     const found = browseBuyAgain(items, { now, listId: "groceries", query: "tter" });
-    expect(found.due).toEqual([]);
+    expect(found.runningLow).toEqual([]);
     expect(found.sections.map((s) => s.items.map((i) => i.name))).toEqual([["Batteries"]]);
   });
 
@@ -264,13 +274,13 @@ describe("browseBuyAgain", () => {
       onList: ["Milk"],
       checkedOnList: ["Bread"],
     });
-    expect(catalog.due).toMatchObject([{ name: "Milk", onList: true, checked: false }]);
+    expect(catalog.runningLow).toMatchObject([{ name: "Milk", onList: true, checked: false }]);
     expect(catalog.sections[0]?.items).toMatchObject([
       { name: "Bread", onList: false, checked: true },
     ]);
   });
 
-  it("keeps Running low membership frozen when stickyDueOrder is provided", () => {
+  it("keeps Running low membership frozen when stickyRunningLowOrder is provided", () => {
     const items = [
       bought("Milk", 10, 4, 5),
       bought("Pasta", 4, 14, 14),
@@ -281,9 +291,9 @@ describe("browseBuyAgain", () => {
       now,
       onList: ["Pasta"],
       inBasket: ["Pasta"],
-      stickyDueOrder: ["milk", "pasta"],
+      stickyRunningLowOrder: ["milk", "pasta"],
     });
-    expect(frozen.due.map((item) => item.name)).toEqual(["Milk", "Pasta"]);
+    expect(frozen.runningLow.map((item) => item.name)).toEqual(["Milk", "Pasta"]);
     expect(frozen.sections.flatMap((s) => s.items.map((i) => i.name))).toEqual(["Passata"]);
   });
 });
@@ -348,5 +358,39 @@ describe("lastBoughtCue", () => {
     expect(lastBoughtCue("2026-07-31T23:30:00Z", null, now, "Europe/Amsterdam")).toBe(
       "Last bought in August",
     );
+  });
+});
+
+/** An item on a list, waiting or ticked */
+function onList(name: string, checked: boolean): ShoppingItem {
+  return {
+    id: name,
+    name,
+    quantity: null,
+    checked,
+    addedBy: null,
+    checkedBy: null,
+    checkedAt: null,
+    createdAt: daysAgo(1),
+  };
+}
+
+describe("what's running low and not on the list yet", () => {
+  it("leaves out what's waiting and what's ticked, for the dock's count and Add all alike", () => {
+    const items = [
+      bought("Milk", 10, 4, 5, { listIds: ["groceries"] }),
+      bought("Eggs", 10, 4, 5, { listIds: ["groceries"] }),
+      bought("Butter", 10, 4, 5, { listIds: ["groceries"] }),
+    ];
+    const list: ShoppingList = {
+      id: "groceries",
+      name: "Groceries",
+      items: [onList("Milk", false), onList("Butter", true)],
+      trip: null,
+    };
+
+    const read = buyAgainFor(items, list, "groceries", now);
+
+    expect(read.runningLowToAdd().map((item) => item.name)).toEqual(["Eggs"]);
   });
 });

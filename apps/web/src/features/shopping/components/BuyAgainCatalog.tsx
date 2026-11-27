@@ -59,8 +59,8 @@ export function BuyAgainCatalog({
   listName,
   trimmedQuery,
   includeOtherLists,
-  dueCollapsed,
-  unaddedDueCount,
+  runningLowCollapsed,
+  runningLowToAddCount,
   bulkUndo,
   bulkUndoActive,
   addTypedCard,
@@ -68,8 +68,7 @@ export function BuyAgainCatalog({
   now,
   viewerId,
   openByKey,
-  addedIdFor,
-  untickedIdsByKey,
+  statusOf,
   hintedKey,
   freshKey,
   enterKey,
@@ -78,8 +77,8 @@ export function BuyAgainCatalog({
   collapsingHideKeys,
   typedQuantity,
   onShowAllLists,
-  onExpandDue,
-  onAddAllDue,
+  onExpandRunningLow,
+  onAddAllRunningLow,
   onToggleRow,
   onStepQuantity,
   onHideRow,
@@ -90,8 +89,8 @@ export function BuyAgainCatalog({
   listName: string;
   trimmedQuery: string;
   includeOtherLists: boolean;
-  dueCollapsed: boolean;
-  unaddedDueCount: number;
+  runningLowCollapsed: boolean;
+  runningLowToAddCount: number;
   bulkUndo: BulkUndo | null;
   bulkUndoActive: boolean;
   addTypedCard: ReactNode;
@@ -99,8 +98,8 @@ export function BuyAgainCatalog({
   now: Temporal.Instant;
   viewerId: string;
   openByKey: ReadonlyMap<string, ShoppingItem>;
-  addedIdFor: (name: string) => string | undefined;
-  untickedIdsByKey: Record<string, { id: string }>;
+  /** Whether this visit added or unticked it (see list-entry.ts) */
+  statusOf: (name: string) => "added" | "unticked" | null;
   hintedKey: string | null;
   freshKey: string | null;
   enterKey: string | null;
@@ -109,8 +108,8 @@ export function BuyAgainCatalog({
   collapsingHideKeys: Record<string, true>;
   typedQuantity: string | null;
   onShowAllLists: () => void;
-  onExpandDue: () => void;
-  onAddAllDue: () => void;
+  onExpandRunningLow: () => void;
+  onAddAllRunningLow: () => void;
   onToggleRow: (entry: BuyAgainCatalogItem) => void;
   onStepQuantity: (item: ShoppingItem, delta: 1 | -1) => void;
   onHideRow: (entry: BuyAgainCatalogItem) => void;
@@ -178,8 +177,8 @@ export function BuyAgainCatalog({
         now={now}
         viewerId={viewerId}
         listItem={listItem}
-        addedHere={listItem !== undefined && addedIdFor(entry.name) === listItem.id}
-        untickedHere={listItem !== undefined && untickedIdsByKey[key]?.id === listItem.id}
+        addedHere={listItem !== undefined && statusOf(entry.name) === "added"}
+        untickedHere={listItem !== undefined && statusOf(entry.name) === "unticked"}
         hinted={hintedKey === key}
         fresh={freshKey === key}
         enterTarget={enterKey === key}
@@ -198,12 +197,12 @@ export function BuyAgainCatalog({
   return (
     <div className="space-y-3 pt-1">
       {addTypedAtTop && addTypedCard}
-      {catalog.due.length > 0 && dueCollapsed && (
-        <section aria-labelledby="buy-again-due-heading" className={SHEET_CARD}>
+      {catalog.runningLow.length > 0 && runningLowCollapsed && (
+        <section aria-labelledby="buy-again-running-low-heading" className={SHEET_CARD}>
           <button
             type="button"
             aria-expanded={false}
-            onClick={onExpandDue}
+            onClick={onExpandRunningLow}
             className="flex min-h-14 w-full items-center gap-2.5 px-4 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/80 focus-visible:ring-inset active:bg-muted/70"
           >
             <span
@@ -214,15 +213,15 @@ export function BuyAgainCatalog({
             </span>
             <span className="min-w-0 flex-1">
               <h3
-                id="buy-again-due-heading"
+                id="buy-again-running-low-heading"
                 className="truncate text-[0.9375rem] font-[780] tracking-[-0.01em] [font-stretch:112%]"
               >
                 Running low
               </h3>
               <span className="block truncate text-xs text-muted-foreground">
-                {catalog.due.length === 1
+                {catalog.runningLow.length === 1
                   ? `It's already on ${listName}`
-                  : `All ${catalog.due.length} are already on ${listName}`}
+                  : `All ${catalog.runningLow.length} are already on ${listName}`}
               </span>
             </span>
             <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-muted-foreground">
@@ -232,12 +231,12 @@ export function BuyAgainCatalog({
           </button>
         </section>
       )}
-      {catalog.due.length > 0 && !dueCollapsed && (
-        <section aria-labelledby="buy-again-due-heading" className={SHEET_CARD}>
+      {catalog.runningLow.length > 0 && !runningLowCollapsed && (
+        <section aria-labelledby="buy-again-running-low-heading" className={SHEET_CARD}>
           <StickyCardHead>
             <div className={cn(STICKY_CARD_HEAD_INNER, "gap-2")}>
               <h3
-                id="buy-again-due-heading"
+                id="buy-again-running-low-heading"
                 className="flex min-w-0 items-center gap-2.5 text-[0.9375rem] font-[780] tracking-[-0.01em] [font-stretch:112%]"
               >
                 <span
@@ -248,18 +247,18 @@ export function BuyAgainCatalog({
                 </span>
                 <span className="truncate">Running low</span>
               </h3>
-              {!editing && (bulkUndo || unaddedDueCount >= 2) && (
+              {!editing && (bulkUndo || runningLowToAddCount >= 2) && (
                 <Button
                   type="button"
                   variant="soft"
                   size="sm"
-                  data-add-due
+                  data-add-running-low
                   aria-label={
                     bulkUndo && bulkUndoActive
                       ? `Undo adding ${bulkUndo.count} to ${listName}`
                       : undefined
                   }
-                  onClick={bulkUndo && bulkUndoActive ? bulkUndo.undo : onAddAllDue}
+                  onClick={bulkUndo && bulkUndoActive ? bulkUndo.undo : onAddAllRunningLow}
                   className="h-9 gap-1.5 rounded-full px-3.5 font-[700] tabular-nums after:-inset-y-1"
                 >
                   {bulkUndoActive ? (
@@ -268,13 +267,13 @@ export function BuyAgainCatalog({
                       Undo
                     </>
                   ) : (
-                    `Add ${Math.max(unaddedDueCount, bulkUndo?.count ?? 0)} due`
+                    `Add all ${Math.max(runningLowToAddCount, bulkUndo?.count ?? 0)}`
                   )}
                 </Button>
               )}
             </div>
           </StickyCardHead>
-          <ul>{catalog.due.map(renderRow)}</ul>
+          <ul>{catalog.runningLow.map(renderRow)}</ul>
         </section>
       )}
 

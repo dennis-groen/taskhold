@@ -14,7 +14,6 @@ import {
 import { CompactHeader } from "@/components/layout/AreaHeader.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Button } from "@/components/ui/button";
-import { offerUndo } from "@/lib/feedback.ts";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { cn } from "cn";
 
@@ -23,13 +22,10 @@ import type { ShoppingItem } from "../shopping.api.ts";
 import type { ItemChanges } from "../shopping.changes.ts";
 import {
   namesOf,
-  useAddItem,
-  useBuyAgain,
+  useBuyAgainFor,
   useBuyAgainHistoryCount,
-  useBuyAgainState,
   usePendingToggleIds,
   useShoppingList,
-  useUndoAddItem,
 } from "../shopping.hooks.ts";
 import {
   byCategory,
@@ -38,6 +34,7 @@ import {
   sameCategories,
   type FoldState,
 } from "../shopping-items.ts";
+import { offerUndoAll, useListEntry } from "../list-entry.hooks.ts";
 import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
 import { CategorySection } from "./CategorySection.tsx";
 import { EditItemSheet } from "./EditItemSheet.tsx";
@@ -70,10 +67,8 @@ export function ShoppingListPage() {
   // Set by "Clear ticked", so the empty list congratulates instead of asking for a first item
   const [finished, setFinished] = useState(false);
   const [restockOpen, setRestockOpen] = useState(false);
-  const addItem = useAddItem(user);
-  const undoAddItem = useUndoAddItem();
-  const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(listId);
-  const suggestions = useBuyAgain(listId, "", pinnedIds);
+  const listEntry = useListEntry(listId, user);
+  const suggestions = useBuyAgainFor(listId).offer("", listEntry.addedIds);
   const historyCount = useBuyAgainHistoryCount();
   // Keep the empty-list launchpad open while you tap several items in a row, instead of vanishing
   // after the first tap. Also re-arms if a list empties while open, and resets when switching lists.
@@ -208,34 +203,16 @@ export function ShoppingListPage() {
               chips={suggestions.slice(0, 10).map(({ name, quantity }) => ({
                 name,
                 quantity,
-                added: addedIdFor(name) !== undefined,
+                added: listEntry.status(name) === "added",
               }))}
               onToggleOne={(name, quantity) => {
-                const existingId = addedIdFor(name);
-                if (existingId) {
-                  clearAdded(name);
-                  undoAddItem(listId, existingId);
-                } else {
-                  const id = addItem(listId, name, quantity);
-                  markAdded(name, id);
-                }
+                listEntry.tap(name, quantity);
               }}
               onAddAll={() => {
-                const toAdd = suggestions
-                  .slice(0, 10)
-                  .filter((item) => addedIdFor(item.name) === undefined);
-                if (toAdd.length === 0) return;
-                const added = toAdd.map(({ name, quantity }) => {
-                  const id = addItem(listId, name, quantity);
-                  markAdded(name, id);
-                  return { name, id };
-                });
-                offerUndo(`Added ${added.length} to ${list.name}`, () => {
-                  for (const item of added) {
-                    clearAdded(item.name);
-                    undoAddItem(listId, item.id);
-                  }
-                });
+                const all = listEntry.putAll(
+                  suggestions.slice(0, 10).filter((item) => listEntry.status(item.name) === null),
+                );
+                offerUndoAll(listEntry, all.outcomes, list.name);
               }}
               onBrowseAll={() => setRestockOpen(true)}
               onDismiss={() => setLaunchpadState({ listId, open: false })}
