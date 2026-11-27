@@ -106,6 +106,10 @@ function ReminderSettings({
   const dailyId = useId();
   const shoppingId = useId();
   const [pending, setPending] = useState(false);
+  // Where the phone's switch is headed while that's saved, so a tap shows at once. Turning on can
+  // take a second or two (the push service, then the API), and a switch that sat still read as a
+  // missed tap: the second tap turned it straight off again.
+  const [turning, setTurning] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -134,18 +138,35 @@ function ReminderSettings({
   }
 
   async function saveChoice(changes: { dailySummary: boolean } | { shoppingTrips: boolean }) {
+    const key = reminderStatusQuery().queryKey;
+    const before = queryClient.getQueryData(key);
+    // Shown at once, and put back if the save fails
+    queryClient.setQueryData(key, (status) =>
+      status?.settings ? { ...status, settings: { ...status.settings, ...changes } } : status,
+    );
     await run(async () => {
-      queryClient.setQueryData(reminderKeys.status(), await updateReminderSettings(changes));
+      try {
+        queryClient.setQueryData(key, await updateReminderSettings(changes));
+      } catch (err) {
+        queryClient.setQueryData(key, before);
+        throw err;
+      }
     }, "Couldn't save that. Try again.");
   }
 
+  async function switchDevice(next: boolean, action: () => Promise<unknown>, fallback: string) {
+    setTurning(next);
+    await run(action, fallback);
+    setTurning(null);
+  }
+
   function turnOn() {
-    void run(device.turnOn, "Couldn't turn notifications on. Try again.");
+    void switchDevice(true, device.turnOn, "Couldn't turn notifications on. Try again.");
   }
 
   function flip(checked: boolean) {
     if (!checked) {
-      void run(device.turnOff, "Couldn't turn notifications off.");
+      void switchDevice(false, device.turnOff, "Couldn't turn notifications off.");
       return;
     }
     if (device.state === "needs-install") return setSheet("install");
@@ -191,7 +212,7 @@ function ReminderSettings({
             ) : (
               <Switch
                 id={switchId}
-                checked={on}
+                checked={turning ?? on}
                 disabled={pending || blocked}
                 onCheckedChange={flip}
               />
