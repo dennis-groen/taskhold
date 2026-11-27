@@ -88,7 +88,7 @@ export function listEntry(
   viewer: PersonSummary,
 ): ListEntry {
   const store = storeFor(queryClient);
-  const by = { id: viewer.id, name: viewer.name };
+  const by = person(viewer);
 
   function items(): readonly ShoppingItem[] | undefined {
     return queryClient.getQueryData(listQuery(listId).queryKey)?.items;
@@ -223,7 +223,7 @@ export function listEntry(
           listId,
           itemId: now.id,
           checked: true,
-          by: outcome.item.checkedBy ?? by,
+          by: person(outcome.item.checkedBy ?? by),
         });
         return true;
       }
@@ -293,7 +293,7 @@ export function listEntry(
         listId,
         itemId: found.item.id,
         checked: true,
-        by: found.checkedBy ?? by,
+        by: person(found.checkedBy ?? by),
       });
       return { kind: "ticked-again", item: found.item };
     },
@@ -390,4 +390,9 @@ function storeFor(queryClient: QueryClient): Store {
   };
   stores.set(queryClient, store);
   return store;
+}
+
+/** Only what the list shows about a person, since a change is saved on the device with its variables */
+function person({ id, name }: PersonSummary): PersonSummary {
+  return { id, name };
 }
