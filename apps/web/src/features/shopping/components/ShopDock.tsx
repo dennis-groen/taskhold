@@ -8,21 +8,17 @@ import { firstName, type PersonSummary } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
 import { categorize } from "../categories.ts";
-import { findOnList, parseEntry, type Entry } from "../item-entry.ts";
+import { parseEntry, type Entry } from "../item-entry.ts";
+import { nextAmount, type Clash, type ClashChoice } from "../list-entry.ts";
+import { useListEntry } from "../list-entry.hooks.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
 import {
-  useAddItem,
   useBuyAgain,
   useBuyAgainDueCount,
   useBuyAgainHistoryCount,
-  useBuyAgainState,
-  useEditItem,
   useManageLists,
-  useToggleItem,
-  useUndoAddItem,
 } from "../shopping.hooks.ts";
 import { listQuery } from "../shopping.queries.ts";
-import { stepQuantity } from "../item-quantity.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
 import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
 
@@ -101,9 +97,6 @@ function NewListField() {
   );
 }
 
-/** What the last add ran into: the same thing on the list already, waiting or ticked */
-type Clash = { item: ShoppingItem; entry: Entry };
-
 /**
  * On a list: adds what's typed to it. While typing, a card says how it'll be read ("Adds Oat milk
  * · 2 to Dairy & Eggs") and the chips narrow to match. Something the list has already isn't added
@@ -116,19 +109,15 @@ function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }
   const [restockOpen, setRestockOpen] = useState(false);
   const [clash, setClash] = useState<Clash | null>(null);
   const { data: list } = useQuery(listQuery(listId));
-  const add = useAddItem(viewer);
-  const undoAdd = useUndoAddItem();
-  const edit = useEditItem(listId);
-  const toggle = useToggleItem(listId, viewer);
+  const listEntry = useListEntry(listId, viewer);
   const historyCount = useBuyAgainHistoryCount();
   const dueCount = useBuyAgainDueCount(listId);
   const entry = typed.trim() ? parseEntry(typed) : null;
   const isTyping = Boolean(entry?.name);
-  const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(listId);
-  const suggestions = useBuyAgain(listId, entry?.name ?? "", pinnedIds);
+  const suggestions = useBuyAgain(listId, entry?.name ?? "", listEntry.addedIds);
   const chips = suggestions.map(({ name, quantity }) => ({
     name,
-    added: !isTyping && addedIdFor(name) !== undefined,
+    added: !isTyping && listEntry.status(name) === "added",
     quantity: isTyping ? (entry?.quantity ?? quantity) : quantity,
   }));
   // Keep the dock slim while ticking items in the aisle; reveal quick chips once focused or typing
@@ -136,18 +125,15 @@ function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }
   // The clash card follows housemates' changes while it's up
   const clashing = clash && list?.items.find((item) => item.id === clash.item.id);
 
-  function addEntry(next: Entry, { focus = true }: { focus?: boolean } = {}): string | null {
-    const existing = list && findOnList(list.items, next.name);
-    let addedId: string | null = null;
-    if (existing) {
-      setClash({ item: existing, entry: next });
-    } else {
-      addedId = add(listId, next.name, next.quantity);
-      setClash(null);
-    }
+  /** Something the list has already isn't added twice: the clash card asks what to do */
+  function addEntry(
+    next: Entry,
+    { focus = true, usualQuantity = null }: { focus?: boolean; usualQuantity?: string | null } = {},
+  ) {
+    const outcome = listEntry.put(next, { onClash: "ask", usualQuantity });
+    setClash(outcome.kind === "clash" ? outcome : null);
     setTyped("");
     if (focus) inputRef.current?.focus();
-    return addedId;
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -157,19 +143,16 @@ function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }
 
   function pickChip(name: string) {
     const usualQuantity = suggestions.find((item) => item.name === name)?.quantity ?? null;
-    const id = addEntry(
-      { name, quantity: isTyping ? (entry?.quantity ?? usualQuantity) : usualQuantity },
+    addEntry(
+      { name, quantity: isTyping ? (entry?.quantity ?? null) : null },
       // Idle chips shouldn't pop up the keyboard when the input wasn't focused; BuyAgainChips's
       // preventDefault on mousedown already keeps it up when it was
-      { focus: isTyping },
+      { focus: isTyping, usualQuantity },
     );
-    if (id && !isTyping) markAdded(name, id);
   }
 
   function undoChip(name: string) {
-    const id = addedIdFor(name);
-    clearAdded(name);
-    if (id) undoAdd(listId, id);
+    listEntry.takeBack(name);
   }
 
   function openRestock() {
@@ -201,18 +184,10 @@ function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }
           <div className="mb-1.5">
             <ClashCard
               item={clashing}
-              entry={clash.entry}
+              nextAmount={nextAmount(clashing, clash.entry)}
               viewerId={viewer.id}
-              onUntick={() => {
-                toggle(clashing.id, false);
-                setClash(null);
-              }}
-              onSetQuantity={(quantity) => {
-                edit(clashing.id, { quantity });
-                setClash(null);
-              }}
-              onAddAnyway={() => {
-                add(listId, clash.entry.name, clash.entry.quantity);
+              onSettle={(choice) => {
+                listEntry.settle(clash, choice);
                 setClash(null);
               }}
             />
@@ -326,26 +301,17 @@ function Tag({ children }: { children: ReactNode }) {
  */
 function ClashCard({
   item,
-  entry,
+  nextAmount: nextQuantity,
   viewerId,
-  onUntick,
-  onSetQuantity,
-  onAddAnyway,
+  onSettle,
 }: {
+  /** The item as it is now, following housemates' changes while the card is up */
   item: ShoppingItem;
-  entry: Entry;
+  /** What "Make it …" offers (see list-entry.ts), or null for nothing */
+  nextAmount: string | null;
   viewerId: string;
-  onUntick: () => void;
-  onSetQuantity: (quantity: string) => void;
-  onAddAnyway: () => void;
+  onSettle: (choice: ClashChoice) => void;
 }) {
-  const nextQuantity = item.checked
-    ? null
-    : entry.quantity
-      ? entry.quantity === item.quantity
-        ? null
-        : entry.quantity
-      : stepQuantity(item.quantity ?? "", 1);
   const ticker = item.checkedBy
     ? item.checkedBy.id === viewerId
       ? "You"
@@ -369,7 +335,12 @@ function ClashCard({
       </p>
       <div className="mt-2 flex gap-2">
         {item.checked ? (
-          <Button size="sm" onMouseDown={keepFocus} onClick={onUntick} className="h-9 flex-1">
+          <Button
+            size="sm"
+            onMouseDown={keepFocus}
+            onClick={() => onSettle("untick")}
+            className="h-9 flex-1"
+          >
             Untick {item.name}
           </Button>
         ) : (
@@ -377,7 +348,7 @@ function ClashCard({
             <Button
               size="sm"
               onMouseDown={keepFocus}
-              onClick={() => onSetQuantity(nextQuantity)}
+              onClick={() => onSettle("set-amount")}
               className="h-9 flex-1"
             >
               Make it {nextQuantity}
@@ -388,7 +359,7 @@ function ClashCard({
           size="sm"
           variant="secondary"
           onMouseDown={keepFocus}
-          onClick={onAddAnyway}
+          onClick={() => onSettle("add-row")}
           className="h-9 flex-1"
         >
           Add a new row

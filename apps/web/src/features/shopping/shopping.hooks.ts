@@ -164,13 +164,6 @@ export function useEditItem(listId: string | undefined) {
   };
 }
 
-/** Ticks or unticks an item on a list; defaults `by` to the viewer */
-export function useToggleItem(listId: string, viewer: PersonSummary) {
-  const toggle = useChange(shoppingChanges.toggle);
-  return (itemId: string, checked: boolean, by: PersonSummary = viewer) =>
-    toggle.run({ listId, itemId, checked, by: person(by) });
-}
-
 /** Item ids whose ticks are saved on this device and still waiting to reach the server */
 export function usePendingToggleIds(): Set<string> {
   return new Set(useWaitingVars(shoppingChanges.toggle).map((vars) => vars.itemId));
