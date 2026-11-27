@@ -14,7 +14,6 @@ import {
 import { CompactHeader } from "@/components/layout/AreaHeader.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { Button } from "@/components/ui/button";
-import { offerUndo } from "@/lib/feedback.ts";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { cn } from "cn";
 
@@ -35,7 +34,7 @@ import {
   sameCategories,
   type FoldState,
 } from "../shopping-items.ts";
-import { useListEntry } from "../list-entry.hooks.ts";
+import { offerUndoAll, useListEntry } from "../list-entry.hooks.ts";
 import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
 import { CategorySection } from "./CategorySection.tsx";
 import { EditItemSheet } from "./EditItemSheet.tsx";
@@ -69,7 +68,7 @@ export function ShoppingListPage() {
   const [finished, setFinished] = useState(false);
   const [restockOpen, setRestockOpen] = useState(false);
   const listEntry = useListEntry(listId, user);
-  const suggestions = useBuyAgainFor(listId).suggest("", listEntry.addedIds);
+  const suggestions = useBuyAgainFor(listId).offer("", listEntry.addedIds);
   const historyCount = useBuyAgainHistoryCount();
   // Keep the empty-list launchpad open while you tap several items in a row, instead of vanishing
   // after the first tap. Also re-arms if a list empties while open, and resets when switching lists.
@@ -207,23 +206,13 @@ export function ShoppingListPage() {
                 added: listEntry.status(name) === "added",
               }))}
               onToggleOne={(name, quantity) => {
-                if (listEntry.status(name) === "added") {
-                  listEntry.takeBack(name);
-                } else {
-                  listEntry.put(
-                    { name, quantity: null },
-                    { onClash: "settle", usualQuantity: quantity },
-                  );
-                }
+                listEntry.tap(name, quantity);
               }}
               onAddAll={() => {
                 const all = listEntry.putAll(
                   suggestions.slice(0, 10).filter((item) => listEntry.status(item.name) === null),
                 );
-                if (all.count === 0) return;
-                offerUndo(`Added ${all.count} to ${list.name}`, () => {
-                  all.undo();
-                });
+                offerUndoAll(listEntry, all.outcomes, list.name);
               }}
               onBrowseAll={() => setRestockOpen(true)}
               onDismiss={() => setLaunchpadState({ listId, open: false })}

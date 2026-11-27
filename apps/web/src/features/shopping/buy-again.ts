@@ -490,7 +490,7 @@ export type BuyAgainFor = {
    * Chips: regulars, or past buys matching what's typed, leaving out what's waiting on the list
    * except the `pinned` items added this visit, so their chips stay put while nothing is typed
    */
-  suggest: (typed: string, pinned?: ReadonlySet<string>) => BuyAgainSuggestion[];
+  offer: (typed: string, pinned?: ReadonlySet<string>) => BuyAgainSuggestion[];
   /** The sheet: Running low and the aisles */
   browse: (options?: {
     query?: string;
@@ -521,7 +521,7 @@ export function buyAgainFor(
 
   return {
     loaded: list !== undefined && history.length > 0,
-    suggest: (typed, pinned) => {
+    offer: (typed, pinned) => {
       const isTyping = typed.trim() !== "";
       const onList = waiting
         .filter((item) => isTyping || !pinned?.has(item.id))

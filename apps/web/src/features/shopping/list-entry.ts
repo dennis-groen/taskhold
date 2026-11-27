@@ -33,8 +33,8 @@ export type Outcome =
 
 export type Clash = Extract<Outcome, { kind: "clash" }>;
 
-/** How a clash is settled: put it back on the list, change its amount, or add a second item */
-export type ClashChoice = "untick" | "set-amount" | "add-row";
+/** How a clash is settled: put it back on the list, change its amount, or add another item */
+export type ClashChoice = "untick" | "set-amount" | "add-another";
 
 export type PutOptions = {
   /**
@@ -58,14 +58,21 @@ export type ListEntry = {
   settle: (clash: Clash, choice: ClashChoice) => Outcome;
   /** Takes back what this visit added or unticked; null when it did neither */
   takeBack: (name: string) => Outcome | null;
+  /**
+   * A tap on a chip or a row: takes back what this visit did to it, or else puts it on the list
+   * with its usual amount, settling a clash
+   */
+  tap: (name: string, usualQuantity: string | null) => Outcome;
   /** Whether this visit added or unticked it, and it's still waiting */
   status: (name: string) => "added" | "unticked" | null;
   /** The items this visit added that are still waiting */
   addedIds: () => ReadonlySet<string>;
   /**
-   * Takes back what the outcomes did, leaving anything someone has changed since (a housemate
-   * ticked it, changed its amount, or it's gone). Returns how many it took back.
+   * What undo would still take back: one outcome per item, leaving anything someone has changed
+   * since (a housemate ticked it, changed its amount, or it's gone). For saying how many first.
    */
+  undoable: (outcomes: readonly Outcome[]) => Outcome[];
+  /** Takes back the undoable outcomes. Returns how many it took back. */
   undo: (outcomes: readonly Outcome[]) => number;
   /**
    * Keeps this list's memory while held. The memory goes when the last holder lets go: a visit to
@@ -192,60 +199,101 @@ export function listEntry(
     const existing = list && findOnList(list, entry.name);
     if (!existing) return add(entry.name, entry.quantity ?? usualQuantity);
     if (onClash === "ask") {
-      return { kind: "clash", item: existing, entry, nextAmount: nextAmount(existing, entry) };
+      // Asking, the usual amount is what the person picked: "Make it …" offers it, and another
+      // item gets it
+      const asked = { name: entry.name, quantity: entry.quantity ?? usualQuantity };
+      return {
+        kind: "clash",
+        item: existing,
+        entry: asked,
+        nextAmount: nextAmount(existing, asked),
+      };
     }
     return settleExisting(existing, entry.quantity);
   }
 
-  function undoOne(outcome: Outcome): boolean {
+  /** What takes `outcome` back, or null when someone has changed it since (or it's gone) */
+  function undoFor(outcome: Outcome): (() => void) | null {
     switch (outcome.kind) {
       case "added": {
         const now = itemById(outcome.itemId);
         // Only while it's still waiting: a housemate may have ticked it meanwhile
-        if (now?.checked) return false;
-        if (items() !== undefined && !now && !waitingAddIds().has(outcome.itemId)) return false;
-        forget(outcome.name);
-        run(shoppingChanges.remove, { listId, itemId: outcome.itemId });
-        return true;
+        if (now?.checked) return null;
+        if (items() !== undefined && !now && !waitingAddIds().has(outcome.itemId)) return null;
+        return () => {
+          forget(outcome.name);
+          run(shoppingChanges.remove, { listId, itemId: outcome.itemId });
+        };
       }
       case "unticked": {
         const now = itemById(outcome.item.id);
-        if (!now || now.checked) return false;
-        if (outcome.amount !== null && now.quantity === outcome.amount) {
+        if (!now || now.checked) return null;
+        return () => {
+          if (outcome.amount !== null && now.quantity === outcome.amount) {
+            run(shoppingChanges.edit, {
+              listId,
+              itemId: now.id,
+              changes: { quantity: outcome.item.quantity },
+            });
+          }
+          forget(outcome.item.name);
+          tickBack(now, outcome.item.checkedBy);
+        };
+      }
+      case "amount-set": {
+        const now = itemById(outcome.item.id);
+        if (!now || now.quantity !== outcome.amount) return null;
+        return () =>
           run(shoppingChanges.edit, {
             listId,
             itemId: now.id,
             changes: { quantity: outcome.item.quantity },
           });
-        }
-        forget(outcome.item.name);
-        run(shoppingChanges.toggle, {
-          listId,
-          itemId: now.id,
-          checked: true,
-          by: person(outcome.item.checkedBy ?? by),
-        });
-        return true;
-      }
-      case "amount-set": {
-        const now = itemById(outcome.item.id);
-        if (!now || now.quantity !== outcome.amount) return false;
-        run(shoppingChanges.edit, {
-          listId,
-          itemId: now.id,
-          changes: { quantity: outcome.item.quantity },
-        });
-        return true;
       }
       default:
-        return false;
+        return null;
     }
   }
 
+  /** Ticks `item` again for whoever had ticked it, or the viewer when nobody's known */
+  function tickBack(item: ShoppingItem, checkedBy: PersonSummary | null) {
+    run(shoppingChanges.toggle, {
+      listId,
+      itemId: item.id,
+      checked: true,
+      by: person(checkedBy ?? by),
+    });
+  }
+
+  /**
+   * The outcomes undo would still take back, one per item (the latest), so adding something,
+   * taking it back and adding it again counts once
+   */
+  function undoable(outcomes: readonly Outcome[]): Outcome[] {
+    const latest = new Map<string, Outcome>();
+    for (const outcome of outcomes) {
+      const id = outcomeItemId(outcome);
+      if (id !== null) latest.set(id, outcome);
+    }
+    return [...latest.values()].filter((outcome) => undoFor(outcome) !== null);
+  }
+
   function undo(outcomes: readonly Outcome[]): number {
-    let taken = 0;
-    for (const outcome of outcomes) if (undoOne(outcome)) taken++;
-    return taken;
+    const actions = undoable(outcomes).flatMap((outcome) => undoFor(outcome) ?? []);
+    for (const action of actions) action();
+    return actions.length;
+  }
+
+  function takeBack(name: string): Outcome | null {
+    const found = remembered(itemKey(name));
+    if (!found) return null;
+    forget(name);
+    if (found.kind === "added") {
+      run(shoppingChanges.remove, { listId, itemId: found.id });
+      return { kind: "taken-off", itemId: found.id, name };
+    }
+    tickBack(found.item, found.checkedBy);
+    return { kind: "ticked-again", item: found.item };
   }
 
   return {
@@ -274,29 +322,17 @@ export function listEntry(
           const amount = nextAmount(item, clash.entry);
           return amount === null ? { kind: "already-there", item } : setAmount(item, amount);
         }
-        case "add-row":
+        case "add-another":
           return add(clash.entry.name, clash.entry.quantity);
         default:
           return choice satisfies never;
       }
     },
 
-    takeBack: (name) => {
-      const found = remembered(itemKey(name));
-      if (!found) return null;
-      forget(name);
-      if (found.kind === "added") {
-        run(shoppingChanges.remove, { listId, itemId: found.id });
-        return { kind: "taken-off", itemId: found.id, name };
-      }
-      run(shoppingChanges.toggle, {
-        listId,
-        itemId: found.item.id,
-        checked: true,
-        by: person(found.checkedBy ?? by),
-      });
-      return { kind: "ticked-again", item: found.item };
-    },
+    takeBack,
+
+    tap: (name, usualQuantity) =>
+      takeBack(name) ?? put({ name, quantity: null }, { onClash: "settle", usualQuantity }),
 
     status: (name) => remembered(itemKey(name))?.kind ?? null,
 
@@ -309,10 +345,25 @@ export function listEntry(
       return ids;
     },
 
+    undoable,
+
     undo,
 
     hold: () => store.hold(listId),
   };
+}
+
+/** The item an outcome changed, if it changed one */
+function outcomeItemId(outcome: Outcome): string | null {
+  switch (outcome.kind) {
+    case "added":
+      return outcome.itemId;
+    case "unticked":
+    case "amount-set":
+      return outcome.item.id;
+    default:
+      return null;
+  }
 }
 
 /** Keeps `listId`'s memory while held, as ListEntry's `hold` does. Returns the release. */

@@ -176,6 +176,26 @@ describe("putting something on a list", () => {
   });
 });
 
+describe("a chip that clashes", () => {
+  it("offers its usual amount, and adds another item with it", async () => {
+    const { queryClient, entry } = setup();
+    const asked = entry.put(
+      { name: "Milk", quantity: null },
+      { onClash: "ask", usualQuantity: "2" },
+    );
+    expect(asked).toMatchObject({ kind: "clash", entry: { name: "Milk", quantity: "2" } });
+    if (asked.kind !== "clash") throw new Error("expected a clash");
+
+    entry.settle(asked, "add-another");
+    await settled(queryClient);
+    expect(
+      queryClient
+        .getQueryData(listQuery("list").queryKey)
+        ?.items.filter((i) => i.name === "Milk" && !i.checked),
+    ).toMatchObject([{ quantity: "2" }]);
+  });
+});
+
 describe("the amount a clash offers", () => {
   it("is one more, the amount typed, or nothing when that's what it is already", () => {
     const waiting = item({ id: "x", name: "Oats", quantity: "2 bags" });
@@ -213,9 +233,9 @@ describe("settling a clash", () => {
     expect(shown(queryClient, "Bread")).toMatchObject({ quantity: "4" });
   });
 
-  it("adds a second item", async () => {
+  it("adds another item", async () => {
     const { queryClient, entry } = setup();
-    entry.settle(clash(entry, "Bread"), "add-row");
+    entry.settle(clash(entry, "Bread"), "add-another");
     await settled(queryClient);
     expect(
       queryClient.getQueryData(listQuery("list").queryKey)?.items.filter((i) => i.name === "Bread"),
@@ -224,6 +244,19 @@ describe("settling a clash", () => {
 });
 
 describe("a second tap", () => {
+  it("is the same tap: on, off, and back on again", async () => {
+    const { queryClient, entry } = setup();
+    expect(entry.tap("Eggs", "6").kind).toBe("added");
+    await settled(queryClient);
+    expect(entry.tap("Eggs", "6").kind).toBe("taken-off");
+    await settled(queryClient);
+    expect(entry.tap("Milk", null).kind).toBe("unticked");
+    await settled(queryClient);
+    expect(entry.tap("Milk", null).kind).toBe("ticked-again");
+    await settled(queryClient);
+    expect(shown(queryClient, "Milk")).toMatchObject({ checked: true, checkedBy: sam });
+  });
+
   it("takes off what this visit added", async () => {
     const { queryClient, entry } = setup();
     entry.put({ name: "Eggs", quantity: null }, { onClash: "settle" });
@@ -323,6 +356,46 @@ describe("putting several on at once", () => {
     expect(entry.undo([outcome])).toBe(1);
     await settled(queryClient);
     expect(shown(queryClient, "Bread")).toMatchObject({ quantity: "2" });
+  });
+});
+
+describe("counting what Undo takes back", () => {
+  it("counts an item once when it was added, taken back, and added again", async () => {
+    const { queryClient, entry } = setup();
+    const first = entry.tap("Eggs", null);
+    await settled(queryClient);
+    entry.tap("Eggs", null);
+    await settled(queryClient);
+    const again = entry.tap("Eggs", null);
+    await settled(queryClient);
+
+    expect(entry.undoable([first, again])).toEqual([again]);
+    expect(entry.undo([first, again])).toBe(1);
+    await settled(queryClient);
+    expect(shown(queryClient, "Eggs")).toBeUndefined();
+  });
+
+  it("counts an item once when it was unticked, ticked back, and unticked again", async () => {
+    const { queryClient, entry } = setup();
+    const first = entry.tap("Milk", null);
+    await settled(queryClient);
+    entry.tap("Milk", null);
+    await settled(queryClient);
+    const again = entry.tap("Milk", null);
+    await settled(queryClient);
+
+    expect(entry.undoable([first, again])).toHaveLength(1);
+  });
+
+  it("counts nothing a housemate has changed since", async () => {
+    const { queryClient, entry } = setup();
+    const eggs = entry.tap("Eggs", null);
+    await settled(queryClient);
+    if (eggs.kind !== "added") throw new Error("expected an add");
+    housemate(queryClient, eggs.itemId, { checked: true, checkedBy: sam });
+
+    expect(entry.undoable([eggs])).toEqual([]);
+    expect(entry.undo([eggs])).toBe(0);
   });
 });
 

@@ -116,7 +116,7 @@ function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }
   const runningLowCount = useBuyAgainFor(listId, foregroundNow).runningLowToAdd().length;
   const entry = typed.trim() ? parseEntry(typed) : null;
   const isTyping = Boolean(entry?.name);
-  const suggestions = useBuyAgainFor(listId).suggest(entry?.name ?? "", listEntry.addedIds);
+  const suggestions = useBuyAgainFor(listId).offer(entry?.name ?? "", listEntry.addedIds);
   const chips = suggestions.map(({ name, quantity }) => ({
     name,
     added: !isTyping && listEntry.status(name) === "added",
@@ -363,7 +363,7 @@ function ClashCard({
           size="sm"
           variant="secondary"
           onMouseDown={keepFocus}
-          onClick={() => onSettle("add-row")}
+          onClick={() => onSettle("add-another")}
           className="h-9 flex-1"
         >
           Add a new row

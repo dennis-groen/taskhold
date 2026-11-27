@@ -153,11 +153,11 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
   const historyCount = useBuyAgainHistoryCount();
 
   if (!target || historyCount === 0) return null;
-  return <BuyAgainFor target={target} lists={lists} onPick={setPickedId} />;
+  return <BuyAgainForList target={target} lists={lists} onPick={setPickedId} />;
 }
 
 /** Buy again chips for the list picked above them */
-function BuyAgainFor({
+function BuyAgainForList({
   target,
   lists,
   onPick,
@@ -169,7 +169,7 @@ function BuyAgainFor({
   const { user } = householdRoute.useRouteContext();
   const [restockOpen, setRestockOpen] = useState(false);
   const listEntry = useListEntry(target.id, user);
-  const suggestions = useBuyAgainFor(target.id).suggest("", listEntry.addedIds);
+  const suggestions = useBuyAgainFor(target.id).offer("", listEntry.addedIds);
 
   const chips = suggestions.map(({ name, quantity }) => ({
     name,
@@ -201,8 +201,7 @@ function BuyAgainFor({
         <BuyAgainChips
           chips={chips}
           onPick={(name) => {
-            const quantity = suggestions.find((item) => item.name === name)?.quantity ?? null;
-            listEntry.put({ name, quantity: null }, { onClash: "settle", usualQuantity: quantity });
+            listEntry.tap(name, suggestions.find((item) => item.name === name)?.quantity ?? null);
           }}
           onUndo={(name) => {
             listEntry.takeBack(name);

@@ -14,7 +14,6 @@ import { ClockCounterClockwiseIcon } from "@/components/icons.ts";
 import { SheetContent, SheetEyebrow } from "@/components/layout/Sheet.tsx";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import { offerUndo } from "@/lib/feedback.ts";
 import type { PersonSummary } from "@/lib/shared-with.ts";
 import { useKeyboardOffset } from "@/lib/use-keyboard-offset.ts";
 import { cn } from "cn";
@@ -29,7 +28,7 @@ import {
 } from "../buy-again-sheet.hooks.ts";
 import { findOnList, itemKey, parseEntry } from "../item-entry.ts";
 import type { Outcome } from "../list-entry.ts";
-import { useListEntry } from "../list-entry.hooks.ts";
+import { offerUndoAll, useListEntry } from "../list-entry.hooks.ts";
 import type { BoughtItem, ShoppingItem } from "../shopping.api.ts";
 import { useBuyAgainFor, useForgetBuyAgain } from "../shopping.hooks.ts";
 import { historyQuery, listQuery } from "../shopping.queries.ts";
@@ -95,17 +94,8 @@ export function BuyAgainSheet({
 
   /** Closing the sheet hides what it did, so offer to take back what's still there */
   function offerSessionUndo() {
-    const put = putRef.current;
+    offerUndoAll(entry, putRef.current, listName);
     putRef.current = [];
-    const still = put.filter((outcome) =>
-      outcome.kind === "added"
-        ? entry.status(outcome.name) === "added"
-        : outcome.kind === "unticked" && entry.status(outcome.item.name) === "unticked",
-    );
-    if (still.length === 0) return;
-    offerUndo(`Added ${still.length} to ${listName}`, () => {
-      entry.undo(still);
-    });
   }
 
   return (

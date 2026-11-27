@@ -332,31 +332,26 @@ export function useBuyAgainSession({
     setBulkUndo(null);
   }
 
-  /** Says what happened, and passes on what can be taken back when the sheet closes */
+  /** Says what happened, and passes on what closing the sheet can offer to take back */
   function report(outcome: Outcome) {
     const message = said(outcome, listName);
     if (message) onAnnounce(message);
-    onPut([outcome]);
+    if (outcome.kind === "added" || outcome.kind === "unticked") onPut([outcome]);
   }
 
-  function toggleRow(row: BuyAgainCatalogItem, typedQuantity?: string | null) {
+  function toggleRow(pastBuy: BuyAgainCatalogItem, typedQuantity?: string | null) {
     if (!list) return;
     dismissBulkUndo();
-    const was = entry.status(row.name);
-    // A second tap takes back what this session did; a typed amount ("3 milk") always means
-    // "make it 3", never "take it off"
+    // A typed amount ("3 milk") always means "make it 3", never "take it off", except on an item
+    // this visit unticked, where a second tap ticks it back
     const outcome =
-      was === "unticked" || (was === "added" && !typedQuantity)
-        ? entry.takeBack(row.name)
-        : entry.put(
-            { name: row.name, quantity: typedQuantity ?? null },
-            { onClash: "settle", usualQuantity: row.quantity },
-          );
-    if (!outcome) return;
+      typedQuantity && entry.status(pastBuy.name) !== "unticked"
+        ? entry.put({ name: pastBuy.name, quantity: typedQuantity }, { onClash: "settle" })
+        : entry.tap(pastBuy.name, pastBuy.quantity);
     if (outcome.kind === "already-there") {
       // Already on the list before this sheet opened (possibly a housemate's): never delete on a
       // stray tap
-      onFlashHint(itemKey(row.name), outcome.item.name);
+      onFlashHint(itemKey(pastBuy.name), outcome.item.name);
       return;
     }
     report(outcome);
@@ -374,7 +369,11 @@ export function useBuyAgainSession({
       count: all.count,
       undo: () => {
         const taken = all.undo();
-        onAnnounce(`Took ${taken} back off ${listName}`);
+        onAnnounce(
+          taken === all.count
+            ? `Took ${taken} back off ${listName}`
+            : `Took ${taken} of ${all.count} back off ${listName}. Someone changed the others since`,
+        );
         // The items come back a moment later; until then the button stays, showing "Add all N",
         // so it never unmounts under the focus that pressed it
         clearTimeout(bulkTimerRef.current);
@@ -404,8 +403,11 @@ export function useBuyAgainSession({
       showUndoBar({
         message: said(outcome, listName) ?? "",
         undo: () => {
-          entry.undo([outcome]);
-          onAnnounce(`Took ${outcome.name} off ${listName}`);
+          onAnnounce(
+            entry.undo([outcome]) > 0
+              ? `Took ${outcome.name} off ${listName}`
+              : `${outcome.name} stays on ${listName}. Someone changed it since`,
+          );
           hideUndoBar();
         },
       });
