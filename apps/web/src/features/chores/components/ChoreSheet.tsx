@@ -7,7 +7,6 @@ import {
   SheetContent,
   SheetEyebrow,
 } from "@/components/layout/Sheet.tsx";
-import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { BroomIcon, CheckIcon, PencilSimpleIcon } from "@/components/icons.ts";
 import { UserAvatar } from "@/components/UserAvatar.tsx";
 import { Button } from "@/components/ui/button";
@@ -133,22 +132,17 @@ function SheetBody({
               setEditing(false);
             }}
             footer={
-              <ConfirmDialog
-                trigger={
-                  <Button variant="secondary" size="xl">
-                    Delete chore
-                  </Button>
-                }
-                title={`Delete ${chore.name}?`}
-                description="It goes for everyone in the household, with its history."
-                confirmLabel="Delete chore"
-                destructive
-                onConfirm={async () => {
-                  // Gone from the list straight away, and sent once there is a connection
+              <Button
+                variant="secondary"
+                size="xl"
+                onClick={() => {
+                  // Gone from the list straight away, with a moment to undo before it's deleted
                   remove(chore);
                   onClose();
                 }}
-              />
+              >
+                Delete chore
+              </Button>
             }
           />
         </div>

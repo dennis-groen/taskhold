@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { toast } from "sonner";
 import { useRegisterSW } from "virtual:pwa-register/react";
+
+import { offerUpdate } from "@/lib/feedback.ts";
 
 // An app left open for days still hears about new versions. Phones pause this timer while the app
 // is in the background, so it also checks each time the app comes back to the front.
@@ -29,14 +30,11 @@ export function UpdatePrompt() {
 
   useEffect(() => {
     if (!needRefresh) return;
-    toast("A new version of taskhold is ready", {
-      description: "Reload to get the latest.",
-      id: "app-update",
-      // Stays until the person picks: reloading interrupts whatever they're doing
-      duration: Number.POSITIVE_INFINITY,
-      action: { label: "Reload", onClick: () => reload(updateServiceWorker) },
-      cancel: { label: "Later", onClick: () => setNeedRefresh(false) },
-    });
+    // Stays until the person picks: reloading interrupts whatever they're doing
+    offerUpdate(
+      () => reload(updateServiceWorker),
+      () => setNeedRefresh(false),
+    );
   }, [needRefresh, setNeedRefresh, updateServiceWorker]);
 
   return null;

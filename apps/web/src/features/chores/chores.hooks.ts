@@ -8,6 +8,7 @@ import type { PersonSummary } from "@/lib/shared-with.ts";
 
 import type { Chore, ChoreInput } from "./chores.api.ts";
 import { scheduleOf } from "./chore-dates.ts";
+import { deleteAfterUndo, useWithoutHeld } from "./chore-delete-hold.ts";
 import { choreChanges, markedDone } from "./chores.changes.ts";
 import { choresQuery } from "./chores.queries.ts";
 
@@ -16,31 +17,38 @@ import { choresQuery } from "./chores.queries.ts";
  * screen straight away and is rolled back if the API rejects it (see chores.changes.ts).
  */
 export function useChores(viewer: PersonSummary) {
-  const { data: chores } = useSuspenseQuery(choresQuery());
+  const { data: all } = useSuspenseQuery(choresQuery());
+  const chores = useWithoutHeld(all);
   const complete = useChange(choreChanges.complete);
   const undo = useChange(choreChanges.undo);
 
   return {
     chores,
     /**
-     * Marks the chore done today. Returns the chore as it is now. `offerUndo` words the Undo
+     * Marks the chore done today. Returns the chore as it is now. `undoOffer` words the Undo
      * notice from that; nothing is offered when the chore was done already.
      */
-    complete: (chore: Chore, offerUndo?: (after: Chore) => UndoOffer) => {
+    complete: (chore: Chore, undoOffer?: (after: Chore) => UndoOffer) => {
       const on = today();
       // Only what the list shows about a person, since a change is saved on the device
       const by = { id: viewer.id, name: viewer.name };
       const after = markedDone(chore, by, on);
-      complete.run({ choreId: chore.id, on, by }, offerUndo?.(after));
+      complete.run({ choreId: chore.id, on, by }, undoOffer?.(after));
       return after;
     },
     undo: (choreId: string) => undo.run(choreId),
   };
 }
 
+/** The household's chores once they've loaded, for pages that don't wait for them (empty until then) */
+export function useChoreList(): Chore[] {
+  const { data: all = [] } = useQuery(choresQuery());
+  return useWithoutHeld(all);
+}
+
 /** How many chores are late, for the badge on the Chores tab. Zero until they've loaded. */
 export function useOverdueCount(): number {
-  const { data: chores = [] } = useQuery(choresQuery());
+  const chores = useChoreList();
   const on = today();
   return chores.filter((chore) => !chore.done && dueGroup(chore.dueOn, on) === "overdue").length;
 }
@@ -88,7 +96,6 @@ export function useManageChores(members: Assignee[]) {
   const add = useChange(choreChanges.add);
   const edit = useChange(choreChanges.edit);
   const remove = useChange(choreChanges.remove);
-  const clearDone = useChange(choreChanges.clearDone);
 
   return {
     add: (input: ChoreInput) =>
@@ -110,8 +117,21 @@ export function useManageChores(members: Assignee[]) {
         assignee: assigneeOf(input.assigneeId, members),
       });
     },
-    remove: (chore: Chore) => remove.run(chore.id),
-    clearDone: () => clearDone.run(null),
+    /** Takes the chore off the screen and offers Undo; it's deleted once that closes */
+    remove: (chore: Chore) =>
+      deleteAfterUndo([chore.id], `${chore.name} deleted`, () => remove.runAsync(chore.id)),
+    /**
+     * Deletes the done chores on screen, one by one rather than with the API's clear-done, so a
+     * chore a housemate marks done during the Undo window isn't swept up without its own Undo
+     */
+    clearDone: (done: readonly Chore[]) => {
+      const ids = done.map((chore) => chore.id);
+      deleteAfterUndo(
+        ids,
+        done.length === 1 ? "1 chore cleared" : `${done.length} chores cleared`,
+        () => Promise.all(ids.map((id) => remove.runAsync(id))),
+      );
+    },
   };
 }
 

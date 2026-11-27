@@ -58,12 +58,12 @@ export function BuyAgainSheet({
   listId: string;
   listName: string;
   viewer: PersonSummary;
-  /** Called on close with how many items were added during this sheet session */
-  onSessionClose?: (addedCount: number) => void;
+  /** Called on close with the items added during this sheet session */
+  onSessionClose?: (addedIds: readonly string[]) => void;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const addedCountRef = useRef(0);
+  const addedIdsRef = useRef<readonly string[]>([]);
   const commitPendingHidesRef = useRef<() => void>(() => {});
   // Keep content mounted until the drawer's exit animation finishes, and bump sessionId on each open
   const [session, setSession] = useState({ mounted: open, id: open ? 1 : 0, wasOpen: open });
@@ -77,8 +77,8 @@ export function BuyAgainSheet({
 
   // Stable identities, so the content's registration effect runs once per session. If it re-ran,
   // its cleanup would commit pending hides and cut their Undo short.
-  const handleAddedCountChange = useCallback((count: number) => {
-    addedCountRef.current = count;
+  const handleAddedChange = useCallback((ids: ReadonlySet<string>) => {
+    addedIdsRef.current = [...ids];
   }, []);
   const registerCommitPendingHides = useCallback((fn: () => void) => {
     commitPendingHidesRef.current = fn;
@@ -106,9 +106,9 @@ export function BuyAgainSheet({
         }
         if (!nextOpen) {
           commitPendingHidesRef.current();
-          if (addedCountRef.current > 0) {
-            onSessionClose?.(addedCountRef.current);
-            addedCountRef.current = 0;
+          if (addedIdsRef.current.length > 0) {
+            onSessionClose?.(addedIdsRef.current);
+            addedIdsRef.current = [];
           }
         }
         onOpenChange(nextOpen);
@@ -134,7 +134,7 @@ export function BuyAgainSheet({
             keyboardUp={keyboard !== null}
             bodyRef={bodyRef}
             searchRef={searchRef}
-            onAddedCountChange={handleAddedCountChange}
+            onAddedChange={handleAddedChange}
             registerCommitPendingHides={registerCommitPendingHides}
           />
         )}
@@ -150,7 +150,7 @@ function BuyAgainSheetContent({
   keyboardUp,
   bodyRef,
   searchRef,
-  onAddedCountChange,
+  onAddedChange,
   registerCommitPendingHides,
 }: {
   listId: string;
@@ -159,7 +159,7 @@ function BuyAgainSheetContent({
   keyboardUp: boolean;
   bodyRef: RefObject<HTMLDivElement | null>;
   searchRef: RefObject<HTMLInputElement | null>;
-  onAddedCountChange: (count: number) => void;
+  onAddedChange: (ids: ReadonlySet<string>) => void;
   registerCommitPendingHides: (fn: () => void) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -272,7 +272,7 @@ function BuyAgainSheetContent({
   );
 
   const {
-    addedCount,
+    addedIds,
     addedIdFor,
     untickedByKey,
     bulkUndo,
@@ -298,8 +298,8 @@ function BuyAgainSheetContent({
   });
 
   useEffect(() => {
-    onAddedCountChange(addedCount);
-  }, [addedCount, onAddedCountChange]);
+    onAddedChange(addedIds);
+  }, [addedIds, onAddedChange]);
 
   // On a visit where everything running low is already waiting, the card has nothing to act on:
   // fold it to one line so the past buys you can still add lead the sheet

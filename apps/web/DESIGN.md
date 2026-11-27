@@ -68,6 +68,21 @@ In dark mode, area slabs drop about 30% chroma while brightness moves to text (`
 - `ShoppingItemRow` (`features/shopping/components/ShoppingItemRow.tsx`): tapping the item name or amount opens the edit sheet; the round tick sits on the right under the thumb (or left in left-handed mode). Ticked items show "You" or the housemate's first name beside the tick plus `MemberMark`; unticked items someone else added show "Added by Sam" under the name.
 - `ShopDock`, `BuyAgainChips`, and `BuyAgainSheet` (`features/shopping/components/`): on a list, `ShopDock` provides quick add ("2 milk") with a live aisle preview card, duplicate clash card, an expandable sideways-scrolling row of toggleable `BuyAgainChips` while focused or typing, and a button to open the full `BuyAgainSheet` restock catalog.
 
+## Toasts
+
+A dark slip just above the dock, as wide as the dock on a phone (26rem on a desktop). Every toast goes through `lib/feedback.ts`; lint blocks importing `sonner` anywhere else.
+
+- **When**: only for one of these. Never to confirm what the screen already shows (a tick, a new row, a saved form, an item added from the dock), and not for what housemates do, which arrives on screen by itself.
+  1. **Undo** (`offerUndo`): a change that can be taken back: removing, clearing, deleting, adding several items at once from Buy again, marking a chore done, skipping it or putting it off.
+  2. **Failure** (`changeFailed`): a change made in the background didn't save. Errors in forms and dialogs stay next to the form.
+  3. **Out of sight** (`notify`, `notifyAction`, `inform`): the result isn't on screen: the person was taken somewhere else ("Groceries deleted" from inside the list), it happened on other devices, or a housemate is involved ("Sam is already out shopping").
+  4. **A decision** (`offerUpdate`): a new version is ready. It stays until the person picks Reload or Later.
+- **One at a time**: a new toast replaces the one on screen. A replaced Undo counts as timed out, so its change is saved. The update prompt steps aside while another toast shows and comes back after.
+- **How long**: notices 4s (6s with a second line), Undo and View 6s (8s), failures 8s. `feedback.ts` keeps the time, not Sonner, and pauses it while a finger presses the toast, a mouse is over it, keyboard focus is in it, or the app is in the background. A tap on the toast's text doesn't pause it.
+- **Closing**: swipe left, right or down, or wait. No ✕: it would crowd the text and sit beside Undo. Swiping away an Undo is the same as letting it time out.
+- **Motion**: it rises 12px out of the dock and fades in (240ms, `--ease-out`), and sinks back when it goes. Swiped, it follows the finger. With reduced motion it only fades.
+- Deleting chores waits for the Undo window instead of being sent at once, so Undo keeps their history ([ADR 0001](../../docs/adr/0001-chore-deletes-wait-for-the-undo-window.md)).
+
 ## Icons
 
 Phosphor only, imported from `components/icons.ts` (lint blocks direct imports outside `components/ui`). Add a new icon there first. `regular` by default, `bold` for small glyphs (carets, plus, repeat, locks), `duotone` for illustrative spots (empty states, categories), and `fill` for the active tab and active theme choice.

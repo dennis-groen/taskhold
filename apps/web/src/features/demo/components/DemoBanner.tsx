@@ -3,8 +3,7 @@ import { useState } from "react";
 import { HandPointingIcon } from "@/components/icons.ts";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { errorMessage } from "@/lib/api.ts";
-import { notify } from "@/lib/feedback.ts";
+import { changeFailed, notify } from "@/lib/feedback.ts";
 
 import { askHousemate } from "../demo.api.ts";
 
@@ -25,7 +24,7 @@ export function DemoBanner({ endsAt }: { endsAt: string }) {
         "It came through live updates, just as it would from their phone.",
       );
     } catch (err) {
-      notify(errorMessage(err, "Couldn't reach your housemates. Try again in a moment."));
+      changeFailed(err, "Couldn't reach your housemates. Try again in a moment.");
     } finally {
       setPending(false);
     }

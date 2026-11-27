@@ -172,7 +172,7 @@ export function ShoppingListPage() {
           <ListMenu
             list={{ id: list.id, name: list.name, itemCount: list.items.length }}
             onSlab
-            beforeDelete={async () => {
+            leaveList={async () => {
               await navigate({ to: "/lists" });
             }}
           />

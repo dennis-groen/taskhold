@@ -1,7 +1,6 @@
 import { onlineManager, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { toast } from "sonner";
-import { changeFailed } from "@/lib/feedback.ts";
+import { changeFailed, inform } from "@/lib/feedback.ts";
 import { useChange, useWaitingVars } from "@/lib/offline-changes.ts";
 import { firstName, type PersonSummary } from "@/lib/shared-with.ts";
 
@@ -90,9 +89,10 @@ export function useShoppingTrip(listId: string, viewer: PersonSummary) {
         const started = await startTrip(listId, crypto.randomUUID());
         setTrip(started);
         if (started.shopper && started.shopper.id !== viewer.id) {
-          toast.info(`${firstName(started.shopper.name)} is already out shopping`, {
-            description: "They'll tick things off as they go.",
-          });
+          inform(
+            `${firstName(started.shopper.name)} is already out shopping`,
+            "They'll tick things off as they go.",
+          );
         }
       } catch (err) {
         changeFailed(err, tripStartFailure(err));

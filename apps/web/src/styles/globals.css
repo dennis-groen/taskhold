@@ -330,6 +330,22 @@
 :root:has([data-slot="drawer-popup"][data-open]) {
   --toast-bottom: calc(5.75rem + env(safe-area-inset-bottom));
 }
+/* As wide as the dock (inset 0.5rem, at most 560px) on a phone or tablet; narrower on a desktop,
+   where there's no dock */
+:root {
+  --toast-width: min(560px, calc(100vw - 1rem));
+  @media (width >= 64rem) {
+    --toast-width: 26rem;
+  }
+}
+/* Up to 600px Sonner stretches the toaster across the screen (mobileOffset 0 in __root.tsx) and
+   sizes the toast from that; keep it to the dock's width, centred, there too */
+@media (width <= 600px) {
+  [data-sonner-toaster] [data-sonner-toast].cn-toast {
+    width: var(--toast-width);
+    margin-inline: auto;
+  }
+}
 
 @layer base {
   * {
@@ -631,6 +647,37 @@
   }
   [data-sonner-toaster] [data-sonner-toast].cn-toast [data-button][data-cancel]:hover {
     background: color-mix(in srgb, var(--toast-fg) 8%, transparent);
+  }
+}
+
+/* Motion: the slip rises a little out of the dock and fades in, and sinks back into it when it
+   goes. Swiped, it follows the finger and leaves that way (Sonner's swipe-out). The exit stays
+   under Sonner's 200ms before it unmounts the toast. */
+[data-sonner-toaster] [data-sonner-toast].cn-toast {
+  --y: translateY(0.75rem);
+  transition:
+    transform 240ms var(--ease-out),
+    opacity 240ms var(--ease-out),
+    height 240ms var(--ease-out);
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast[data-mounted="true"] {
+  --y: translateY(0);
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast[data-removed="true"][data-swipe-out="false"] {
+  --y: translateY(0.75rem);
+  opacity: 0;
+  transition:
+    transform 180ms var(--ease-in-out),
+    opacity 180ms var(--ease-in-out);
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast[data-swiping="true"] {
+  transition: none;
+}
+/* Reduced motion: it only fades (Sonner turns its own transitions off altogether) */
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster] [data-sonner-toast].cn-toast {
+    --y: translateY(0) !important;
+    transition: opacity 200ms var(--ease-out) !important;
   }
 }
 

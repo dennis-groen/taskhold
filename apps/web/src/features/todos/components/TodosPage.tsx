@@ -1,11 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { CheckCircleIcon, LockIcon, NotePencilIcon } from "@/components/icons.ts";
 import { AreaHeader, Count } from "@/components/layout/AreaHeader.tsx";
 import { EmptyState } from "@/components/layout/EmptyState.tsx";
 import { DUE_GROUPS, dueGroup, today as todayOnDevice } from "@/lib/dates.ts";
+import { notifyAction } from "@/lib/feedback.ts";
 import { useSettlingItems } from "@/lib/use-settling-items.ts";
 import { cn } from "cn";
 
@@ -125,12 +125,13 @@ export function TodosPage() {
         }}
         onMove={(todo) => {
           moveToChores(todo.id);
-          toast("Moved to Chores", {
-            description: todo.notes
+          notifyAction(
+            "Moved to Chores",
+            { label: "View", onClick: () => void navigate({ to: "/chores" }) },
+            todo.notes
               ? `${todo.name} is shared with everyone now. Its notes were deleted.`
               : `${todo.name} is shared with everyone now.`,
-            action: { label: "View", onClick: () => void navigate({ to: "/chores" }) },
-          });
+          );
         }}
         onClose={() => setOpenId(null)}
       />

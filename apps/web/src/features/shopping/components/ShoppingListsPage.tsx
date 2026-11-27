@@ -6,7 +6,7 @@ import { CaretRightIcon, PlusIcon } from "@/components/icons.ts";
 import { AreaHeader, Count, Meter } from "@/components/layout/AreaHeader.tsx";
 import { SharedWithLine } from "@/components/SharedWithLine.tsx";
 import { Button } from "@/components/ui/button";
-import { notifyAction } from "@/lib/feedback.ts";
+import { offerUndo } from "@/lib/feedback.ts";
 import type { Housemate } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
@@ -155,7 +155,6 @@ function ListRow({ list, first }: { list: ShoppingListSummary; first: boolean })
  * above them with one tap.
  */
 function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
-  const navigate = useNavigate();
   const { user } = householdRoute.useRouteContext();
   const add = useAddItem(user);
   const undoAdd = useUndoAddItem();
@@ -227,9 +226,9 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
         listId={target.id}
         listName={target.name}
         viewer={user}
-        onSessionClose={(addedCount) => {
-          notifyAction(`Added ${addedCount} to ${target.name}`, "View", () => {
-            void navigate({ to: "/lists/$listId", params: { listId: target.id } });
+        onSessionClose={(addedIds) => {
+          offerUndo(`Added ${addedIds.length} to ${target.name}`, () => {
+            for (const id of addedIds) undoAdd(target.id, id);
           });
         }}
       />

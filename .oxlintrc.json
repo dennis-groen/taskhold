@@ -335,6 +335,10 @@
               {
                 "regex": "^@phosphor-icons/",
                 "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
+              },
+              {
+                "regex": "^sonner$",
+                "message": "Show toasts through @/lib/feedback.ts, which keeps them one at a time and on the rules in DESIGN.md."
               }
             ]
           }
@@ -358,6 +362,10 @@
               {
                 "regex": "^@phosphor-icons/",
                 "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
+              },
+              {
+                "regex": "^sonner$",
+                "message": "Show toasts through @/lib/feedback.ts, which keeps them one at a time and on the rules in DESIGN.md."
               }
             ]
           }
@@ -394,6 +402,10 @@
               {
                 "regex": "^@phosphor-icons/",
                 "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
+              },
+              {
+                "regex": "^sonner$",
+                "message": "Show toasts through @/lib/feedback.ts, which keeps them one at a time and on the rules in DESIGN.md."
               }
             ]
           }
@@ -472,6 +484,10 @@
                 "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
               },
               {
+                "regex": "^sonner$",
+                "message": "Show toasts through @/lib/feedback.ts, which keeps them one at a time and on the rules in DESIGN.md."
+              },
+              {
                 "regex": "^\\.\\./[a-z-]+\\.changes(\\.ts)?$",
                 "allowTypeImports": true,
                 "message": "Run changes through the feature's hooks (*.hooks.ts) instead of importing *.changes.ts in a component."
@@ -524,6 +540,10 @@
                 "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
               },
               {
+                "regex": "^sonner$",
+                "message": "Show toasts through @/lib/feedback.ts, which keeps them one at a time and on the rules in DESIGN.md."
+              },
+              {
                 "regex": "^\\.\\./[a-z-]+\\.changes(\\.ts)?$",
                 "allowTypeImports": true,
                 "message": "Run changes through the feature's hooks (*.hooks.ts) instead of importing *.changes.ts in a component."
@@ -549,6 +569,27 @@
               {
                 "regex": ".*",
                 "message": "Keep features flat: .ts files at the feature's root, .tsx components directly in components/. Or split the feature."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // The one module that shows toasts (ui/sonner.tsx, the Toaster, is allowed with the shadcn files below)
+      "files": ["apps/web/src/lib/feedback.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/**", "@/routes/**", "@/router.tsx", "@/main.tsx"],
+                "message": "Shared code can't depend on features or routes."
+              },
+              {
+                "regex": "^@phosphor-icons/",
+                "message": "Import icons from @/components/icons.ts, so the icon library can be swapped in one file."
               }
             ]
           }

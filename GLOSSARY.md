@@ -12,6 +12,10 @@ _Avoid_: topic, section, module
 Something a person does to the data in an area (ticking an item, adding a chore, marking a chore done, skipping it) that shows straight away and reaches the server once there's a connection, even if the app is closed in between.
 _Avoid_: mutation, action, optimistic update
 
+**Undo**:
+Taking back a change you just made, offered for a few seconds after it. Whatever comes back returns exactly as it was, history included.
+_Avoid_: revert, restore, cancel
+
 **Member**:
 Someone in a household. Only its members see or change its shopping lists and chores, and someone stops being one the moment they leave or are removed.
 _Avoid_: user, housemate
