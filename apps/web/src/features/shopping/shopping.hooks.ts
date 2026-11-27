@@ -1,10 +1,4 @@
-import {
-  onlineManager,
-  useQuery,
-  useQueryClient,
-  useSuspenseQuery,
-  type QueryClient,
-} from "@tanstack/react-query";
+import { onlineManager, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { changeFailed } from "@/lib/feedback.ts";
@@ -17,7 +11,6 @@ import {
   startTrip,
   type BoughtItem,
   type ShoppingList,
-  type ShoppingListSummary,
   type ShoppingTrip,
 } from "./shopping.api.ts";
 import { tripStartFailure } from "./shopping-trip.ts";
@@ -28,7 +21,7 @@ import {
   type BuyAgainCatalog,
   type BuyAgainSuggestion,
 } from "./buy-again.ts";
-import { historyQuery, isListGone, listQuery, listsQuery } from "./shopping.queries.ts";
+import { historyQuery, isListGone, listQuery } from "./shopping.queries.ts";
 
 /**
  * A list plus the changes people make to it. Every change shows on screen straight away and is
@@ -124,7 +117,6 @@ export function useShoppingTrip(listId: string, viewer: PersonSummary) {
  * a restart (see shopping.changes.ts); a failure rolls back with a notice.
  */
 export function useManageLists() {
-  const queryClient = useQueryClient();
   const createList = useChange(shoppingChanges.createList);
   const renameList = useChange(shoppingChanges.renameList);
   const deleteList = useChange(shoppingChanges.deleteList);
@@ -133,47 +125,34 @@ export function useManageLists() {
     /** Returns the new list's id, so it can be opened straight away */
     create: (name: string) => {
       const id = crypto.randomUUID();
-      // The new list opens before the API has it, offline too
-      queryClient.setQueryData(listQuery(id).queryKey, { id, name, items: [], trip: null });
       createList.run({ id, name });
       return id;
     },
     rename: (listId: string, name: string) => {
       renameList.run({ listId, name });
-      // The overview shows the name too; the refetch after the change puts it right if it fails
-      queryClient.setQueryData(listsQuery().queryKey, (lists: ShoppingListSummary[] | undefined) =>
-        lists?.map((list) => (list.id === listId ? { ...list, name } : list)),
-      );
     },
     /** Call once the list's page has been left, so it doesn't look for a list that's gone */
     remove: (listId: string) => {
       deleteList.run({ listId });
-      queryClient.removeQueries({ queryKey: listQuery(listId).queryKey });
     },
   };
 }
 
 /** Adds an item to any list, optimistically when that list is on screen or cached */
 export function useAddItem(viewer: PersonSummary) {
-  const queryClient = useQueryClient();
   const add = useChange(shoppingChanges.add);
   return (listId: string, name: string, quantity: string | null) => {
     const id = crypto.randomUUID();
     add.run({ listId, id, name, quantity, by: person(viewer) });
-    // The overview and sidebar show list counts too; the refetch after the change puts them right
-    // if it fails
-    adjustListCounts(queryClient, listId, { itemCount: 1, openCount: 1 });
     return id;
   };
 }
 
 /** Removes an item quietly, without an undo toast, e.g. toggling a Buy again chip back off */
 export function useUndoAddItem() {
-  const queryClient = useQueryClient();
   const remove = useChange(shoppingChanges.remove);
   return (listId: string, itemId: string) => {
     remove.run({ listId, itemId });
-    adjustListCounts(queryClient, listId, { itemCount: -1, openCount: -1 });
   };
 }
 
@@ -368,24 +347,6 @@ export function useBuyAgainCatalog(
       stickyDueOrder,
     });
   }, [history, list, now, listId, query, includeOtherLists, stickyDueOrder]);
-}
-
-function adjustListCounts(
-  queryClient: QueryClient,
-  listId: string,
-  delta: { itemCount: number; openCount: number },
-) {
-  queryClient.setQueryData(listsQuery().queryKey, (lists: ShoppingListSummary[] | undefined) =>
-    lists?.map((list) =>
-      list.id === listId
-        ? {
-            ...list,
-            itemCount: Math.max(0, list.itemCount + delta.itemCount),
-            openCount: Math.max(0, list.openCount + delta.openCount),
-          }
-        : list,
-    ),
-  );
 }
 
 /** Only what the list shows about a person, since a change is saved on the device with its variables */

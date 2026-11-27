@@ -37,6 +37,57 @@ const DEFAULT_FAILURE = "Couldn't save that change. Check your connection and tr
 // The pauses between attempts while the API gives no answer: 1 s, 2 s, 4 s … up to 30 s
 const SEND_AGAIN_AFTER_MS = (attempt: number) => Math.min(1_000 * 2 ** attempt, 30_000);
 
+/** A secondary query updated alongside a change's primary target, and rolled back with it */
+type SecondaryUpdate<Vars, Data> = {
+  readonly run: (queryClient: QueryClient, vars: Vars, after: Data | undefined) => () => void;
+};
+
+/**
+ * Declares a secondary query updated alongside a change's primary target. Returning `undefined`
+ * removes the query if it was cached (or leaves it absent if it wasn't); returning a value writes
+ * it, even when it wasn't cached yet. Every touched query is cancelled, snapshotted, and rolled
+ * back on error.
+ */
+type SecondaryBuilder<Vars, Data> = <Secondary>(
+  target: (vars: Vars) => DataTag<QueryKey, Secondary, Error>,
+  apply: (
+    current: Secondary | undefined,
+    vars: Vars,
+    after: Data | undefined,
+  ) => Secondary | undefined,
+) => SecondaryUpdate<Vars, Data>;
+
+function buildSecondary<Vars, Data, Secondary>(
+  target: (vars: Vars) => DataTag<QueryKey, Secondary, Error>,
+  apply: (
+    current: Secondary | undefined,
+    vars: Vars,
+    after: Data | undefined,
+  ) => Secondary | undefined,
+): SecondaryUpdate<Vars, Data> {
+  return {
+    run: (queryClient, vars, after) => {
+      const queryKey = target(vars);
+      void queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      const next = apply(previous, vars, after);
+      if (next === previous) return () => {};
+      if (next === undefined) {
+        queryClient.removeQueries({ queryKey, exact: true });
+      } else {
+        queryClient.setQueryData(queryKey, next);
+      }
+      return () => {
+        if (previous === undefined) {
+          queryClient.removeQueries({ queryKey, exact: true });
+        } else {
+          queryClient.setQueryData(queryKey, previous);
+        }
+      };
+    },
+  };
+}
+
 /** What a feature says about one of its changes */
 type ChangeSpec<Vars, Data, Response, UndoVars> = {
   /** Sending it twice does the same as once (see ChangeMeta). No default: both ways lose data. */
@@ -50,6 +101,10 @@ type ChangeSpec<Vars, Data, Response, UndoVars> = {
    * API knows (a due date it works out): the screen then follows `settle` once it's saved.
    */
   apply?: (data: Data, vars: Vars) => Data;
+  /** Secondary queries kept in sync with the primary target, and rolled back with it */
+  also?: (
+    update: SecondaryBuilder<NoInfer<Vars>, NoInfer<Data>>,
+  ) => readonly SecondaryUpdate<NoInfer<Vars>, NoInfer<Data>>[];
   /** Puts the API's answer in the target, for a change without `apply` */
   settle?: (data: Data, response: Response, vars: Vars) => Data;
   /**
@@ -84,6 +139,11 @@ export type Change<Vars> = {
   readonly describe: (queryClient: QueryClient, vars: Vars) => string | null;
 };
 
+type ChangeContext = {
+  previous: unknown;
+  rollbacks?: readonly (() => void)[];
+};
+
 type ChangeOptions<Vars> = {
   mutationKey: readonly unknown[];
   meta: ChangeMeta;
@@ -91,9 +151,9 @@ type ChangeOptions<Vars> = {
   retry?: (failureCount: number, error: Error) => boolean;
   retryDelay?: (attempt: number) => number;
   mutationFn: (vars: Vars) => Promise<unknown>;
-  onMutate: (vars: Vars) => Promise<{ previous: unknown }>;
+  onMutate: (vars: Vars) => ChangeContext;
   onSuccess: (response: unknown, vars: Vars) => void;
-  onError: (err: Error, vars: Vars, context: { previous: unknown } | undefined) => void;
+  onError: (err: Error, vars: Vars, context: ChangeContext | undefined) => void;
   onSettled: () => void;
 };
 
@@ -129,15 +189,21 @@ export function defineChange<Vars, Data, Response = unknown, UndoVars = never>(
         retryDelay: SEND_AGAIN_AFTER_MS,
       }),
       mutationFn: spec.send,
-      onMutate: async (vars) => {
-        if (!spec.apply) return { previous: undefined };
+      onMutate: (vars) => {
+        const secondaries = spec.also?.(buildSecondary) ?? [];
+        if (!spec.apply && secondaries.length === 0) return { previous: undefined };
         const queryKey = spec.target(vars);
-        // A refetch that's already on its way would overwrite the change with older data
-        await queryClient.cancelQueries({ queryKey });
-        const previous = queryClient.getQueryData(queryKey);
+        // Cancel any refetch already on its way, and update the cache synchronously so a caller
+        // that navigates right after (e.g. opening a newly created list) sees the new data
+        void queryClient.cancelQueries({ queryKey });
+        const current = queryClient.getQueryData(queryKey);
+        const applied = Boolean(spec.apply && current !== undefined);
         // Not on the device (a list that isn't open): nothing to show, but the change is still sent
-        if (previous !== undefined) queryClient.setQueryData(queryKey, spec.apply(previous, vars));
-        return { previous };
+        const after = spec.apply && current !== undefined ? spec.apply(current, vars) : current;
+        if (applied) queryClient.setQueryData(queryKey, after);
+
+        const rollbacks = secondaries.map((secondary) => secondary.run(queryClient, vars, after));
+        return { previous: applied ? current : undefined, rollbacks };
       },
       onSuccess: (response, vars) => {
         const { settle } = spec;
@@ -153,6 +219,7 @@ export function defineChange<Vars, Data, Response = unknown, UndoVars = never>(
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- read from this target in onMutate
           queryClient.setQueryData(spec.target(vars), context.previous as Data);
         }
+        for (const rollback of context?.rollbacks ?? []) rollback();
         if (spec.failure !== false) changeFailed(err, spec.failure ?? DEFAULT_FAILURE);
       },
       onSettled: () => refetchAfterLastChange(queryClient, area),
