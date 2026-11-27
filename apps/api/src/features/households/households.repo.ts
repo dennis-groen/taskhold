@@ -121,6 +121,20 @@ export async function lockHousehold(
   return rows[0] ?? null;
 }
 
+/**
+ * Holds the household row until the transaction ends, so nobody can leave or be removed (which
+ * takes lockHousehold) meanwhile. Holders don't wait for each other. Returns false when the
+ * household no longer exists.
+ */
+export async function shareHousehold(householdId: string, tx: Transaction): Promise<boolean> {
+  const rows = await tx
+    .select({ id: household.id })
+    .from(household)
+    .where(eq(household.id, householdId))
+    .for("key share");
+  return rows.length > 0;
+}
+
 /** The member who joined first, or null when nobody is left */
 export async function findEarliestMember(
   householdId: string,

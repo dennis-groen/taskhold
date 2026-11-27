@@ -50,8 +50,8 @@ export async function findMembership(
 }
 
 /** Like findMembership, for features that only work inside a household */
-export async function getMembershipOf(userId: string, executor?: Executor): Promise<Membership> {
-  const membership = await findMembership(userId, executor);
+export async function getMembershipOf(userId: string): Promise<Membership> {
+  const membership = await findMembership(userId);
   if (!membership) throw notInHousehold();
   return membership;
 }
@@ -63,6 +63,60 @@ export function isMemberOf(
   executor?: Executor,
 ): Promise<boolean> {
   return householdsRepo.isMember({ householdId, userId }, executor);
+}
+
+/** What a household write's work gets: whose household it is, and the transaction to write on */
+export type HouseholdScope = {
+  householdId: string;
+  role: Membership["role"];
+  tx: Transaction;
+  /** Call once something was written; the household then hears about it when the write commits */
+  changed: () => void;
+};
+
+/**
+ * Writes for a feature whose data belongs to a household and lives under `topic`. Each write runs
+ * `work` in one transaction, for a member only: the household is held so nobody leaves or is
+ * removed until it commits, and a member who left just before gets notInHousehold. If the work
+ * called `changed()`, everyone in the household hears about `topic` when it commits; never when it
+ * rolls back. Read results back on `scope.tx` too, so they see the write.
+ */
+export function householdWrites(topic: "chores" | "shopping") {
+  return async function write<T>(
+    userId: string,
+    work: (scope: HouseholdScope) => Promise<T>,
+  ): Promise<T> {
+    return transaction(async (tx) => {
+      const membership = await shareMembershipOf(userId, tx);
+      let changed = false;
+      const result = await work({
+        householdId: membership.id,
+        role: membership.role,
+        tx,
+        changed: () => {
+          changed = true;
+        },
+      });
+      // Delivered by Postgres only if the transaction commits
+      if (changed) await announce({ householdId: membership.id, topic }, tx);
+      return result;
+    });
+  };
+}
+
+/**
+ * The user's membership, with their household held until the transaction ends (see
+ * householdsRepo.shareHousehold). Read again once held, because a leave or removal may have
+ * committed while we waited.
+ */
+async function shareMembershipOf(userId: string, tx: Transaction): Promise<Membership> {
+  const before = await householdsRepo.findMembershipByUserId(userId, tx);
+  if (!before || !(await householdsRepo.shareHousehold(before.householdId, tx))) {
+    throw notInHousehold();
+  }
+  const membership = await findMembership(userId, tx);
+  if (!membership || membership.id !== before.householdId) throw notInHousehold();
+  return membership;
 }
 
 export async function getHouseholdOf(userId: string): Promise<Household> {

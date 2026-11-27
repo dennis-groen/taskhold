@@ -1,11 +1,11 @@
 // Business rules for shopping lists. Every member of a household can see and change all of its
 // lists; nobody else can, and a list from another household looks the same as one that doesn't exist.
-import { transaction, type Transaction } from "../../db/db.ts";
-import { announce } from "../live/live-changes.ts";
+import type { Executor } from "../../db/db.ts";
 import { logger } from "../../lib/logger.ts";
 import { sendPush, type SendPush } from "../../lib/push.ts";
 import { annotate, describeError } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
+import type { HouseholdScope } from "../households/households.service.ts";
 import * as remindersService from "../reminders/reminders.service.ts";
 import { buildPurchasePairs } from "./purchase-pairs.ts";
 import * as shoppingRepo from "./shopping.repo.ts";
@@ -38,56 +38,56 @@ const TRIP_LASTS = Temporal.Duration.from({ hours: 2 });
 // Starting again within this long of a trip that notified doesn't notify again
 const QUIET_AFTER_PING = Temporal.Duration.from({ minutes: 30 });
 
+/** Every write to a household's shopping lists goes through here (see householdWrites) */
+const writeShopping = householdsService.householdWrites("shopping");
+
 export async function getLists(userId: string): Promise<ShoppingListSummary[]> {
   const household = await householdsService.getMembershipOf(userId);
   return shoppingRepo.findListsByHousehold(household.id);
 }
 
-export async function createList(userId: string, input: CreateListInput): Promise<ShoppingList> {
-  const household = await householdsService.getMembershipOf(userId);
+export function createList(userId: string, input: CreateListInput): Promise<ShoppingList> {
   const id = input.id ?? crypto.randomUUID();
   annotate("shopping", { list_id: id });
+  return writeShopping(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const ref = { householdId, listId: id };
 
-  // A retry of a create that already got in answers with that list, whatever has changed since
-  if (input.id && (await shoppingRepo.findList({ householdId: household.id, listId: id }))) {
-    annotate("shopping", { retried: true });
-    return getList(userId, id);
-  }
+    // A retry of a create that already got in answers with that list, whatever has changed since
+    const existing = input.id ? await shoppingRepo.findList(ref, tx) : null;
+    if (existing) {
+      annotate("shopping", { retried: true });
+      return loadList(existing, tx);
+    }
 
-  if ((await shoppingRepo.countLists(household.id)) >= MAX_LISTS) throw listLimitReached();
-  const inserted = await shoppingRepo.insertList({
-    id,
-    householdId: household.id,
-    name: input.name,
+    if ((await shoppingRepo.countLists(householdId, tx)) >= MAX_LISTS) throw listLimitReached();
+    const inserted = await shoppingRepo.insertList({ id, householdId, name: input.name }, tx);
+    if (inserted) {
+      scope.changed();
+      return { id, name: input.name, items: [], trip: null };
+    }
+    // Not inserted: a retry that raced its twin, or an id that belongs to another household
+    const raced = await shoppingRepo.findList(ref, tx);
+    if (raced) return loadList(raced, tx);
+    throw listIdTaken();
   });
-  if (inserted) {
-    await changed(household.id);
-    return { id, name: input.name, items: [], trip: null };
-  }
-  // Not inserted: a retry that raced its twin, or an id that belongs to another household
-  if (await shoppingRepo.findList({ householdId: household.id, listId: id })) {
-    return getList(userId, id);
-  }
-  throw listIdTaken();
 }
 
 export async function getList(userId: string, listId: string): Promise<ShoppingList> {
-  const { list } = await findListOf(userId, listId);
-  const items = await shoppingRepo.findItems(list.id);
-  const trip = await shoppingRepo.findRunningTrip(
-    list.id,
-    Temporal.Now.instant().subtract(TRIP_LASTS),
-  );
-  annotate("shopping", { item_count: items.length });
-  return { id: list.id, name: list.name, items: items.map(toItem), trip };
+  annotate("shopping", { list_id: listId });
+  const household = await householdsService.getMembershipOf(userId);
+  const list = await shoppingRepo.findList({ householdId: household.id, listId });
+  if (!list) throw listNotFound();
+  return loadList(list);
 }
 
 export async function renameList(userId: string, listId: string, name: string): Promise<void> {
   annotate("shopping", { list_id: listId });
-  const household = await householdsService.getMembershipOf(userId);
-  const renamed = await shoppingRepo.renameList({ householdId: household.id, listId }, name);
-  if (!renamed) throw listNotFound();
-  await changed(household.id);
+  await writeShopping(userId, async (scope) => {
+    const ref = { householdId: scope.householdId, listId };
+    if (!(await shoppingRepo.renameList(ref, name, scope.tx))) throw listNotFound();
+    scope.changed();
+  });
 }
 
 /**
@@ -96,50 +96,57 @@ export async function renameList(userId: string, listId: string, name: string): 
  */
 export async function deleteList(userId: string, listId: string): Promise<void> {
   annotate("shopping", { list_id: listId });
-  const household = await householdsService.getMembershipOf(userId);
-  const deleted = await shoppingRepo.deleteList({ householdId: household.id, listId });
-  if (deleted) await changed(household.id);
+  await writeShopping(userId, async (scope) => {
+    const ref = { householdId: scope.householdId, listId };
+    if (await shoppingRepo.deleteList(ref, scope.tx)) scope.changed();
+  });
 }
 
-export async function addItem(
+export function addItem(
   userId: string,
   listId: string,
   input: AddItemInput,
 ): Promise<ShoppingItem> {
-  const { list, householdId } = await findListOf(userId, listId);
-  const id = input.id ?? crypto.randomUUID();
-  annotate("shopping", { item_id: id });
-  // A retry of an add that already got in must still succeed, so only a new item counts
-  const isNew = !(await shoppingRepo.findItem({ listId: list.id, itemId: id }));
-  if (isNew && (await shoppingRepo.countItems(list.id)) >= MAX_ITEMS_PER_LIST) {
-    throw itemLimitReached();
-  }
-  const inserted = await shoppingRepo.insertItem({
-    id,
-    listId: list.id,
-    name: input.name,
-    quantity: input.quantity ?? null,
-    addedById: userId,
-  });
+  return writeShopping(userId, async (scope) => {
+    const { tx } = scope;
+    const list = await findListIn(scope, listId);
+    const id = input.id ?? crypto.randomUUID();
+    annotate("shopping", { item_id: id });
+    // A retry of an add that already got in must still succeed, so only a new item counts
+    const isNew = !(await shoppingRepo.findItem({ listId: list.id, itemId: id }, tx));
+    if (isNew && (await shoppingRepo.countItems(list.id, tx)) >= MAX_ITEMS_PER_LIST) {
+      throw itemLimitReached();
+    }
+    const inserted = await shoppingRepo.insertItem(
+      {
+        id,
+        listId: list.id,
+        name: input.name,
+        quantity: input.quantity ?? null,
+        addedById: userId,
+      },
+      tx,
+    );
 
-  // Not inserted: either a retry of an add that already went through, or someone else's id
-  const item = await shoppingRepo.findItem({ listId: list.id, itemId: id });
-  if (!item) throw inserted ? itemNotFound() : itemIdTaken();
-  if (inserted) await changed(householdId);
-  return toItem(item);
+    // Not inserted: either a retry of an add that already went through, or someone else's id
+    const item = await shoppingRepo.findItem({ listId: list.id, itemId: id }, tx);
+    if (!item) throw inserted ? itemNotFound() : itemIdTaken();
+    if (inserted) scope.changed();
+    return toItem(item);
+  });
 }
 
-export async function updateItem(
+export function updateItem(
   userId: string,
   ref: { listId: string; itemId: string },
   changes: UpdateItemInput,
 ): Promise<ShoppingItem> {
-  const { list, householdId } = await findListOf(userId, ref.listId);
-  const itemRef = { listId: list.id, itemId: ref.itemId };
   annotate("shopping", { item_id: ref.itemId, checked: changes.checked });
-
-  const purchaseRef = { householdId, itemId: ref.itemId };
-  await transaction(async (tx) => {
+  return writeShopping(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const list = await findListIn(scope, ref.listId);
+    const itemRef = { listId: list.id, itemId: ref.itemId };
+    const purchaseRef = { householdId, itemId: ref.itemId };
     const checkedAt = Temporal.Now.instant();
     const updated = await shoppingRepo.updateItem(
       itemRef,
@@ -172,12 +179,12 @@ export async function updateItem(
         tx,
       );
     }
-    await changed(householdId, tx);
-  });
+    scope.changed();
 
-  const item = await shoppingRepo.findItem(itemRef);
-  if (!item) throw itemNotFound();
-  return toItem(item);
+    const item = await shoppingRepo.findItem(itemRef, tx);
+    if (!item) throw itemNotFound();
+    return toItem(item);
+  });
 }
 
 /** Deleting an item that's already gone succeeds, so two people removing it at once both see it go */
@@ -185,23 +192,32 @@ export async function deleteItem(
   userId: string,
   ref: { listId: string; itemId: string },
 ): Promise<void> {
-  const { list, householdId } = await findListOf(userId, ref.listId);
   annotate("shopping", { item_id: ref.itemId });
-  await shoppingRepo.deleteItem({ listId: list.id, itemId: ref.itemId });
-  await changed(householdId);
+  await writeShopping(userId, async (scope) => {
+    const list = await findListIn(scope, ref.listId);
+    await shoppingRepo.deleteItem({ listId: list.id, itemId: ref.itemId }, scope.tx);
+    // Announced even when it was already gone: the other device may have missed that
+    scope.changed();
+  });
 }
 
 /** Removes everything that's been checked off. Returns how many items went. */
-export async function clearCheckedItems(userId: string, listId: string): Promise<number> {
-  const { list, householdId } = await findListOf(userId, listId);
-  const removed = await shoppingRepo.deleteCheckedItems(list.id);
-  // Only the caller's own trip ends: someone at home clearing ticked items mustn't end the shopper's
-  const tripsEnded = await shoppingRepo.endTrips(list.id, Temporal.Now.instant(), {
-    shopperId: userId,
+export function clearCheckedItems(userId: string, listId: string): Promise<number> {
+  return writeShopping(userId, async (scope) => {
+    const { tx } = scope;
+    const list = await findListIn(scope, listId);
+    const removed = await shoppingRepo.deleteCheckedItems(list.id, tx);
+    // Only the caller's own trip ends: someone at home clearing ticked items mustn't end the shopper's
+    const tripsEnded = await shoppingRepo.endTrips(
+      list.id,
+      Temporal.Now.instant(),
+      { shopperId: userId },
+      tx,
+    );
+    annotate("shopping", { removed_count: removed });
+    if (removed > 0 || tripsEnded > 0) scope.changed();
+    return removed;
   });
-  annotate("shopping", { removed_count: removed });
-  if (removed > 0 || tripsEnded > 0) await changed(householdId);
-  return removed;
 }
 
 /**
@@ -214,27 +230,30 @@ export async function startTrip(
   input: { id: string },
   send: SendPush = sendPush,
 ): Promise<ShoppingTrip> {
-  const { list, householdId } = await findListOf(userId, listId);
   annotate("shopping", { trip_id: input.id });
   const now = Temporal.Now.instant();
   const since = now.subtract(TRIP_LASTS);
 
-  // A retry of a start that already got in answers with the trip as it is now, and tells no one
-  const existing = await shoppingRepo.findTripById(input.id);
-  if (existing) {
-    if (existing.householdId !== householdId || existing.listId !== list.id) throw tripIdTaken();
-    annotate("shopping", { retried: true });
-    const running = await shoppingRepo.findRunningTrip(list.id, since);
-    if (running) return running;
-    return { id: existing.id, shopper: existing.shopper, startedAt: existing.startedAt };
-  }
+  const outcome = await writeShopping(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const list = await findListIn(scope, listId);
+    const base = { list, householdId, notify: false };
 
-  const { notify, started } = await transaction(async (tx) => {
+    // A retry of a start that already got in answers with the trip as it is now, and tells no one
+    const existing = await shoppingRepo.findTripById(input.id, tx);
+    if (existing) {
+      if (existing.householdId !== householdId || existing.listId !== list.id) throw tripIdTaken();
+      annotate("shopping", { retried: true });
+      const running = await shoppingRepo.findRunningTrip(list.id, since, tx);
+      const { id, shopper, startedAt } = existing;
+      return { ...base, started: running ?? { id, shopper, startedAt } };
+    }
+
     await shoppingRepo.lockList({ householdId, listId: list.id }, tx);
     // Close forgotten trips, so the one-running-per-list index lets a new one in
     await shoppingRepo.endTrips(list.id, now, { startedBefore: since }, tx);
     const running = await shoppingRepo.findRunningTrip(list.id, since, tx);
-    if (running) return { notify: false, started: running };
+    if (running) return { ...base, started: running };
 
     const shouldNotify = !(await shoppingRepo.wasNotifiedSince(
       list.id,
@@ -245,10 +264,11 @@ export async function startTrip(
       { id: input.id, householdId, listId: list.id, shopperId: userId, notified: shouldNotify },
       tx,
     );
-    await changed(householdId, tx);
+    scope.changed();
     const trip = await shoppingRepo.findRunningTrip(list.id, since, tx);
-    return { notify: shouldNotify, started: trip };
+    return { ...base, notify: shouldNotify, started: trip };
   });
+  const { list, householdId, notify, started } = outcome;
   if (!started) throw tripIdTaken();
 
   let notified = 0;
@@ -282,10 +302,12 @@ export async function startTrip(
 
 /** Ends the list's trip, whoever started it. Ending one that's already gone succeeds. */
 export async function endTrip(userId: string, listId: string): Promise<void> {
-  const { list, householdId } = await findListOf(userId, listId);
-  const ended = await shoppingRepo.endTrips(list.id, Temporal.Now.instant());
-  annotate("shopping", { trips_ended: ended });
-  if (ended > 0) await changed(householdId);
+  await writeShopping(userId, async (scope) => {
+    const list = await findListIn(scope, listId);
+    const ended = await shoppingRepo.endTrips(list.id, Temporal.Now.instant(), {}, scope.tx);
+    annotate("shopping", { trips_ended: ended });
+    if (ended > 0) scope.changed();
+  });
 }
 
 /** How far back "buy again" looks, and how many names it sends at most */
@@ -319,28 +341,36 @@ export async function getPurchaseHistory(userId: string): Promise<BoughtItem[]> 
 }
 
 /** Removes items from the household's "buy again" history so they stop being suggested */
-export async function forgetPurchaseHistory(
-  userId: string,
-  names: readonly string[],
-): Promise<number> {
-  const household = await householdsService.getMembershipOf(userId);
-  const removed = await shoppingRepo.forgetPurchasesByName(household.id, names);
-  annotate("shopping", { forgotten_count: removed });
-  if (removed > 0) await changed(household.id);
-  return removed;
+export function forgetPurchaseHistory(userId: string, names: readonly string[]): Promise<number> {
+  return writeShopping(userId, async (scope) => {
+    const removed = await shoppingRepo.forgetPurchasesByName(scope.householdId, names, scope.tx);
+    annotate("shopping", { forgotten_count: removed });
+    if (removed > 0) scope.changed();
+    return removed;
+  });
 }
 
-async function findListOf(userId: string, listId: string) {
+/** The household's list, inside a write */
+async function findListIn(scope: HouseholdScope, listId: string) {
   annotate("shopping", { list_id: listId });
-  const household = await householdsService.getMembershipOf(userId);
-  const list = await shoppingRepo.findList({ householdId: household.id, listId });
+  const list = await shoppingRepo.findList({ householdId: scope.householdId, listId }, scope.tx);
   if (!list) throw listNotFound();
-  return { list, householdId: household.id };
+  return list;
 }
 
-/** Tells everyone in the household that its shopping lists changed */
-function changed(householdId: string, executor?: Transaction) {
-  return announce({ householdId, topic: "shopping" }, executor);
+/** A list with its items and the trip running for it, if any */
+async function loadList(
+  list: { id: string; name: string },
+  executor?: Executor,
+): Promise<ShoppingList> {
+  const items = await shoppingRepo.findItems(list.id, executor);
+  const trip = await shoppingRepo.findRunningTrip(
+    list.id,
+    Temporal.Now.instant().subtract(TRIP_LASTS),
+    executor,
+  );
+  annotate("shopping", { item_count: items.length });
+  return { id: list.id, name: list.name, items: items.map(toItem), trip };
 }
 
 function firstName(name: string | undefined): string {

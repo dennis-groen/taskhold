@@ -1,7 +1,6 @@
 // Business rules for private to-dos. A to-do belongs to one person and only they can see or change
 // it; someone else's to-do looks the same as one that doesn't exist. To-dos don't depend on a
 // household, except for moving one to the household's chores.
-import { transaction } from "../../db/db.ts";
 import { announce } from "../live/live-changes.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as choresService from "../chores/chores.service.ts";
@@ -103,19 +102,19 @@ export async function clearDoneTodos(userId: string): Promise<number> {
  */
 export async function moveToChores(userId: string, todoId: string): Promise<ChoreDetail> {
   annotate("todos", { todo_id: todoId });
-  return transaction(async (tx) => {
+  // One write, so a failure (e.g. the chore limit) puts the to-do back
+  return choresService.writeChores(userId, async (scope) => {
     // Deleting first locks the row, so moving the same to-do twice at once makes one chore
-    const removed = await todosRepo.deleteTodo({ userId, todoId }, tx);
+    const removed = await todosRepo.deleteTodo({ userId, todoId }, scope.tx);
     if (!removed) throw todoNotFound();
-    // Sent when the transaction commits; createChore announces the new chore itself
-    await announce({ userId, topic: "todos" }, tx);
-    // On the same transaction, so a failure (e.g. not in a household) rolls the delete back and
-    // the move never waits on the pool for a second connection
-    return choresService.createChore(
-      userId,
-      { name: removed.name.slice(0, 60), repeat: null, dueOn: removed.dueOn, assigneeId: null },
-      tx,
-    );
+    // Sent when the write commits; the new chore is announced to the household by the write
+    await announce({ userId, topic: "todos" }, scope.tx);
+    return choresService.createChoreIn(scope, {
+      name: removed.name.slice(0, 60),
+      repeat: null,
+      dueOn: removed.dueOn,
+      assigneeId: null,
+    });
   });
 }
 

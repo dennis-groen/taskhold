@@ -86,7 +86,7 @@ Folder names match in both apps and follow the API path (`/api/<feature>`). The 
 4. Logic: `<noun>.service.ts` and `<noun>.errors.ts`
 5. Transport: `<noun>.routes.ts`, mounted in `app.ts`
 6. Tests: `<noun>.test.ts`, including a 404 for another household on every route
-7. Live updates, for data other people or devices see: add the topic to `apps/api/src/features/live/live-topics.ts` and call `announce()` from the service after each write. `pnpm check` then fails in the web app until the next two steps are done
+7. Live updates, for data other people or devices see: add the topic to `apps/api/src/features/live/live-topics.ts` and announce each write: data a household shares is written through `householdsService.householdWrites(topic)` with `scope.changed()` (it holds the household and announces on commit), anything else calls `announce()` from the service. `pnpm check` then fails in the web app until the next two steps are done
 8. Web: `<noun>.api.ts`, `<noun>.queries.ts` (query keys start with the area's name), `<noun>.changes.ts`, `<noun>.hooks.ts`, then components. Add the area to `AREAS` and `AREA_NAMES` in `lib/offline-changes.ts`, register its changes in `registerAllChanges` in `router.tsx`, and add its `components/*.tsx` glob to the area-components override in `.oxlintrc.json`
 9. Route file under `routes/`, area colour tokens in `styles/globals.css` and `lib/theme.ts`, a nav entry in `components/layout/HouseholdShell.tsx`, and the area's dock add control in `routes/_household.tsx`
 10. Add the feature to the Features list above, then run `pnpm check` and `pnpm test <noun>`
