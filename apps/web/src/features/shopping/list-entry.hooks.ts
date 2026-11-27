@@ -25,6 +25,10 @@ export function useListEntry(
   listId: string,
   viewer: PersonSummary,
 ): Omit<ListEntry, "addedIds" | "hold"> & { addedIds: ReadonlySet<string> } {
+  // The React Compiler would keep `status` and `addedIds` answers from an earlier render: they
+  // read the memory, the list and the waiting adds from outside React, which it can't see. So this
+  // hook hands out a new entry on every render, and components ask it again each time.
+  "use no memo";
   const queryClient = useQueryClient();
   useQuery(listQuery(listId));
   useWaitingVars(shoppingChanges.add);
