@@ -3,7 +3,7 @@
 // follow what's on the list and what's being typed, offline too.
 import { CATEGORIES, categorize, type Category } from "./categories.ts";
 import { foldName as fold, itemKey } from "./item-entry.ts";
-import type { BoughtItem } from "./shopping.api.ts";
+import type { BoughtItem, ShoppingList } from "./shopping.api.ts";
 
 /** How many chips to offer with nothing typed, and while typing */
 const REGULARS_LIMIT = 12;
@@ -13,7 +13,7 @@ const MATCHES_LIMIT = 8;
 const JUST_BOUGHT = 0.25;
 
 /**
- * "Running low" in the Buy again sheet (and its "Add N due" and the dock's count) is a promise,
+ * "Running low" in the Buy again sheet (and its "Add all" and the dock's count) is a promise,
  * so it waits until most of the usual gap has passed. Chips can suggest earlier than that.
  */
 const RUNNING_LOW = 0.8;
@@ -59,7 +59,7 @@ type MergedBoughtItem = BoughtItem & { variants: string[] };
  * Variants that only differ in case, accents or a trailing plural ("Banana" and "Bananas") are
  * folded into one entry spelled the way it was last bought.
  *
- * With nothing typed: regulars (bought on two days or more) that are due, scoped to `listId` when
+ * With nothing typed: regulars (bought on two days or more) that are running low, scoped to `listId` when
  * given (legacy items with no list stay eligible anywhere), with a boost for items often bought
  * on the same trip as something already in `inBasket`. Items far past their usual cycle decay and
  * eventually drop off so abandoned or seasonal buys don't clog the row. Lists with fewer than
@@ -108,7 +108,7 @@ export function suggestBuyAgain(
     .filter((item) => !waiting.has(itemKey(item.name)))
     .map((item) => {
       const isChecked = checked.has(itemKey(item.name));
-      const lateness = isChecked ? 0 : due(item, now);
+      const lateness = isChecked ? 0 : howLate(item, now);
       const pairMatches = isChecked
         ? 0
         : item.pairedWith.filter((other) => basket.has(itemKey(other))).length;
@@ -263,10 +263,10 @@ function match(name: string, query: string): 0 | 1 | null {
 }
 
 /**
- * How far into its usual gap a regular is: 1 means it's due today, 1.5 that it's half a gap late.
+ * How far into its usual gap a regular is: 1 means it runs out today, 1.5 that it's half a gap late.
  * Null for something bought only once, which has no usual gap.
  */
-function due({ trips, firstBoughtAt, lastBoughtAt }: BoughtItem, now: Temporal.Instant) {
+function howLate({ trips, firstBoughtAt, lastBoughtAt }: BoughtItem, now: Temporal.Instant) {
   if (trips < 2) return null;
   const last = Temporal.Instant.from(lastBoughtAt);
   const span = Temporal.Instant.from(firstBoughtAt).until(last).total("hours");
@@ -275,7 +275,7 @@ function due({ trips, firstBoughtAt, lastBoughtAt }: BoughtItem, now: Temporal.I
 }
 
 /**
- * Rises with lateness up to a plateau when due/overdue, then decays once an item is far past its
+ * Rises with lateness up to a plateau once it's running low, then decays once an item is far past its
  * usual cycle so abandoned or seasonal buys fade out instead of staying pinned at the front.
  */
 function urgency(lateness: number): number {
@@ -304,8 +304,8 @@ export type BuyAgainCatalogItem = {
   lastBoughtAt: string;
   /** Approximate usual cycle in whole days, or null for one-offs */
   usualDays: number | null;
-  /** True when due/running low or boosted by an item currently in the basket */
-  due: boolean;
+  /** True when running low, or boosted by an item currently in the basket */
+  runningLow: boolean;
   /** True when boosted because an item it's often bought with is already waiting on the list */
   paired: boolean;
   /** True when currently waiting (unchecked) on the target list */
@@ -319,13 +319,13 @@ export type BuyAgainCatalogItem = {
 };
 
 export type BuyAgainCatalog = {
-  /** Due regulars and basket-paired items for this list (empty while filtering by search) */
-  due: BuyAgainCatalogItem[];
+  /** Regulars running low and basket-paired items for this list (empty while filtering by search) */
+  runningLow: BuyAgainCatalogItem[];
   /** Remaining past buys grouped by supermarket aisle in walking order */
   sections: { category: Category; items: BuyAgainCatalogItem[] }[];
   /** True when the household also has past buys tied exclusively to other lists */
   hasOtherLists: boolean;
-  /** Total visible items across due + aisle sections */
+  /** Total visible items across Running low and the aisle sections */
   total: number;
 };
 
@@ -343,7 +343,7 @@ export function browseBuyAgain(
     onList = [],
     inBasket,
     checkedOnList = [],
-    stickyDueOrder,
+    stickyRunningLowOrder,
   }: {
     now: Temporal.Instant;
     listId?: string;
@@ -353,7 +353,7 @@ export function browseBuyAgain(
     inBasket?: readonly string[];
     checkedOnList?: readonly string[];
     /** Frozen itemKey order for "Running low" so rows never jump sections while tapping */
-    stickyDueOrder?: readonly string[];
+    stickyRunningLowOrder?: readonly string[];
   },
 ): BuyAgainCatalog {
   const merged = mergeVariants(history);
@@ -362,8 +362,8 @@ export function browseBuyAgain(
   const checked = new Set(checkedOnList.map(itemKey));
   const foldedQuery = fold(query);
   const searching = foldedQuery !== "";
-  const stickyRank = stickyDueOrder
-    ? new Map(stickyDueOrder.map((key, index) => [key, index]))
+  const stickyRank = stickyRunningLowOrder
+    ? new Map(stickyRunningLowOrder.map((key, index) => [key, index]))
     : null;
 
   const belongsToOtherList = (item: MergedBoughtItem) =>
@@ -376,12 +376,12 @@ export function browseBuyAgain(
     const isOnList = waiting.has(key);
     const isChecked = checked.has(key);
     const otherList = belongsToOtherList(item);
-    const lateness = isChecked ? 0 : due(item, now);
+    const lateness = isChecked ? 0 : howLate(item, now);
     const pairMatches =
       isChecked || isOnList
         ? 0
         : item.pairedWith.filter((other) => basket.has(itemKey(other))).length;
-    const isDue = stickyRank
+    const isRunningLow = stickyRank
       ? stickyRank.has(key) && !otherList
       : !isChecked &&
         !otherList &&
@@ -401,7 +401,7 @@ export function browseBuyAgain(
         trips: item.trips,
         lastBoughtAt: item.lastBoughtAt,
         usualDays: usualGapDays(item),
-        due: isDue,
+        runningLow: isRunningLow,
         // "Goes with your list" only when it isn't still in the cupboard from last time
         paired: pairMatches > 0 && (lateness === null || lateness >= JUST_BOUGHT),
         onList: isOnList,
@@ -419,10 +419,10 @@ export function browseBuyAgain(
     return includeOtherLists || entry.forThisList;
   });
 
-  const dueItems = searching
+  const runningLowItems = searching
     ? []
     : visible
-        .filter(({ entry }) => entry.due)
+        .filter(({ entry }) => entry.runningLow)
         .toSorted((a, b) => {
           if (stickyRank) {
             return (stickyRank.get(a.key) ?? Infinity) - (stickyRank.get(b.key) ?? Infinity);
@@ -431,8 +431,8 @@ export function browseBuyAgain(
         })
         .map(({ entry }) => entry);
 
-  const dueKeys = new Set(dueItems.map((entry) => itemKey(entry.name)));
-  const remaining = visible.filter(({ key }) => !dueKeys.has(key));
+  const runningLowKeys = new Set(runningLowItems.map((entry) => itemKey(entry.name)));
+  const remaining = visible.filter(({ key }) => !runningLowKeys.has(key));
 
   const grouped = new Map<Category, typeof remaining>();
   for (const candidate of remaining) {
@@ -467,10 +467,76 @@ export function browseBuyAgain(
   }
 
   return {
-    due: dueItems,
+    runningLow: runningLowItems,
     sections,
     hasOtherLists,
-    total: dueItems.length + remaining.length,
+    total: runningLowItems.length + remaining.length,
+  };
+}
+
+/**
+ * Running low, and not on the list yet: neither waiting nor ticked. What "Add all" in the Buy again
+ * sheet adds and the dock counts, so the two never disagree.
+ */
+export function runningLowToAdd(catalog: BuyAgainCatalog): BuyAgainCatalogItem[] {
+  return catalog.runningLow.filter((item) => !item.onList && !item.checked);
+}
+
+/** Buy again for one list, read from the history and the list once, judged at `now` */
+export type BuyAgainFor = {
+  /** The history and the list are both on the device */
+  loaded: boolean;
+  /**
+   * Chips: regulars, or past buys matching what's typed, leaving out what's waiting on the list
+   * except the `pinned` items added this visit, so their chips stay put while nothing is typed
+   */
+  suggest: (typed: string, pinned?: ReadonlySet<string>) => BuyAgainSuggestion[];
+  /** The sheet: Running low and the aisles */
+  browse: (options?: {
+    query?: string;
+    includeOtherLists?: boolean;
+    stickyRunningLowOrder?: readonly string[];
+  }) => BuyAgainCatalog;
+  runningLowToAdd: () => BuyAgainCatalogItem[];
+};
+
+export function buyAgainFor(
+  history: BoughtItem[],
+  list: ShoppingList | undefined,
+  listId: string | undefined,
+  now: Temporal.Instant,
+): BuyAgainFor {
+  const waiting = list?.items.filter((item) => !item.checked) ?? [];
+  const waitingNames = waiting.map((item) => item.name);
+  const tickedNames = list?.items.filter((item) => item.checked).map((item) => item.name) ?? [];
+  const browse: BuyAgainFor["browse"] = (options = {}) =>
+    browseBuyAgain(history, {
+      now,
+      listId,
+      ...options,
+      onList: waitingNames,
+      inBasket: waitingNames,
+      checkedOnList: tickedNames,
+    });
+
+  return {
+    loaded: list !== undefined && history.length > 0,
+    suggest: (typed, pinned) => {
+      const isTyping = typed.trim() !== "";
+      const onList = waiting
+        .filter((item) => isTyping || !pinned?.has(item.id))
+        .map((item) => item.name);
+      return suggestBuyAgain(history, {
+        now,
+        typed,
+        listId,
+        onList,
+        inBasket: waitingNames,
+        checkedOnList: tickedNames,
+      });
+    },
+    browse,
+    runningLowToAdd: () => runningLowToAdd(browse()),
   };
 }
 

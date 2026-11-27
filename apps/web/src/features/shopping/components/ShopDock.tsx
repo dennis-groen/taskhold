@@ -13,10 +13,10 @@ import { nextAmount, type Clash, type ClashChoice } from "../list-entry.ts";
 import { useListEntry } from "../list-entry.hooks.ts";
 import type { ShoppingItem } from "../shopping.api.ts";
 import {
-  useBuyAgain,
-  useBuyAgainDueCount,
+  useBuyAgainFor,
   useBuyAgainHistoryCount,
   useManageLists,
+  useNowSinceForeground,
 } from "../shopping.hooks.ts";
 import { listQuery } from "../shopping.queries.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
@@ -111,10 +111,12 @@ function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }
   const { data: list } = useQuery(listQuery(listId));
   const listEntry = useListEntry(listId, viewer);
   const historyCount = useBuyAgainHistoryCount();
-  const dueCount = useBuyAgainDueCount(listId);
+  // Counted afresh when the app comes back to the foreground, unlike the chips
+  const foregroundNow = useNowSinceForeground();
+  const runningLowCount = useBuyAgainFor(listId, foregroundNow).runningLowToAdd().length;
   const entry = typed.trim() ? parseEntry(typed) : null;
   const isTyping = Boolean(entry?.name);
-  const suggestions = useBuyAgain(listId, entry?.name ?? "", listEntry.addedIds);
+  const suggestions = useBuyAgainFor(listId).suggest(entry?.name ?? "", listEntry.addedIds);
   const chips = suggestions.map(({ name, quantity }) => ({
     name,
     added: !isTyping && listEntry.status(name) === "added",
@@ -239,14 +241,16 @@ function ItemField({ listId, viewer }: { listId: string; viewer: PersonSummary }
           {!isTyping && historyCount > 0 && (
             <button
               type="button"
-              aria-label={dueCount > 0 ? `Buy again, ${dueCount} due` : "Buy again"}
+              aria-label={
+                runningLowCount > 0 ? `Buy again, ${runningLowCount} running low` : "Buy again"
+              }
               onMouseDown={keepFocus}
               onClick={openRestock}
               className="flex h-10 shrink-0 items-center gap-1 rounded-[14px] px-2.5 text-sm font-[750] text-area-fg outline-none transition-[background-color,scale] duration-150 ease-(--ease-out) hover:bg-area-tint/70 focus-visible:ring-3 focus-visible:ring-ring/80 active:scale-[0.94] motion-reduce:active:scale-100"
             >
               <ClockCounterClockwiseIcon aria-hidden weight="bold" className="size-[19px]" />
-              {dueCount > 0 && (
-                <span className="text-xs leading-none tabular-nums">{dueCount}</span>
+              {runningLowCount > 0 && (
+                <span className="text-xs leading-none tabular-nums">{runningLowCount}</span>
               )}
             </button>
           )}

@@ -19,19 +19,19 @@ import type { PersonSummary } from "@/lib/shared-with.ts";
 import { useKeyboardOffset } from "@/lib/use-keyboard-offset.ts";
 import { cn } from "cn";
 
-import { filterEnterTarget } from "../buy-again.ts";
+import { filterEnterTarget, runningLowToAdd } from "../buy-again.ts";
 import {
   afterPaint,
   useBuyAgainSession,
   usePendingHides,
-  useStickyDueOrder,
+  useStickyRunningLowOrder,
   useTimedValue,
 } from "../buy-again-sheet.hooks.ts";
 import { findOnList, itemKey, parseEntry } from "../item-entry.ts";
 import type { Outcome } from "../list-entry.ts";
 import { useListEntry } from "../list-entry.hooks.ts";
 import type { BoughtItem, ShoppingItem } from "../shopping.api.ts";
-import { useBuyAgainCatalog, useForgetBuyAgain } from "../shopping.hooks.ts";
+import { useBuyAgainFor, useForgetBuyAgain } from "../shopping.hooks.ts";
 import { historyQuery, listQuery } from "../shopping.queries.ts";
 import { BuyAgainCatalog } from "./BuyAgainCatalog.tsx";
 import { BuyAgainFooter } from "./BuyAgainFooter.tsx";
@@ -252,22 +252,22 @@ function BuyAgainSheetContent({
       registerCommitPendingHides,
     });
 
-  const { stickyDueOrder, allDueInitiallyOnList, dueExpanded, expandDue } = useStickyDueOrder(
-    listId,
-    list,
-    history,
-    now,
-  );
+  const buyAgain = useBuyAgainFor(listId, now);
+  const {
+    stickyRunningLowOrder,
+    allRunningLowInitiallyOnList,
+    runningLowExpanded,
+    expandRunningLow,
+  } = useStickyRunningLowOrder(listId, buyAgain);
 
   const trimmedQuery = query.trim();
   const parsedQuery = trimmedQuery ? parseEntry(trimmedQuery) : null;
   const parsedDeferred = deferredQuery.trim() ? parseEntry(deferredQuery) : null;
 
-  const catalog = useBuyAgainCatalog(listId, {
+  const catalog = buyAgain.browse({
     query: parsedDeferred?.name ?? "",
     includeOtherLists,
-    now,
-    stickyDueOrder,
+    stickyRunningLowOrder,
   });
 
   // O(1) lookup by itemKey instead of scanning list.items per row
@@ -281,9 +281,8 @@ function BuyAgainSheetContent({
 
   // Items, not names, so it matches the count on the list page
   const openCount = list?.items.filter((item) => !item.checked).length ?? 0;
-  const unaddedDue = catalog.due.filter(
-    (item) => !item.onList && !item.checked && !(itemKey(item.name) in pendingHides),
-  );
+  // What "Add all" adds: the one definition the dock counts too, less rows being hidden right now
+  const toAdd = runningLowToAdd(catalog).filter((item) => !(itemKey(item.name) in pendingHides));
 
   const {
     statusOf,
@@ -292,7 +291,7 @@ function BuyAgainSheetContent({
     undoBar,
     lastUndoBar,
     toggleRow,
-    addAllDue,
+    addAllRunningLow,
     quickAddParsed,
     stepRowQuantity,
   } = useBuyAgainSession({
@@ -300,7 +299,7 @@ function BuyAgainSheetContent({
     listName,
     viewer,
     list,
-    unaddedDue,
+    runningLowToAdd: toAdd,
     undoBarRef,
     onAnnounce: setAnnouncement,
     onFlashHint: flashHint,
@@ -312,8 +311,12 @@ function BuyAgainSheetContent({
 
   // On a visit where everything running low is already waiting, the card has nothing to act on:
   // fold it to one line so the past buys you can still add lead the sheet
-  const dueCollapsed =
-    allDueInitiallyOnList && unaddedDue.length === 0 && !dueExpanded && !editing && !trimmedQuery;
+  const runningLowCollapsed =
+    allRunningLowInitiallyOnList &&
+    toAdd.length === 0 &&
+    !runningLowExpanded &&
+    !editing &&
+    !trimmedQuery;
 
   /** Measure the sheet while no filter is applied (its natural size, in whatever mode it's in) */
   function lockHeightIfNeeded() {
@@ -486,8 +489,8 @@ function BuyAgainSheetContent({
           listName={listName}
           trimmedQuery={trimmedQuery}
           includeOtherLists={includeOtherLists}
-          dueCollapsed={dueCollapsed}
-          unaddedDueCount={unaddedDue.length}
+          runningLowCollapsed={runningLowCollapsed}
+          runningLowToAddCount={toAdd.length}
           bulkUndo={bulkUndo}
           bulkUndoActive={bulkUndoActive}
           addTypedCard={addTypedCard}
@@ -504,8 +507,8 @@ function BuyAgainSheetContent({
           collapsingHideKeys={collapsingHides}
           typedQuantity={parsedQuery?.quantity ?? null}
           onShowAllLists={() => setIncludeOtherLists(true)}
-          onExpandDue={expandDue}
-          onAddAllDue={addAllDue}
+          onExpandRunningLow={expandRunningLow}
+          onAddAllRunningLow={addAllRunningLow}
           onToggleRow={(entry) => toggleRow(entry, parsedQuery?.quantity ?? null)}
           onStepQuantity={stepRowQuantity}
           onHideRow={scheduleHide}

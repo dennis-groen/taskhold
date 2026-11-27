@@ -23,7 +23,7 @@ import type { ShoppingItem } from "../shopping.api.ts";
 import type { ItemChanges } from "../shopping.changes.ts";
 import {
   namesOf,
-  useBuyAgain,
+  useBuyAgainFor,
   useBuyAgainHistoryCount,
   usePendingToggleIds,
   useShoppingList,
@@ -69,7 +69,7 @@ export function ShoppingListPage() {
   const [finished, setFinished] = useState(false);
   const [restockOpen, setRestockOpen] = useState(false);
   const listEntry = useListEntry(listId, user);
-  const suggestions = useBuyAgain(listId, "", listEntry.addedIds);
+  const suggestions = useBuyAgainFor(listId).suggest("", listEntry.addedIds);
   const historyCount = useBuyAgainHistoryCount();
   // Keep the empty-list launchpad open while you tap several items in a row, instead of vanishing
   // after the first tap. Also re-arms if a list empties while open, and resets when switching lists.

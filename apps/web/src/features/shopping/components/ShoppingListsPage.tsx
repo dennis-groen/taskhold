@@ -11,7 +11,7 @@ import { cn } from "cn";
 
 import { useListEntry } from "../list-entry.hooks.ts";
 import type { ShoppingListSummary } from "../shopping.api.ts";
-import { useBuyAgain, useBuyAgainHistoryCount, useManageLists } from "../shopping.hooks.ts";
+import { useBuyAgainFor, useBuyAgainHistoryCount, useManageLists } from "../shopping.hooks.ts";
 import { listsQuery } from "../shopping.queries.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
 import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
@@ -169,7 +169,7 @@ function BuyAgainFor({
   const { user } = householdRoute.useRouteContext();
   const [restockOpen, setRestockOpen] = useState(false);
   const listEntry = useListEntry(target.id, user);
-  const suggestions = useBuyAgain(target.id, "", listEntry.addedIds);
+  const suggestions = useBuyAgainFor(target.id).suggest("", listEntry.addedIds);
 
   const chips = suggestions.map(({ name, quantity }) => ({
     name,
@@ -211,7 +211,7 @@ function BuyAgainFor({
         />
       ) : (
         <p className="text-sm text-muted-foreground">
-          Nothing due for {target.name} right now.{" "}
+          Nothing running low for {target.name} right now.{" "}
           <button
             type="button"
             onClick={() => setRestockOpen(true)}

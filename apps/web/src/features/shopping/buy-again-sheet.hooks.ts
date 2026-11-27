@@ -2,12 +2,12 @@ import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "rea
 
 import type { PersonSummary } from "@/lib/shared-with.ts";
 
-import { browseBuyAgain, type BuyAgainCatalogItem } from "./buy-again.ts";
+import type { BuyAgainCatalogItem, BuyAgainFor } from "./buy-again.ts";
 import { itemKey, type Entry } from "./item-entry.ts";
 import { stepQuantity } from "./item-quantity.ts";
 import type { Outcome } from "./list-entry.ts";
 import { useListEntry } from "./list-entry.hooks.ts";
-import type { BoughtItem, ShoppingItem, ShoppingList } from "./shopping.api.ts";
+import type { ShoppingItem, ShoppingList } from "./shopping.api.ts";
 import { useEditItem } from "./shopping.hooks.ts";
 
 /** How long an inline "Hidden · Undo" row stays before committing forgetHistory */
@@ -199,49 +199,36 @@ export function usePendingHides({
  * Freezes which items belong in "Running low" once the list and history are loaded, so tapping
  * an item never moves it or its paired items between "Running low" and the aisle cards mid-session.
  */
-export function useStickyDueOrder(
-  listId: string,
-  list: ShoppingList | undefined,
-  history: BoughtItem[],
-  now: Temporal.Instant,
-) {
-  const [stickyDue, setStickyDue] = useState<{
+export function useStickyRunningLowOrder(listId: string, buyAgain: BuyAgainFor) {
+  const [stickyRunningLow, setStickyRunningLow] = useState<{
     listId: string;
     order: string[];
     /** Everything running low was already on the list when the sheet opened */
     allOnList: boolean;
   } | null>(null);
-  const [dueExpanded, setDueExpanded] = useState(false);
+  const [runningLowExpanded, setRunningLowExpanded] = useState(false);
 
-  if (list !== undefined && history.length > 0 && stickyDue?.listId !== listId) {
-    const initialOpen = list.items.filter((item) => !item.checked).map((item) => item.name);
-    const initialChecked = list.items.filter((item) => item.checked).map((item) => item.name);
-    const initial = browseBuyAgain(history, {
-      now,
-      listId,
-      onList: initialOpen,
-      inBasket: initialOpen,
-      checkedOnList: initialChecked,
-    });
+  if (buyAgain.loaded && stickyRunningLow?.listId !== listId) {
+    const initial = buyAgain.browse();
     // What's still to add leads; rows already on the list go last (and stay put after that)
     const order = [
-      ...initial.due.filter((item) => !item.onList),
-      ...initial.due.filter((item) => item.onList),
+      ...initial.runningLow.filter((item) => !item.onList),
+      ...initial.runningLow.filter((item) => item.onList),
     ].map((item) => itemKey(item.name));
-    setStickyDue({
+    setStickyRunningLow({
       listId,
       order,
-      allOnList: initial.due.length > 0 && initial.due.every((item) => item.onList),
+      allOnList: initial.runningLow.length > 0 && initial.runningLow.every((item) => item.onList),
     });
-    setDueExpanded(false);
+    setRunningLowExpanded(false);
   }
 
-  const matched = stickyDue?.listId === listId ? stickyDue : null;
+  const matched = stickyRunningLow?.listId === listId ? stickyRunningLow : null;
   return {
-    stickyDueOrder: matched?.order,
-    allDueInitiallyOnList: matched?.allOnList ?? false,
-    dueExpanded,
-    expandDue: () => setDueExpanded(true),
+    stickyRunningLowOrder: matched?.order,
+    allRunningLowInitiallyOnList: matched?.allOnList ?? false,
+    runningLowExpanded,
+    expandRunningLow: () => setRunningLowExpanded(true),
   };
 }
 
@@ -276,7 +263,7 @@ export function useBuyAgainSession({
   listName,
   viewer,
   list,
-  unaddedDue,
+  runningLowToAdd,
   undoBarRef,
   onAnnounce,
   onFlashHint,
@@ -289,7 +276,7 @@ export function useBuyAgainSession({
   listName: string;
   viewer: PersonSummary;
   list: ShoppingList | undefined;
-  unaddedDue: readonly BuyAgainCatalogItem[];
+  runningLowToAdd: readonly BuyAgainCatalogItem[];
   undoBarRef: RefObject<HTMLDivElement | null>;
   onAnnounce: (message: string) => void;
   onFlashHint: (key: string, name: string) => void;
@@ -299,7 +286,7 @@ export function useBuyAgainSession({
   rescueFocusFrom: (element: Element | null | undefined) => void;
   rescueLostFocus: () => void;
 }) {
-  // In-sheet undo banner for bulk "Add N due" (stays inside focus trap, never collides with toasts)
+  // In-sheet undo banner for bulk "Add all N" (stays inside focus trap, never collides with toasts)
   const [bulkUndo, setBulkUndo] = useState<BulkUndo | null>(null);
   const bulkTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // After adding something new from the filter, which has no row to show it: "Added x · Undo"
@@ -318,8 +305,8 @@ export function useBuyAgainSession({
     [],
   );
 
-  // Once undone items are back, "Add N due" stands on its own again
-  if (bulkUndo?.undone && unaddedDue.length >= 2) {
+  // Once undone items are back, "Add all N" stands on its own again
+  if (bulkUndo?.undone && runningLowToAdd.length >= 2) {
     setBulkUndo(null);
   }
   const bulkUndoActive = bulkUndo !== null && !bulkUndo.undone;
@@ -375,25 +362,25 @@ export function useBuyAgainSession({
     report(outcome);
   }
 
-  function addAllDue() {
-    if (!list || unaddedDue.length === 0) return;
-    const all = entry.putAll(unaddedDue);
+  function addAllRunningLow() {
+    if (!list || runningLowToAdd.length === 0) return;
+    const all = entry.putAll(runningLowToAdd);
     if (all.count === 0) return;
     onPut(all.outcomes);
 
     clearTimeout(bulkTimerRef.current);
-    // The "Add N due" button turns into Undo where it is, so focus and thumb stay put
+    // The "Add all N" button turns into Undo where it is, so focus and thumb stay put
     setBulkUndo({
       count: all.count,
       undo: () => {
         const taken = all.undo();
         onAnnounce(`Took ${taken} back off ${listName}`);
-        // The items come back a moment later; until then the button stays, showing "Add N due",
+        // The items come back a moment later; until then the button stays, showing "Add all N",
         // so it never unmounts under the focus that pressed it
         clearTimeout(bulkTimerRef.current);
         setBulkUndo((prev) => prev && { ...prev, undone: true });
         // Fallback if they never come back (e.g. a housemate added them meanwhile); never
-        // clears a newer "Add N due" press
+        // clears a newer "Add all N" press
         bulkTimerRef.current = setTimeout(() => {
           setBulkUndo((prev) => (prev?.undone ? null : prev));
           rescueLostFocus();
@@ -439,7 +426,7 @@ export function useBuyAgainSession({
     undoBar,
     lastUndoBar,
     toggleRow,
-    addAllDue,
+    addAllRunningLow,
     quickAddParsed,
     stepRowQuantity,
   };
