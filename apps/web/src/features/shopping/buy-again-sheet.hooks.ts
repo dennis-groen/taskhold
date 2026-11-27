@@ -3,16 +3,12 @@ import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "rea
 import type { PersonSummary } from "@/lib/shared-with.ts";
 
 import { browseBuyAgain, type BuyAgainCatalogItem } from "./buy-again.ts";
-import { findOnList, itemKey, type Entry } from "./item-entry.ts";
+import { itemKey, type Entry } from "./item-entry.ts";
 import { stepQuantity } from "./item-quantity.ts";
+import type { Outcome } from "./list-entry.ts";
+import { useListEntry } from "./list-entry.hooks.ts";
 import type { BoughtItem, ShoppingItem, ShoppingList } from "./shopping.api.ts";
-import {
-  useAddItem,
-  useBuyAgainState,
-  useEditItem,
-  useToggleItem,
-  useUndoAddItem,
-} from "./shopping.hooks.ts";
+import { useEditItem } from "./shopping.hooks.ts";
 
 /** How long an inline "Hidden · Undo" row stays before committing forgetHistory */
 const HIDE_UNDO_MS = 5_000;
@@ -249,10 +245,31 @@ export function useStickyDueOrder(
   };
 }
 
+/** What the sheet says out loud after putting something on the list, or taking it back */
+function said(outcome: Outcome, listName: string): string | null {
+  switch (outcome.kind) {
+    case "added":
+      return `Added ${outcome.quantity ? `${outcome.quantity} ` : ""}${outcome.name} to ${listName}`;
+    case "unticked":
+      return `${outcome.item.name} is back on ${listName}`;
+    case "amount-set":
+      return `${outcome.item.name} set to ${outcome.amount}`;
+    case "already-there":
+      return `${outcome.item.name} is already on ${listName}`;
+    case "taken-off":
+      return `Took ${outcome.name} off ${listName}`;
+    case "ticked-again":
+      return `${outcome.item.name} ticked off again`;
+    default:
+      return null;
+  }
+}
+
 /**
  * Session actions inside the Buy again sheet: toggling past buys on/off the list, stepping
- * quantities, bulk-adding all "Running low" items with in-place Undo, and quick-adding a typed
- * entry with a transient Undo bar.
+ * quantities, bulk-adding everything running low with in-place Undo, and quick-adding a typed
+ * entry with a transient Undo bar. What a tap means is list-entry.ts's; this decides what the
+ * sheet shows and says about it.
  */
 export function useBuyAgainSession({
   listId,
@@ -264,6 +281,7 @@ export function useBuyAgainSession({
   onAnnounce,
   onFlashHint,
   onClearQuery,
+  onPut,
   rescueFocusFrom,
   rescueLostFocus,
 }: {
@@ -276,13 +294,11 @@ export function useBuyAgainSession({
   onAnnounce: (message: string) => void;
   onFlashHint: (key: string, name: string) => void;
   onClearQuery: () => void;
+  /** What this session put on the list, so closing the sheet can offer to take it all back */
+  onPut: (outcomes: readonly Outcome[]) => void;
   rescueFocusFrom: (element: Element | null | undefined) => void;
   rescueLostFocus: () => void;
 }) {
-  // Track items unticked during this session (with original checker) so a second tap re-ticks cleanly
-  const [untickedByKey, setUntickedByKey] = useState<
-    Record<string, { id: string; checkedBy: PersonSummary | null }>
-  >({});
   // In-sheet undo banner for bulk "Add N due" (stays inside focus trap, never collides with toasts)
   const [bulkUndo, setBulkUndo] = useState<BulkUndo | null>(null);
   const bulkTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -291,11 +307,8 @@ export function useBuyAgainSession({
   const [lastUndoBar, setLastUndoBar] = useState<UndoBar | null>(null);
   const undoBarTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const add = useAddItem(viewer);
-  const undoAdd = useUndoAddItem();
+  const entry = useListEntry(listId, viewer);
   const edit = useEditItem(listId);
-  const toggle = useToggleItem(listId, viewer);
-  const { addedIdFor, markAdded, clearAdded, pinnedIds } = useBuyAgainState(listId);
 
   useEffect(
     () => () => {
@@ -332,103 +345,49 @@ export function useBuyAgainSession({
     setBulkUndo(null);
   }
 
-  function toggleRow(entry: BuyAgainCatalogItem, overrideQuantity?: string | null) {
+  /** Says what happened, and passes on what can be taken back when the sheet closes */
+  function report(outcome: Outcome) {
+    const message = said(outcome, listName);
+    if (message) onAnnounce(message);
+    onPut([outcome]);
+  }
+
+  function toggleRow(row: BuyAgainCatalogItem, typedQuantity?: string | null) {
     if (!list) return;
     dismissBulkUndo();
-    const key = itemKey(entry.name);
-    const existing = findOnList(list.items, entry.name);
-    if (existing) {
-      if (existing.checked) {
-        toggle(existing.id, false);
-        if (overrideQuantity && overrideQuantity !== existing.quantity) {
-          edit(existing.id, { quantity: overrideQuantity });
-        }
-        setUntickedByKey((prev) => ({
-          ...prev,
-          [key]: { id: existing.id, checkedBy: existing.checkedBy },
-        }));
-        onAnnounce(`${existing.name} is back on ${listName}`);
-      } else if (untickedByKey[key]?.id === existing.id) {
-        // Second tap on an item unticked in this session ticks it back off with its original ticker
-        const original = untickedByKey[key];
-        toggle(existing.id, true, original.checkedBy ?? viewer);
-        setUntickedByKey((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
-        onAnnounce(`${existing.name} ticked off again`);
-      } else if (overrideQuantity) {
-        // A typed amount ("3 milk") always means "make it 3", never "take it off"
-        if (overrideQuantity !== existing.quantity) {
-          edit(existing.id, { quantity: overrideQuantity });
-          onAnnounce(`${existing.name} set to ${overrideQuantity}`);
-        } else {
-          onFlashHint(key, existing.name);
-        }
-      } else if (addedIdFor(entry.name) === existing.id) {
-        // Added in this session: tapping again takes it back off
-        clearAdded(entry.name);
-        undoAdd(listId, existing.id);
-        onAnnounce(`Took ${existing.name} off ${listName}`);
-      } else {
-        // Already on the list before this sheet opened (possibly a housemate's): never delete on stray tap
-        onFlashHint(key, existing.name);
-      }
+    const was = entry.status(row.name);
+    // A second tap takes back what this session did; a typed amount ("3 milk") always means
+    // "make it 3", never "take it off"
+    const outcome =
+      was === "unticked" || (was === "added" && !typedQuantity)
+        ? entry.takeBack(row.name)
+        : entry.put(
+            { name: row.name, quantity: typedQuantity ?? null },
+            { onClash: "settle", usualQuantity: row.quantity },
+          );
+    if (!outcome) return;
+    if (outcome.kind === "already-there") {
+      // Already on the list before this sheet opened (possibly a housemate's): never delete on a
+      // stray tap
+      onFlashHint(itemKey(row.name), outcome.item.name);
       return;
     }
-    const quantity = overrideQuantity ?? entry.quantity;
-    const id = add(listId, entry.name, quantity);
-    markAdded(entry.name, id);
-    onAnnounce(`Added ${quantity ? `${quantity} ` : ""}${entry.name} to ${listName}`);
+    report(outcome);
   }
 
   function addAllDue() {
     if (!list || unaddedDue.length === 0) return;
-    const added: { name: string; id: string }[] = [];
-    const unticked: { key: string; id: string; checkedBy: PersonSummary | null }[] = [];
-    for (const entry of unaddedDue) {
-      const existing = findOnList(list.items, entry.name);
-      if (existing) {
-        if (existing.checked) {
-          toggle(existing.id, false);
-          unticked.push({
-            key: itemKey(entry.name),
-            id: existing.id,
-            checkedBy: existing.checkedBy,
-          });
-        }
-      } else {
-        const id = add(listId, entry.name, entry.quantity);
-        markAdded(entry.name, id);
-        added.push({ name: entry.name, id });
-      }
-    }
-    if (unticked.length > 0) {
-      setUntickedByKey((prev) => {
-        const next = { ...prev };
-        for (const item of unticked) {
-          next[item.key] = { id: item.id, checkedBy: item.checkedBy };
-        }
-        return next;
-      });
-    }
-    const count = added.length + unticked.length;
-    if (count === 0) return;
+    const all = entry.putAll(unaddedDue);
+    if (all.count === 0) return;
+    onPut(all.outcomes);
 
     clearTimeout(bulkTimerRef.current);
     // The "Add N due" button turns into Undo where it is, so focus and thumb stay put
     setBulkUndo({
-      count,
+      count: all.count,
       undo: () => {
-        for (const item of added) {
-          clearAdded(item.name);
-          undoAdd(listId, item.id);
-        }
-        for (const item of unticked) {
-          toggle(item.id, true, item.checkedBy ?? viewer);
-        }
-        onAnnounce(`Took ${count} back off ${listName}`);
+        const taken = all.undo();
+        onAnnounce(`Took ${taken} back off ${listName}`);
         // The items come back a moment later; until then the button stays, showing "Add N due",
         // so it never unmounts under the focus that pressed it
         clearTimeout(bulkTimerRef.current);
@@ -441,7 +400,7 @@ export function useBuyAgainSession({
         }, 1_000);
       },
     });
-    onAnnounce(`Added ${count} to ${listName}. Press the same button again to undo`);
+    onAnnounce(`Added ${all.count} to ${listName}. Press the same button again to undo`);
     bulkTimerRef.current = setTimeout(() => {
       setBulkUndo(null);
       // If nothing's left to add, the button goes with it
@@ -451,43 +410,19 @@ export function useBuyAgainSession({
 
   function quickAddParsed(parsedQuery: Entry | null) {
     if (!list || !parsedQuery?.name) return;
-    const existing = findOnList(list.items, parsedQuery.name);
-    if (existing) {
-      if (existing.checked) {
-        toggle(existing.id, false);
-        if (parsedQuery.quantity && parsedQuery.quantity !== existing.quantity) {
-          edit(existing.id, { quantity: parsedQuery.quantity });
-        }
-        const existingKey = itemKey(existing.name);
-        setUntickedByKey((prev) => ({
-          ...prev,
-          [existingKey]: { id: existing.id, checkedBy: existing.checkedBy },
-        }));
-        onAnnounce(`${existing.name} is back on ${listName}`);
-      } else if (parsedQuery.quantity && parsedQuery.quantity !== existing.quantity) {
-        edit(existing.id, { quantity: parsedQuery.quantity });
-        onAnnounce(`${existing.name} set to ${parsedQuery.quantity}`);
-      } else {
-        onAnnounce(`${existing.name} is already on ${listName}`);
-      }
-      onClearQuery();
-      return;
+    const outcome = entry.put(parsedQuery, { onClash: "settle" });
+    report(outcome);
+    if (outcome.kind === "added") {
+      // A new item has no row here yet, so say so where you can see it, with a way back
+      showUndoBar({
+        message: said(outcome, listName) ?? "",
+        undo: () => {
+          entry.undo([outcome]);
+          onAnnounce(`Took ${outcome.name} off ${listName}`);
+          hideUndoBar();
+        },
+      });
     }
-    const { name, quantity } = parsedQuery;
-    const id = add(listId, name, quantity);
-    markAdded(name, id);
-    const message = `Added ${quantity ? `${quantity} ` : ""}${name} to ${listName}`;
-    onAnnounce(message);
-    // A new item has no row here yet, so say so where you can see it, with a way back
-    showUndoBar({
-      message,
-      undo: () => {
-        clearAdded(name);
-        undoAdd(listId, id);
-        onAnnounce(`Took ${name} off ${listName}`);
-        hideUndoBar();
-      },
-    });
     onClearQuery();
   }
 
@@ -498,9 +433,7 @@ export function useBuyAgainSession({
   }
 
   return {
-    addedIds: pinnedIds,
-    addedIdFor,
-    untickedByKey,
+    statusOf: entry.status,
     bulkUndo,
     bulkUndoActive,
     undoBar,

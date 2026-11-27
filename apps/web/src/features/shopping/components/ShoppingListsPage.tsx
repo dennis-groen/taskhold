@@ -6,7 +6,6 @@ import { CaretRightIcon, PlusIcon } from "@/components/icons.ts";
 import { AreaHeader, Count, Meter } from "@/components/layout/AreaHeader.tsx";
 import { SharedWithLine } from "@/components/SharedWithLine.tsx";
 import { Button } from "@/components/ui/button";
-import { offerUndo } from "@/lib/feedback.ts";
 import type { Housemate } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
@@ -226,11 +225,6 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
         listId={target.id}
         listName={target.name}
         viewer={user}
-        onSessionClose={(addedIds) => {
-          offerUndo(`Added ${addedIds.length} to ${target.name}`, () => {
-            for (const id of addedIds) undoAdd(target.id, id);
-          });
-        }}
       />
     </section>
   );

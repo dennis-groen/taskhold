@@ -68,8 +68,7 @@ export function BuyAgainCatalog({
   now,
   viewerId,
   openByKey,
-  addedIdFor,
-  untickedIdsByKey,
+  statusOf,
   hintedKey,
   freshKey,
   enterKey,
@@ -99,8 +98,8 @@ export function BuyAgainCatalog({
   now: Temporal.Instant;
   viewerId: string;
   openByKey: ReadonlyMap<string, ShoppingItem>;
-  addedIdFor: (name: string) => string | undefined;
-  untickedIdsByKey: Record<string, { id: string }>;
+  /** Whether this visit added or unticked it (see list-entry.ts) */
+  statusOf: (name: string) => "added" | "unticked" | null;
   hintedKey: string | null;
   freshKey: string | null;
   enterKey: string | null;
@@ -178,8 +177,8 @@ export function BuyAgainCatalog({
         now={now}
         viewerId={viewerId}
         listItem={listItem}
-        addedHere={listItem !== undefined && addedIdFor(entry.name) === listItem.id}
-        untickedHere={listItem !== undefined && untickedIdsByKey[key]?.id === listItem.id}
+        addedHere={listItem !== undefined && statusOf(entry.name) === "added"}
+        untickedHere={listItem !== undefined && statusOf(entry.name) === "unticked"}
         hinted={hintedKey === key}
         fresh={freshKey === key}
         enterTarget={enterKey === key}

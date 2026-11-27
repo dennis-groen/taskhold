@@ -14,6 +14,7 @@ import { ClockCounterClockwiseIcon } from "@/components/icons.ts";
 import { SheetContent, SheetEyebrow } from "@/components/layout/Sheet.tsx";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
+import { offerUndo } from "@/lib/feedback.ts";
 import type { PersonSummary } from "@/lib/shared-with.ts";
 import { useKeyboardOffset } from "@/lib/use-keyboard-offset.ts";
 import { cn } from "cn";
@@ -27,6 +28,8 @@ import {
   useTimedValue,
 } from "../buy-again-sheet.hooks.ts";
 import { findOnList, itemKey, parseEntry } from "../item-entry.ts";
+import type { Outcome } from "../list-entry.ts";
+import { useListEntry } from "../list-entry.hooks.ts";
 import type { BoughtItem, ShoppingItem } from "../shopping.api.ts";
 import { useBuyAgainCatalog, useForgetBuyAgain } from "../shopping.hooks.ts";
 import { historyQuery, listQuery } from "../shopping.queries.ts";
@@ -51,19 +54,18 @@ export function BuyAgainSheet({
   listId,
   listName,
   viewer,
-  onSessionClose,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   listId: string;
   listName: string;
   viewer: PersonSummary;
-  /** Called on close with the items added during this sheet session */
-  onSessionClose?: (addedIds: readonly string[]) => void;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const addedIdsRef = useRef<readonly string[]>([]);
+  const entry = useListEntry(listId, viewer);
+  // What this opening of the sheet put on the list, for one Undo when it closes
+  const putRef = useRef<Outcome[]>([]);
   const commitPendingHidesRef = useRef<() => void>(() => {});
   // Keep content mounted until the drawer's exit animation finishes, and bump sessionId on each open
   const [session, setSession] = useState({ mounted: open, id: open ? 1 : 0, wasOpen: open });
@@ -77,8 +79,8 @@ export function BuyAgainSheet({
 
   // Stable identities, so the content's registration effect runs once per session. If it re-ran,
   // its cleanup would commit pending hides and cut their Undo short.
-  const handleAddedChange = useCallback((ids: ReadonlySet<string>) => {
-    addedIdsRef.current = [...ids];
+  const handlePut = useCallback((outcomes: readonly Outcome[]) => {
+    putRef.current.push(...outcomes);
   }, []);
   const registerCommitPendingHides = useCallback((fn: () => void) => {
     commitPendingHidesRef.current = fn;
@@ -90,6 +92,21 @@ export function BuyAgainSheet({
         "--drawer-content-max-height": `${keyboard.available}px`,
       }
     : undefined;
+
+  /** Closing the sheet hides what it did, so offer to take back what's still there */
+  function offerSessionUndo() {
+    const put = putRef.current;
+    putRef.current = [];
+    const still = put.filter((outcome) =>
+      outcome.kind === "added"
+        ? entry.status(outcome.name) === "added"
+        : outcome.kind === "unticked" && entry.status(outcome.item.name) === "unticked",
+    );
+    if (still.length === 0) return;
+    offerUndo(`Added ${still.length} to ${listName}`, () => {
+      entry.undo(still);
+    });
+  }
 
   return (
     <Drawer
@@ -106,10 +123,7 @@ export function BuyAgainSheet({
         }
         if (!nextOpen) {
           commitPendingHidesRef.current();
-          if (addedIdsRef.current.length > 0) {
-            onSessionClose?.(addedIdsRef.current);
-            addedIdsRef.current = [];
-          }
+          offerSessionUndo();
         }
         onOpenChange(nextOpen);
       }}
@@ -134,7 +148,7 @@ export function BuyAgainSheet({
             keyboardUp={keyboard !== null}
             bodyRef={bodyRef}
             searchRef={searchRef}
-            onAddedChange={handleAddedChange}
+            onPut={handlePut}
             registerCommitPendingHides={registerCommitPendingHides}
           />
         )}
@@ -150,7 +164,7 @@ function BuyAgainSheetContent({
   keyboardUp,
   bodyRef,
   searchRef,
-  onAddedChange,
+  onPut,
   registerCommitPendingHides,
 }: {
   listId: string;
@@ -159,7 +173,7 @@ function BuyAgainSheetContent({
   keyboardUp: boolean;
   bodyRef: RefObject<HTMLDivElement | null>;
   searchRef: RefObject<HTMLInputElement | null>;
-  onAddedChange: (ids: ReadonlySet<string>) => void;
+  onPut: (outcomes: readonly Outcome[]) => void;
   registerCommitPendingHides: (fn: () => void) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -272,9 +286,7 @@ function BuyAgainSheetContent({
   );
 
   const {
-    addedIds,
-    addedIdFor,
-    untickedByKey,
+    statusOf,
     bulkUndo,
     bulkUndoActive,
     undoBar,
@@ -293,13 +305,10 @@ function BuyAgainSheetContent({
     onAnnounce: setAnnouncement,
     onFlashHint: flashHint,
     onClearQuery: () => setQuery(""),
+    onPut,
     rescueFocusFrom,
     rescueLostFocus,
   });
-
-  useEffect(() => {
-    onAddedChange(addedIds);
-  }, [addedIds, onAddedChange]);
 
   // On a visit where everything running low is already waiting, the card has nothing to act on:
   // fold it to one line so the past buys you can still add lead the sheet
@@ -486,8 +495,7 @@ function BuyAgainSheetContent({
           now={now}
           viewerId={viewer.id}
           openByKey={openByKey}
-          addedIdFor={addedIdFor}
-          untickedIdsByKey={untickedByKey}
+          statusOf={statusOf}
           hintedKey={hinted.value}
           freshKey={fresh.value}
           enterKey={enterKey}

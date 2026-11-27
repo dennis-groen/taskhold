@@ -24,6 +24,28 @@ _Avoid_: user, housemate
 A household a visitor gets without signing in, with made-up housemates, deleted after a day. Sealed: nobody joins it and its visitor can't leave it.
 _Avoid_: sandbox, guest mode
 
+### Shopping
+
+**Item**:
+One thing to buy on a shopping list, with an amount if someone gave one. It's always either waiting or ticked.
+_Avoid_: row, product
+
+**Waiting**:
+An item still to be bought.
+_Avoid_: open, unchecked, pending
+
+**Ticked**:
+An item someone has put in the basket. The list remembers who ticked it.
+_Avoid_: checked, bought, done
+
+**Buy again**:
+What the household has bought before, offered for putting back on a list.
+_Avoid_: restock, history, suggestions
+
+**Running low**:
+A Buy again item whose usual gap between buys has passed, so it's probably needed again.
+_Avoid_: due (that's a chore's word)
+
 ### Chores
 
 **Chore**:
