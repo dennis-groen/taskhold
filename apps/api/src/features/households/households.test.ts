@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { anonymous, errorCode, householdWith, json, signUp } from "../../../test/harness.ts";
+import { stopFeed, watch, type FeedEvent } from "../live/live-changes.ts";
+import { householdWrites } from "./households.service.ts";
+
+afterAll(() => stopFeed());
 
 describe("creating and joining", () => {
   it("makes the creator the owner, and anyone with the code a member", async () => {
@@ -239,5 +243,99 @@ describe("managing members", () => {
       param: { code: oldCode },
     });
     expect(await errorCode(withOld, 404)).toBe("INVITE_NOT_FOUND");
+  });
+});
+
+/** Collects the live changes announced to one household from now on. Other tests announce too. */
+async function heard(householdId: string) {
+  const events: FeedEvent[] = [];
+  const stop = await watch((event) => events.push(event));
+  return {
+    changes: async () => {
+      // Notifications arrive on another connection, a moment after the commit
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      stop();
+      return events.flatMap((event) =>
+        event.type === "change" &&
+        "householdId" in event.change &&
+        event.change.householdId === householdId
+          ? [event.change]
+          : [],
+      );
+    },
+  };
+}
+
+describe("household writes", () => {
+  const write = householdWrites("chores");
+
+  it("tells the household when the work changed something, once it commits", async () => {
+    const owner = await signUp();
+    const { id: householdId } = await householdWith(owner);
+    const listening = await heard(householdId);
+
+    const result = await write(owner.id, async (scope) => {
+      expect(scope.householdId).toBe(householdId);
+      expect(scope.role).toBe("owner");
+      scope.changed();
+      scope.changed();
+      return "done";
+    });
+
+    expect(result).toBe("done");
+    expect(await listening.changes()).toEqual([{ householdId, topic: "chores" }]);
+  });
+
+  it("tells nobody when nothing changed, or when the work fails", async () => {
+    const owner = await signUp();
+    const { id: householdId } = await householdWith(owner);
+    const listening = await heard(householdId);
+
+    await write(owner.id, async () => {});
+    await expect(
+      write(owner.id, async (scope) => {
+        scope.changed();
+        throw new Error("Rolled back");
+      }),
+    ).rejects.toThrow("Rolled back");
+
+    expect(await listening.changes()).toEqual([]);
+  });
+
+  it("refuses someone who isn't a member", async () => {
+    const loner = await signUp();
+    await expect(write(loner.id, async () => {})).rejects.toMatchObject({
+      code: "NOT_IN_HOUSEHOLD",
+    });
+  });
+
+  it("makes a removal wait for a write in progress, and refuses the removed member after", async () => {
+    const owner = await signUp();
+    const member = await signUp();
+    await householdWith(owner, member);
+
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const writing = write(member.id, () => held);
+    // Let the write take hold of the household before the removal starts
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    let removed = false;
+    const removing = owner.api.households.current.members[":userId"]
+      .$delete({ param: { userId: member.id } })
+      .then((response) => {
+        removed = true;
+        return response;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(removed).toBe(false);
+
+    release?.();
+    await writing;
+    expect((await removing).status).toBe(200);
+
+    await expect(write(member.id, async () => {})).rejects.toMatchObject({
+      code: "NOT_IN_HOUSEHOLD",
+    });
   });
 });

@@ -3,10 +3,10 @@
 //
 // What marking done, skipping and putting off do to a due date is chore-schedule.ts's, shared with
 // the web app. This file decides who may do it, locks, and writes.
-import { transaction, type Executor } from "../../db/db.ts";
-import { announce } from "../live/live-changes.ts";
+import type { Executor } from "../../db/db.ts";
 import { annotate } from "../../lib/wide-event.ts";
 import * as householdsService from "../households/households.service.ts";
+import type { HouseholdScope } from "../households/households.service.ts";
 import { couldBeToday } from "./client-today.ts";
 import { isDone, markDone, skip, type ChoreSchedule } from "./chore-schedule.ts";
 import * as choresRepo from "./chores.repo.ts";
@@ -35,6 +35,9 @@ const MAX_CHORES = 200;
 /** How many past completions a chore's detail shows */
 const HISTORY_LENGTH = 10;
 
+/** Every write to a household's chores goes through here (see householdWrites) */
+export const writeChores = householdsService.householdWrites("chores");
+
 export async function getChores(userId: string): Promise<Chore[]> {
   const household = await householdsService.getMembershipOf(userId);
   const records = await choresRepo.findChores(household.id);
@@ -49,39 +52,35 @@ export async function getChore(userId: string, choreId: string): Promise<ChoreDe
   return loadDetail(household.id, choreId);
 }
 
-/**
- * Pass `executor` when creating the chore as part of another feature's transaction (e.g. moving a
- * to-do): every query then runs on it, instead of waiting on the pool for a second connection
- * while the transaction holds one.
- */
-export async function createChore(
-  userId: string,
+export function createChore(userId: string, input: CreateChoreInput): Promise<ChoreDetail> {
+  return writeChores(userId, (scope) => createChoreIn(scope, input));
+}
+
+/** Creates a chore inside a write another feature opened with writeChores (e.g. moving a to-do) */
+export async function createChoreIn(
+  scope: HouseholdScope,
   input: CreateChoreInput,
-  executor?: Executor,
 ): Promise<ChoreDetail> {
-  const household = await householdsService.getMembershipOf(userId, executor);
+  const { householdId, tx } = scope;
   const id = input.id ?? crypto.randomUUID();
-  const ref = { householdId: household.id, choreId: id };
+  const ref = { householdId, choreId: id };
 
   // A retry of an add that already got in answers with that chore, whatever has changed since
-  if (input.id && (await choresRepo.findChore(ref, executor))) {
+  if (input.id && (await choresRepo.findChore(ref, tx))) {
     annotate("chores", { chore_id: id, retried: true });
-    return loadDetail(household.id, id, executor);
+    return loadDetail(householdId, id, tx);
   }
 
-  await checkChore(household.id, input, executor);
-  if ((await choresRepo.countChores(household.id, executor)) >= MAX_CHORES) {
+  await checkChore(householdId, input, tx);
+  if ((await choresRepo.countChores(householdId, tx)) >= MAX_CHORES) {
     throw choreLimitReached();
   }
-  const inserted = await choresRepo.insertChore(
-    { id, householdId: household.id, ...toValues(input) },
-    executor,
-  );
+  const inserted = await choresRepo.insertChore({ id, householdId, ...toValues(input) }, tx);
   // Not inserted: a retry that raced its twin, or an id that belongs to another household
-  if (!inserted && !(await choresRepo.findChore(ref, executor))) throw choreIdTaken();
+  if (!inserted && !(await choresRepo.findChore(ref, tx))) throw choreIdTaken();
   annotate("chores", { chore_id: id, repeats: input.repeat !== null });
-  if (inserted) await changed(household.id, executor);
-  return loadDetail(household.id, id, executor);
+  if (inserted) scope.changed();
+  return loadDetail(householdId, id, tx);
 }
 
 export async function updateChore(
@@ -90,10 +89,9 @@ export async function updateChore(
   changes: UpdateChoreInput,
 ): Promise<ChoreDetail> {
   annotate("chores", { chore_id: choreId });
-  const household = await householdsService.getMembershipOf(userId);
-  const ref = { householdId: household.id, choreId };
-
-  await transaction(async (tx) => {
+  return writeChores(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const ref = { householdId, choreId };
     // Locked, so the merged result is checked against what's actually there
     const current = await choresRepo.lockChore(ref, tx);
     if (!current) throw choreNotFound();
@@ -108,7 +106,7 @@ export async function updateChore(
       dueOn: changes.dueOn !== undefined ? changes.dueOn : current.dueOn,
       assigneeId: changes.assigneeId ?? null,
     };
-    await checkChore(household.id, merged, tx);
+    await checkChore(householdId, merged, tx);
 
     // A one-off chore is done when the newest entry in its history is a completion. Entries from
     // when it repeated would make it done the moment it stops, so it starts over without them.
@@ -128,17 +126,21 @@ export async function updateChore(
       },
       tx,
     );
+    scope.changed();
+    return loadDetail(householdId, choreId, tx);
   });
-  await changed(household.id);
-  return loadDetail(household.id, choreId);
 }
 
 /** Deleting a chore that's already gone, or isn't the household's, does nothing, like for to-dos */
 export async function deleteChore(userId: string, choreId: string): Promise<void> {
   annotate("chores", { chore_id: choreId });
-  const household = await householdsService.getMembershipOf(userId);
-  const deleted = await choresRepo.deleteChore({ householdId: household.id, choreId });
-  if (deleted) await changed(household.id);
+  await writeChores(userId, async (scope) => {
+    const deleted = await choresRepo.deleteChore(
+      { householdId: scope.householdId, choreId },
+      scope.tx,
+    );
+    if (deleted) scope.changed();
+  });
 }
 
 /**
@@ -153,10 +155,9 @@ export async function completeChore(
 ): Promise<ChoreDetail> {
   annotate("chores", { chore_id: choreId });
   if (!couldBeToday(today)) throw implausibleToday();
-  const household = await householdsService.getMembershipOf(userId);
-  const ref = { householdId: household.id, choreId };
-
-  await transaction(async (tx) => {
+  return writeChores(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const ref = { householdId, choreId };
     const current = await choresRepo.lockChore(ref, tx);
     if (!current) throw choreNotFound();
 
@@ -167,16 +168,16 @@ export async function completeChore(
       repeats: schedule.repeat !== null,
       already_done: done.kind === "unchanged",
     });
-    if (done.kind === "unchanged") return;
+    if (done.kind === "unchanged") return loadDetail(householdId, choreId, tx);
 
     await choresRepo.insertCompletion(
       { choreId, completedById: userId, completedOn: today, previousDueOn: current.dueOn },
       tx,
     );
     if (schedule.repeat) await choresRepo.updateChore(ref, { dueOn: done.dueOn }, tx);
+    scope.changed();
+    return loadDetail(householdId, choreId, tx);
   });
-  await changed(household.id);
-  return loadDetail(household.id, choreId);
 }
 
 /**
@@ -191,17 +192,16 @@ export async function skipChore(
 ): Promise<ChoreDetail> {
   annotate("chores", { chore_id: choreId });
   if (!couldBeToday(today)) throw implausibleToday();
-  const household = await householdsService.getMembershipOf(userId);
-  const ref = { householdId: household.id, choreId };
-
-  await transaction(async (tx) => {
+  return writeChores(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const ref = { householdId, choreId };
     const current = await choresRepo.lockChore(ref, tx);
     if (!current) throw choreNotFound();
     const [latest] = await choresRepo.findCompletions(choreId, 1, tx);
     const skipped = skip(scheduleOf(current, latest ?? null), today);
     if (skipped.kind === "not-repeating") throw notRepeating();
     annotate("chores", { already_skipped: skipped.kind === "unchanged" });
-    if (skipped.kind === "unchanged") return;
+    if (skipped.kind === "unchanged") return loadDetail(householdId, choreId, tx);
 
     await choresRepo.insertCompletion(
       {
@@ -214,9 +214,9 @@ export async function skipChore(
       tx,
     );
     await choresRepo.updateChore(ref, { dueOn: skipped.dueOn }, tx);
+    scope.changed();
+    return loadDetail(householdId, choreId, tx);
   });
-  await changed(household.id);
-  return loadDetail(household.id, choreId);
 }
 
 /**
@@ -224,10 +224,9 @@ export async function skipChore(
  */
 export async function undoLastCompletion(userId: string, choreId: string): Promise<ChoreDetail> {
   annotate("chores", { chore_id: choreId });
-  const household = await householdsService.getMembershipOf(userId);
-  const ref = { householdId: household.id, choreId };
-
-  await transaction(async (tx) => {
+  return writeChores(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const ref = { householdId, choreId };
     const current = await choresRepo.lockChore(ref, tx);
     if (!current) throw choreNotFound();
     const [latest] = await choresRepo.findCompletions(choreId, 1, tx);
@@ -240,16 +239,16 @@ export async function undoLastCompletion(userId: string, choreId: string): Promi
     if (repeats && latest.previousDueOn !== null) {
       await choresRepo.updateChore(ref, { dueOn: latest.previousDueOn }, tx);
     }
+    scope.changed();
+    return loadDetail(householdId, choreId, tx);
   });
-  await changed(household.id);
-  return loadDetail(household.id, choreId);
 }
 
 /** Removes the chores that are done (see isDone). Returns how many went. */
 export async function clearDoneChores(userId: string): Promise<number> {
-  const household = await householdsService.getMembershipOf(userId);
-  const removed = await transaction(async (tx) => {
-    const records = await choresRepo.findChores(household.id, tx);
+  return writeChores(userId, async (scope) => {
+    const { householdId, tx } = scope;
+    const records = await choresRepo.findChores(householdId, tx);
     const latest = await choresRepo.findLatestCompletions(
       records.map((record) => record.id),
       tx,
@@ -257,15 +256,15 @@ export async function clearDoneChores(userId: string): Promise<number> {
     const done = records.filter((record) =>
       isDone(scheduleOf(record, latest.get(record.id) ?? null)),
     );
-    return choresRepo.deleteChores(
-      household.id,
+    const removed = await choresRepo.deleteChores(
+      householdId,
       done.map((record) => record.id),
       tx,
     );
+    annotate("chores", { removed_count: removed });
+    if (removed > 0) scope.changed();
+    return removed;
   });
-  annotate("chores", { removed_count: removed });
-  if (removed > 0) await changed(household.id);
-  return removed;
 }
 
 /**
@@ -371,9 +370,4 @@ function toCompletion(record: choresRepo.CompletionRecord): ChoreCompletion {
     skipped: record.skipped,
     createdAt: record.createdAt,
   };
-}
-
-/** Tells everyone in the household that its chores changed */
-function changed(householdId: string, executor?: Executor) {
-  return announce({ householdId, topic: "chores" }, executor);
 }
