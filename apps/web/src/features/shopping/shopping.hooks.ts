@@ -4,7 +4,6 @@ import { changeFailed, inform } from "@/lib/feedback.ts";
 import { useChange, useWaitingVars } from "@/lib/offline-changes.ts";
 import { firstName, type PersonSummary } from "@/lib/shared-with.ts";
 
-import { itemKey } from "./item-entry.ts";
 import {
   endTrip,
   startTrip,
@@ -138,24 +137,6 @@ export function useManageLists() {
   };
 }
 
-/** Adds an item to any list, optimistically when that list is on screen or cached */
-export function useAddItem(viewer: PersonSummary) {
-  const add = useChange(shoppingChanges.add);
-  return (listId: string, name: string, quantity: string | null) => {
-    const id = crypto.randomUUID();
-    add.run({ listId, id, name, quantity, by: person(viewer) });
-    return id;
-  };
-}
-
-/** Removes an item quietly, without an undo toast, e.g. toggling a Buy again chip back off */
-export function useUndoAddItem() {
-  const remove = useChange(shoppingChanges.remove);
-  return (listId: string, itemId: string) => {
-    remove.run({ listId, itemId });
-  };
-}
-
 /** Changes an item's name or quantity on any list; leave a field out to keep it */
 export function useEditItem(listId: string | undefined) {
   const edit = useChange(shoppingChanges.edit);
@@ -167,65 +148,6 @@ export function useEditItem(listId: string | undefined) {
 /** Item ids whose ticks are saved on this device and still waiting to reach the server */
 export function usePendingToggleIds(): Set<string> {
   return new Set(useWaitingVars(shoppingChanges.toggle).map((vars) => vars.itemId));
-}
-
-/**
- * Tracks idle Buy again chips tapped in this session so they stay in place as "✓ Added" instead
- * of vanishing and shifting neighbouring chips under the thumb. Automatically clears entries if
- * the item is ticked off or removed elsewhere.
- */
-export function useBuyAgainState(listId: string | undefined) {
-  const { data: list } = useQuery({ ...listQuery(listId ?? ""), enabled: listId !== undefined });
-  const pendingAddSignature = useWaitingVars(shoppingChanges.add)
-    .filter((vars) => vars.listId === listId)
-    .map((vars) => vars.id)
-    .toSorted()
-    .join("\0");
-  // Keyed by `${listId}:${itemKey(name)}` so switching target lists on the overview keeps each
-  // list's session taps intact
-  const [picked, setPicked] = useState<Record<string, string>>({});
-
-  const activeByKey = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!listId) return map;
-    const pendingAddIds = new Set(pendingAddSignature ? pendingAddSignature.split("\0") : []);
-    const openIds = new Set(list?.items.filter((item) => !item.checked).map((item) => item.id));
-    const checkedIds = new Set(list?.items.filter((item) => item.checked).map((item) => item.id));
-    const prefix = `${listId}:`;
-    for (const [compoundKey, id] of Object.entries(picked)) {
-      if (!compoundKey.startsWith(prefix)) continue;
-      if (checkedIds.has(id)) continue;
-      if (list !== undefined && !openIds.has(id) && !pendingAddIds.has(id)) continue;
-      map.set(compoundKey.slice(prefix.length), id);
-    }
-    return map;
-  }, [listId, list, picked, pendingAddSignature]);
-
-  const pinnedSignature = [...activeByKey.values()].toSorted().join("\0");
-  const pinnedIds = useMemo(
-    () => new Set(pinnedSignature ? pinnedSignature.split("\0") : []),
-    [pinnedSignature],
-  );
-
-  return {
-    pinnedIds,
-    addedIdFor: (name: string) => activeByKey.get(itemKey(name)),
-    markAdded: (name: string, id: string) => {
-      if (!listId) return;
-      const key = `${listId}:${itemKey(name)}`;
-      setPicked((prev) => ({ ...prev, [key]: id }));
-    },
-    clearAdded: (name: string) => {
-      if (!listId) return;
-      const key = `${listId}:${itemKey(name)}`;
-      setPicked((prev) => {
-        if (!(key in prev)) return prev;
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    },
-  };
 }
 
 /** Removes an item (and its merged spellings) from Buy again history on the server */

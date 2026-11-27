@@ -9,15 +9,9 @@ import { Button } from "@/components/ui/button";
 import type { Housemate } from "@/lib/shared-with.ts";
 import { cn } from "cn";
 
+import { useListEntry } from "../list-entry.hooks.ts";
 import type { ShoppingListSummary } from "../shopping.api.ts";
-import {
-  useAddItem,
-  useBuyAgain,
-  useBuyAgainHistoryCount,
-  useBuyAgainState,
-  useManageLists,
-  useUndoAddItem,
-} from "../shopping.hooks.ts";
+import { useBuyAgain, useBuyAgainHistoryCount, useManageLists } from "../shopping.hooks.ts";
 import { listsQuery } from "../shopping.queries.ts";
 import { BuyAgainChips } from "./BuyAgainChips.tsx";
 import { BuyAgainSheet } from "./BuyAgainSheet.tsx";
@@ -154,22 +148,33 @@ function ListRow({ list, first }: { list: ShoppingListSummary; first: boolean })
  * above them with one tap.
  */
 function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
-  const { user } = householdRoute.useRouteContext();
-  const add = useAddItem(user);
-  const undoAdd = useUndoAddItem();
   const [pickedId, setPickedId] = useState<string | null>(null);
-  const [restockOpen, setRestockOpen] = useState(false);
   const target = lists.find((list) => list.id === pickedId) ?? lists[0];
   const historyCount = useBuyAgainHistoryCount();
-  const { pinnedIds, addedIdFor, markAdded, clearAdded } = useBuyAgainState(target?.id);
-  const suggestions = useBuyAgain(target?.id, "", pinnedIds);
 
   if (!target || historyCount === 0) return null;
+  return <BuyAgainFor target={target} lists={lists} onPick={setPickedId} />;
+}
+
+/** Buy again chips for the list picked above them */
+function BuyAgainFor({
+  target,
+  lists,
+  onPick,
+}: {
+  target: ShoppingListSummary;
+  lists: ShoppingListSummary[];
+  onPick: (listId: string) => void;
+}) {
+  const { user } = householdRoute.useRouteContext();
+  const [restockOpen, setRestockOpen] = useState(false);
+  const listEntry = useListEntry(target.id, user);
+  const suggestions = useBuyAgain(target.id, "", listEntry.addedIds);
 
   const chips = suggestions.map(({ name, quantity }) => ({
     name,
     quantity,
-    added: addedIdFor(name) !== undefined,
+    added: listEntry.status(name) === "added",
   }));
 
   return (
@@ -190,20 +195,17 @@ function BuyAgainSection({ lists }: { lists: ShoppingListSummary[] }) {
             <CaretRightIcon aria-hidden weight="bold" className="size-3" />
           </Button>
         </div>
-        <ListPicker lists={lists} value={target.id} onChange={setPickedId} />
+        <ListPicker lists={lists} value={target.id} onChange={onPick} />
       </div>
       {chips.length > 0 ? (
         <BuyAgainChips
           chips={chips}
           onPick={(name) => {
             const quantity = suggestions.find((item) => item.name === name)?.quantity ?? null;
-            const id = add(target.id, name, quantity);
-            markAdded(name, id);
+            listEntry.put({ name, quantity: null }, { onClash: "settle", usualQuantity: quantity });
           }}
           onUndo={(name) => {
-            const id = addedIdFor(name);
-            clearAdded(name);
-            if (id) undoAdd(target.id, id);
+            listEntry.takeBack(name);
           }}
           className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0"
         />
